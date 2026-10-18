@@ -29,7 +29,8 @@ CREATE TABLE games (
   organizer_contact TEXT NOT NULL DEFAULT '',
   status            TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active','cancelled')),
   created_at        TEXT NOT NULL,
-  updated_at        TEXT NOT NULL
+  updated_at        TEXT NOT NULL,
+  reminder_sent_at  TEXT              -- миграция 0002: когда отправлено напоминание (один раз)
 );
 CREATE INDEX idx_games_starts_at ON games (status, starts_at);
 CREATE INDEX idx_games_organizer ON games (organizer_id);

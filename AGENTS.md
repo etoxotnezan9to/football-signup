@@ -7,11 +7,12 @@
 - Одна платформа: VK Mini App. VK Tunnel отключён платформой, не использовать.
 - Оплата ручная (организатор отмечает «оплачено»). Лимит: не более 5 мест на человека в одной игре (`MAX_SEATS_PER_USER` в `packages/shared`).
 - Очередь FIFO; при нехватке мест запись делится между составом и очередью.
+- Личные уведомления VK только с сервера и только по трём поводам (в состав, отмена или перенос, напоминание): у VK лимит 1 уведомление в час и 3 в сутки на человека. Новые поводы добавляйте с оглядкой на этот лимит, см. `docs/spec.md`, раздел 12.
 - SQLite (`node:sqlite`), один процесс API. Секреты (`VK_APP_SECRET`) только в переменных окружения на сервере, не в репозитории, логах и чатах.
 
 ## Структура и команды
 
-`apps/api`, `apps/web`, `packages/shared`; команды из корня: `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm build`, e2e: `pnpm --filter @football/web test:e2e`.
+`apps/api`, `apps/web`, `packages/shared`; команды из корня: `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm build`, e2e: `pnpm --filter @football/web test:e2e`; нагрузка: `node apps/api/scripts/loadtest.ts` (против API с `AUTH_DEV_BYPASS=1`).
 
 ## Соглашения кода
 
