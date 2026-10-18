@@ -60,6 +60,17 @@ export function defaultStartsAt(now: Date): string {
   return toLocalInput(d.toISOString());
 }
 
+/**
+ * Включены ли у пользователя уведомления приложения: параметр запуска `vk_are_notifications_enabled`
+ * (подписан VK). Вне VK или без параметра возвращает null.
+ */
+export function notificationsEnabledFromSearch(search: string): boolean | null {
+  const v = new URLSearchParams(search).get('vk_are_notifications_enabled');
+  if (v === '1') return true;
+  if (v === '0') return false;
+  return null;
+}
+
 /** Ссылка на игру внутри VK: https://vk.com/app<ID>#/game/<id> */
 export function gameLink(appId: number, gameId: number): string {
   return `https://vk.com/app${appId}#/game/${gameId}`;

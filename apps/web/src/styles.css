@@ -54,6 +54,18 @@
   background: var(--vkui--color_background_warning, #fff3cd);
   color: var(--vkui--color_text_primary);
 }
+.notify-prompt {
+  margin: 8px 12px 0;
+  padding: 12px;
+  border-radius: 10px;
+  background: var(--vkui--color_background_secondary, #f2f3f5);
+}
+.notify-prompt__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
 .info-row {
   display: flex;
   gap: 8px;

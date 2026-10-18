@@ -5,6 +5,7 @@ import {
   formatWhen,
   fromLocalInput,
   gameLink,
+  notificationsEnabledFromSearch,
   parseRoute,
   plural,
   routeToHash,
@@ -87,5 +88,17 @@ describe('defaultStartsAt', () => {
   it('завтра в 21:00 по локальному времени, в том числе на стыке месяцев', () => {
     assert.equal(defaultStartsAt(new Date(2026, 9, 16, 10, 0)), '2026-10-17T21:00');
     assert.equal(defaultStartsAt(new Date(2026, 9, 31, 23, 59)), '2026-11-01T21:00');
+  });
+});
+
+describe('notificationsEnabledFromSearch', () => {
+  it('читает подписанный параметр запуска VK', () => {
+    assert.equal(notificationsEnabledFromSearch('?vk_user_id=1&vk_are_notifications_enabled=1&sign=x'), true);
+    assert.equal(notificationsEnabledFromSearch('vk_are_notifications_enabled=0&sign=x'), false);
+  });
+
+  it('без параметра или с мусором — неизвестно', () => {
+    assert.equal(notificationsEnabledFromSearch(''), null);
+    assert.equal(notificationsEnabledFromSearch('?vk_are_notifications_enabled=yes'), null);
   });
 });

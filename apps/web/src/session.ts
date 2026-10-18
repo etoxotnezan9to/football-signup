@@ -1,4 +1,5 @@
 import bridge from '@vkontakte/vk-bridge';
+import { notificationsEnabledFromSearch } from './format.ts';
 
 export const VK_APP_ID = Number(import.meta.env.VITE_VK_APP_ID ?? 54809461);
 
@@ -8,6 +9,8 @@ export interface Session {
   /** Строка авторизации для WebSocket */
   wsAuth: string;
   mock: boolean;
+  /** Разрешил ли пользователь уведомления приложения; null — неизвестно (вне VK) */
+  notificationsEnabled: boolean | null;
   user: { id: number; firstName: string; lastName: string; photoUrl: string | null };
 }
 
@@ -48,6 +51,7 @@ export async function initSession(): Promise<Session> {
       authHeader: `VK ${launch}`,
       wsAuth: launch,
       mock: false,
+      notificationsEnabled: notificationsEnabledFromSearch(window.location.search),
       user: {
         id: info.id,
         firstName: info.first_name,
@@ -64,6 +68,7 @@ export async function initSession(): Promise<Session> {
     authHeader: `Mock ${enc}`,
     wsAuth: `mock:${enc}`,
     mock: true,
+    notificationsEnabled: null,
     user: { id: mock.id, firstName: mock.firstName, lastName: mock.lastName, photoUrl: null },
   };
 }

@@ -2,6 +2,7 @@ import { Button, PanelHeader } from '@vkontakte/vkui';
 import { Empty } from '../components/Empty.tsx';
 import { GameCard } from '../components/GameCard.tsx';
 import { MockBar } from '../components/MockBar.tsx';
+import { NotificationsPrompt } from '../components/NotificationsPrompt.tsx';
 import { useApp } from '../context.ts';
 import { routeToHash } from '../format.ts';
 import { useGames } from '../hooks.ts';
@@ -25,6 +26,7 @@ export function ListPage() {
         </Button>
       </div>
       <MockBar />
+      <NotificationsPrompt />
       {loading && <Empty loading />}
       {!loading && error && !data && <Empty error={error} onRetry={reload} />}
       {data && data.length === 0 && <Empty>Пока нет предстоящих игр. Создайте первую!</Empty>}
