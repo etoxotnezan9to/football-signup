@@ -43,6 +43,19 @@ jobs:
       - name: Install Playwright browser
         run: pnpm --filter @football/web exec playwright install --with-deps chromium
       - run: ci/run.sh e2e pnpm --filter @football/web test:e2e
+      - name: Load test (200 concurrent signups, WebSocket observers)
+        run: |
+          (cd apps/api && NODE_ENV=development AUTH_DEV_BYPASS=1 VK_APP_ID=54809461 DATABASE_FILE=:memory: \
+            HOST=127.0.0.1 PORT=3200 node src/server.ts > /tmp/api-load.log 2>&1 & echo $! > /tmp/api-load.pid)
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:3200/api/health > /dev/null; then break; fi
+            sleep 1
+          done
+          code=0
+          ci/run.sh loadtest node apps/api/scripts/loadtest.ts --base http://127.0.0.1:3200 --users 200 --observers 10 || code=$?
+          echo "--- API log (tail)"; tail -n 15 /tmp/api-load.log
+          kill "$(cat /tmp/api-load.pid)" 2>/dev/null || true
+          exit "$code"
 
   docker:
     runs-on: ubuntu-latest
