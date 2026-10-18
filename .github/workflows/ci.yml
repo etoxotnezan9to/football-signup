@@ -5,6 +5,9 @@ on:
     branches: ['**']
   pull_request:
 
+permissions:
+  contents: write
+
 jobs:
   check:
     runs-on: ubuntu-latest
@@ -15,12 +18,19 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      # Первый прогон без lockfile: генерируем его и сохраняем артефактом (затем закоммитить и перейти на --frozen-lockfile)
-      - run: pnpm install --no-frozen-lockfile
-      - uses: actions/upload-artifact@v4
-        with:
-          name: pnpm-lock
-          path: pnpm-lock.yaml
+      - name: Install dependencies
+        run: |
+          if [ -f pnpm-lock.yaml ]; then pnpm install --frozen-lockfile; else pnpm install --no-frozen-lockfile; fi
+      - name: Commit lockfile if it is not tracked yet
+        if: github.event_name == 'push' && github.ref_name == 'develop-claude'
+        run: |
+          if ! git ls-files --error-unmatch pnpm-lock.yaml >/dev/null 2>&1; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add pnpm-lock.yaml
+            git commit -m "chore: add pnpm-lock.yaml"
+            git push
+          fi
       - run: ci/run.sh lint pnpm lint
       - run: ci/run.sh typecheck pnpm typecheck
       - run: ci/run.sh test pnpm test
