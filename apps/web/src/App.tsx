@@ -69,7 +69,7 @@ export function App({ session, realtime }: Props) {
   const gameId = route.name === 'game' || route.name === 'edit' ? route.id : 0;
 
   return (
-    <ConfigProvider appearance={appearance}>
+    <ConfigProvider colorScheme={appearance}>
       <AdaptivityProvider>
         <AppRoot>
           <AppContext.Provider value={ctx}>

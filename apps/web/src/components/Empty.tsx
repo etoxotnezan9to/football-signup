@@ -12,7 +12,7 @@ export function Empty({
   onRetry?: () => void;
   children?: string;
 }) {
-  if (loading) return <Spinner size="large" style={{ margin: '24px 0' }} />;
+  if (loading) return <Spinner size="l" style={{ margin: '24px 0' }} />;
   return (
     <Div>
       <Text style={{ textAlign: 'center', color: 'var(--vkui--color_text_secondary)' }}>
