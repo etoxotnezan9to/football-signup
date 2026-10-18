@@ -219,6 +219,14 @@ describe('WebSocket', () => {
     ws.close();
   });
 
+  it('dev-авторизация mock: принимается только при authDevBypass', async () => {
+    const db = openDatabase(':memory:', config.migrationsDir);
+    const svc = createService(db);
+    assert.equal(authenticateLaunchParams(config, 'mock:5:A:B', svc), null);
+    assert.equal(authenticateLaunchParams({ ...config, authDevBypass: true }, 'mock:5:A:B', svc), 5);
+    assert.equal(authenticateLaunchParams({ ...config, authDevBypass: true }, 'mock:x:A:B', svc), null);
+  });
+
   it('неверная авторизация закрывает соединение', async () => {
     const port = (app.server.address() as AddressInfo).port;
     const ws = new WebSocket(`ws://127.0.0.1:${port}/ws`);

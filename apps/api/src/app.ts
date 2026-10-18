@@ -36,6 +36,18 @@ export function authenticateLaunchParams(
   service: Service,
   nowMs: number = Date.now(),
 ): number | null {
+  // Только вне production (config.authDevBypass): строка вида `mock:<id>:<имя>:<фамилия>` (имя и фамилия URL-кодированы)
+  if (config.authDevBypass && launchParams.startsWith('mock:')) {
+    const [, idRaw, first = 'Тест', last = ''] = launchParams.split(':');
+    const id = Number(idRaw);
+    if (!Number.isInteger(id) || id <= 0) return null;
+    try {
+      service.upsertUser({ vkId: id, firstName: decodeURIComponent(first), lastName: decodeURIComponent(last) });
+    } catch {
+      return null;
+    }
+    return id;
+  }
   const res = verifyLaunchParams(launchParams, config.vkAppSecret, {
     appId: config.vkAppId,
     nowSec: Math.floor(nowMs / 1000),
