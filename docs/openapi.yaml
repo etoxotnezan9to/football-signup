@@ -1,0 +1,337 @@
+openapi: 3.0.3
+info:
+  title: Football signup API
+  version: 1.0.0
+  description: >
+    REST API мини-приложения «Запись на футбол». Авторизация: заголовок
+    `Authorization: VK <строка параметров запуска VK>` (подпись проверяется на сервере).
+servers:
+  - url: /api
+security:
+  - vkLaunchParams: []
+paths:
+  /health:
+    get:
+      summary: Проверка работоспособности
+      security: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status, version, time]
+                properties:
+                  status: { type: string, enum: [ok] }
+                  version: { type: string }
+                  time: { type: string, format: date-time }
+  /me:
+    get:
+      summary: Текущий пользователь
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/User' }
+        '401': { $ref: '#/components/responses/Error' }
+  /games:
+    get:
+      summary: Список предстоящих активных игр
+      parameters:
+        - { name: cursor, in: query, schema: { type: string } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 50, default: 20 } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/GameSummary' }
+                  nextCursor: { type: string, nullable: true }
+        '401': { $ref: '#/components/responses/Error' }
+    post:
+      summary: Создать игру
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/GameInput' }
+      responses:
+        '201':
+          description: Создано
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GameDetails' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '422': { $ref: '#/components/responses/Error' }
+        '429': { $ref: '#/components/responses/Error' }
+  /games/{gameId}:
+    parameters:
+      - { $ref: '#/components/parameters/GameId' }
+    get:
+      summary: Игра с составом
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GameDetails' }
+        '401': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+    patch:
+      summary: Изменить игру (только организатор)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/GameUpdate' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GameDetails' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /games/{gameId}/cancel:
+    parameters:
+      - { $ref: '#/components/parameters/GameId' }
+    post:
+      summary: Отменить игру (только организатор)
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GameDetails' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+  /games/{gameId}/signup:
+    parameters:
+      - { $ref: '#/components/parameters/GameId' }
+    put:
+      summary: Записаться или изменить число мест
+      description: Идемпотентно. `seats` — желаемое итоговое число мест.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [seats]
+              properties:
+                seats: { type: integer, minimum: 1, maximum: 5 }
+      responses:
+        '200':
+          description: Результат записи
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [signup, game]
+                properties:
+                  signup: { $ref: '#/components/schemas/RosterEntry' }
+                  game: { $ref: '#/components/schemas/GameDetails' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+        '422': { $ref: '#/components/responses/Error' }
+        '429': { $ref: '#/components/responses/Error' }
+    delete:
+      summary: Отменить свою запись
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GameDetails' }
+        '401': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /games/{gameId}/signups/{signupId}:
+    parameters:
+      - { $ref: '#/components/parameters/GameId' }
+      - { name: signupId, in: path, required: true, schema: { type: integer } }
+    patch:
+      summary: Отметить оплату (только организатор)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [paidSeats]
+              properties:
+                paidSeats: { type: integer, minimum: 0, maximum: 5 }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GameDetails' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+    delete:
+      summary: Удалить участника (только организатор)
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GameDetails' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+  /me/games:
+    get:
+      summary: Мои игры (созданные и те, куда я записан)
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [organized, joined]
+                properties:
+                  organized:
+                    type: array
+                    items: { $ref: '#/components/schemas/GameSummary' }
+                  joined:
+                    type: array
+                    items: { $ref: '#/components/schemas/GameSummary' }
+        '401': { $ref: '#/components/responses/Error' }
+components:
+  securitySchemes:
+    vkLaunchParams:
+      type: apiKey
+      in: header
+      name: Authorization
+      description: 'Формат: `VK <строка параметров запуска>`'
+  parameters:
+    GameId:
+      name: gameId
+      in: path
+      required: true
+      schema: { type: integer }
+  responses:
+    Error:
+      description: Ошибка
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorBody' }
+  schemas:
+    ErrorBody:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              enum:
+                - UNAUTHORIZED
+                - FORBIDDEN
+                - NOT_FOUND
+                - VALIDATION_ERROR
+                - SEATS_LIMIT_EXCEEDED
+                - GAME_NOT_ACTIVE
+                - ACTIVE_GAMES_LIMIT
+                - STARTS_AT_IN_PAST
+                - RATE_LIMITED
+            message: { type: string }
+    User:
+      type: object
+      required: [vkId, firstName, lastName]
+      properties:
+        vkId: { type: integer }
+        firstName: { type: string }
+        lastName: { type: string }
+        photoUrl: { type: string, nullable: true }
+    GameInput:
+      type: object
+      required: [title, startsAt, venue, address, feeRub, capacity]
+      properties:
+        title: { type: string, minLength: 1, maxLength: 80 }
+        startsAt: { type: string, format: date-time }
+        venue: { type: string, minLength: 1, maxLength: 80 }
+        address: { type: string, minLength: 1, maxLength: 160 }
+        format: { type: string, maxLength: 120, default: '' }
+        feeRub: { type: integer, minimum: 0, maximum: 100000 }
+        capacity: { type: integer, minimum: 2, maximum: 60 }
+        description: { type: string, maxLength: 1000, default: '' }
+        paymentInfo: { type: string, maxLength: 300, default: '' }
+        organizerContact: { type: string, maxLength: 120, default: '' }
+    GameUpdate:
+      type: object
+      description: Любое подмножество полей GameInput
+      properties:
+        title: { type: string, minLength: 1, maxLength: 80 }
+        startsAt: { type: string, format: date-time }
+        venue: { type: string, minLength: 1, maxLength: 80 }
+        address: { type: string, minLength: 1, maxLength: 160 }
+        format: { type: string, maxLength: 120 }
+        feeRub: { type: integer, minimum: 0, maximum: 100000 }
+        capacity: { type: integer, minimum: 2, maximum: 60 }
+        description: { type: string, maxLength: 1000 }
+        paymentInfo: { type: string, maxLength: 300 }
+        organizerContact: { type: string, maxLength: 120 }
+    GameSummary:
+      type: object
+      required: [id, title, startsAt, venue, feeRub, capacity, status, isFinished, taken, queued, organizer]
+      properties:
+        id: { type: integer }
+        title: { type: string }
+        startsAt: { type: string, format: date-time }
+        venue: { type: string }
+        feeRub: { type: integer }
+        capacity: { type: integer }
+        status: { type: string, enum: [active, cancelled] }
+        isFinished: { type: boolean }
+        taken: { type: integer, description: Занято мест в составе }
+        queued: { type: integer, description: Мест в очереди }
+        organizer: { $ref: '#/components/schemas/User' }
+        mySeats: { type: integer, description: Мои места суммарно, 0 если нет записи }
+    RosterEntry:
+      type: object
+      required: [signupId, user, seats, mainSeats, queueSeats, paidSeats, createdAt]
+      properties:
+        signupId: { type: integer }
+        user: { $ref: '#/components/schemas/User' }
+        seats: { type: integer }
+        mainSeats: { type: integer, description: Мест в составе }
+        queueSeats: { type: integer, description: Мест в очереди }
+        paidSeats: { type: integer }
+        createdAt: { type: string, format: date-time }
+    GameDetails:
+      allOf:
+        - $ref: '#/components/schemas/GameSummary'
+        - type: object
+          required: [address, format, description, paymentInfo, organizerContact, roster]
+          properties:
+            address: { type: string }
+            format: { type: string }
+            description: { type: string }
+            paymentInfo: { type: string }
+            organizerContact: { type: string }
+            roster:
+              type: array
+              description: Все записи в порядке очереди
+              items: { $ref: '#/components/schemas/RosterEntry' }
