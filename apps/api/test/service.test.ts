@@ -267,3 +267,13 @@ describe('мои игры', () => {
     assert.deepEqual(my.joined.map((g) => g.id), [other.id]);
   });
 });
+
+describe('профиль', () => {
+  it('фамилия необязательна, имя обязательно, фото только по https', () => {
+    assert.equal(svc.updateProfile(U1, { firstName: 'Иван' }).lastName, '');
+    expectCode(() => svc.updateProfile(U1, { firstName: '' }), 'VALIDATION_ERROR');
+    expectCode(() => svc.updateProfile(U1, { firstName: 'И', photoUrl: 'javascript:alert(1)' }), 'VALIDATION_ERROR');
+    const ok = svc.updateProfile(U1, { firstName: 'Иван', lastName: 'Петров', photoUrl: 'https://example.com/a.jpg' });
+    assert.equal(ok.photoUrl, 'https://example.com/a.jpg');
+  });
+});

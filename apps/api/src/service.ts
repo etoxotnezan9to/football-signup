@@ -225,7 +225,7 @@ export function createService(db: DatabaseSync, options: ServiceOptions = {}) {
         return v.trim();
       };
       const firstName = name('firstName', 1);
-      const lastName = name('lastName', 0);
+      const lastName = b.lastName === undefined ? '' : name('lastName', 0);
       let photoUrl: string | null = null;
       if (b.photoUrl !== undefined && b.photoUrl !== null) {
         if (typeof b.photoUrl !== 'string' || b.photoUrl.length > 500 || !/^https:\/\//.test(b.photoUrl)) {
