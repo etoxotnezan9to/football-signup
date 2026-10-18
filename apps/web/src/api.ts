@@ -1,0 +1,74 @@
+import type { GameDetails, GameSummary, RosterEntry, User } from '@football/shared';
+
+export class ApiError extends Error {
+  code: string;
+  status: number;
+  details: Record<string, string> | undefined;
+
+  constructor(status: number, code: string, message: string, details?: Record<string, string>) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+    this.code = code;
+    this.details = details;
+  }
+}
+
+let authHeader = '';
+export function setAuthHeader(value: string): void {
+  authHeader = value;
+}
+
+async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
+  const headers: Record<string, string> = { Authorization: authHeader };
+  // Content-Type только при наличии тела: Fastify отвергает пустое тело с JSON-типом
+  if (body !== undefined) headers['Content-Type'] = 'application/json';
+  let res: Response;
+  try {
+    res = await fetch(`/api${path}`, {
+      method,
+      headers,
+      ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+    });
+  } catch {
+    throw new ApiError(0, 'NETWORK', 'Нет связи с сервером');
+  }
+  const text = await res.text();
+  let data: unknown = null;
+  if (text) {
+    try {
+      data = JSON.parse(text);
+    } catch {
+      data = null;
+    }
+  }
+  if (!res.ok) {
+    const err = (data as { error?: { code?: string; message?: string; details?: Record<string, string> } } | null)
+      ?.error;
+    throw new ApiError(res.status, err?.code ?? 'ERROR', err?.message ?? 'Ошибка запроса', err?.details);
+  }
+  return data as T;
+}
+
+export interface GamesPage {
+  items: GameSummary[];
+  nextCursor: string | null;
+}
+
+export const api = {
+  putMe: (profile: { firstName: string; lastName: string; photoUrl: string | null }) =>
+    request<User>('PUT', '/me', profile),
+  listGames: () => request<GamesPage>('GET', '/games?limit=50'),
+  myGames: () => request<{ organized: GameSummary[]; joined: GameSummary[] }>('GET', '/me/games'),
+  getGame: (id: number) => request<GameDetails>('GET', `/games/${id}`),
+  createGame: (body: unknown) => request<GameDetails>('POST', '/games', body),
+  updateGame: (id: number, body: unknown) => request<GameDetails>('PATCH', `/games/${id}`, body),
+  cancelGame: (id: number) => request<GameDetails>('POST', `/games/${id}/cancel`),
+  putSignup: (id: number, seats: number) =>
+    request<{ signup: RosterEntry; game: GameDetails }>('PUT', `/games/${id}/signup`, { seats }),
+  deleteSignup: (id: number) => request<GameDetails>('DELETE', `/games/${id}/signup`),
+  setPaid: (id: number, signupId: number, paidSeats: number) =>
+    request<GameDetails>('PATCH', `/games/${id}/signups/${signupId}`, { paidSeats }),
+  removeSignup: (id: number, signupId: number) =>
+    request<GameDetails>('DELETE', `/games/${id}/signups/${signupId}`),
+};
