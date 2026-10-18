@@ -21,10 +21,10 @@ jobs:
         with:
           name: pnpm-lock
           path: pnpm-lock.yaml
-      - run: pnpm lint
-      - run: pnpm typecheck
-      - run: pnpm test
-      - run: pnpm build
+      - run: ci/run.sh lint pnpm lint
+      - run: ci/run.sh typecheck pnpm typecheck
+      - run: ci/run.sh test pnpm test
+      - run: ci/run.sh build pnpm build
 
   docker:
     runs-on: ubuntu-latest
