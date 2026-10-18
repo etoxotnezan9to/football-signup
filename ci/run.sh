@@ -6,7 +6,10 @@ title="$1"; shift
 out="$("$@" 2>&1)"; code=$?
 printf '%s\n' "$out"
 if [ "$code" -ne 0 ]; then
-  tail_text="$(printf '%s' "$out" | tail -n 80 | tr -d '\r' | sed 's/%/%25/g' | awk '{printf "%s%%0A", $0}')"
+  # Для тестов Node: показываем блок «failing tests», если он есть
+  focus="$(printf '%s\n' "$out" | awk '/failing tests:/{f=1} f')"
+  [ -z "$focus" ] && focus="$out"
+  tail_text="$(printf '%s' "$focus" | head -n 100 | tr -d '\r' | sed 's/%/%25/g' | awk '{printf "%s%%0A", $0}')"
   echo "::error title=${title} (код ${code})::${tail_text:0:9000}"
 fi
 exit "$code"
