@@ -40,6 +40,9 @@ jobs:
       - run: ci/run.sh typecheck pnpm typecheck
       - run: ci/run.sh test pnpm test
       - run: ci/run.sh build pnpm build
+      - name: Install Playwright browser
+        run: pnpm --filter @football/web exec playwright install --with-deps chromium
+      - run: ci/run.sh e2e pnpm --filter @football/web test:e2e
 
   docker:
     runs-on: ubuntu-latest

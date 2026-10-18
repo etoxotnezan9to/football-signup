@@ -134,14 +134,16 @@ export function GameForm({ initial }: { initial?: GameDetails }) {
         {FIELDS.map((f) => (
           <FormItem
             key={f.key}
+            htmlFor={f.key}
             top={f.label}
             status={errors[f.key] ? 'error' : 'default'}
             bottom={errors[f.key] ?? f.hint}
           >
             {f.multiline ? (
-              <Textarea value={form[f.key]} onChange={(e) => setForm({ ...form, [f.key]: e.target.value })} />
+              <Textarea id={f.key} value={form[f.key]} onChange={(e) => setForm({ ...form, [f.key]: e.target.value })} />
             ) : (
               <Input
+                id={f.key}
                 type={f.type ?? 'text'}
                 value={form[f.key]}
                 onChange={(e) => setForm({ ...form, [f.key]: e.target.value })}
