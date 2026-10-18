@@ -170,7 +170,7 @@ export function buildApp(deps: AppDeps): FastifyInstance {
         alive = false;
         socket.ping();
       }, WS_HEARTBEAT_SEC * 1000);
-      socket.on('message', (raw) => conn.onMessage(raw.toString()));
+      socket.on('message', (raw: Buffer | ArrayBuffer | Buffer[]) => conn.onMessage(raw.toString()));
       socket.on('close', () => {
         clearInterval(heartbeat);
         conn.onClose();
