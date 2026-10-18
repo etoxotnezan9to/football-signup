@@ -27,14 +27,15 @@ jobs:
       - run: pnpm build
 
   docker:
-    if: hashFiles('pnpm-lock.yaml') != ''
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - name: Build API image
+        if: hashFiles('pnpm-lock.yaml') != ''
         run: docker build -f apps/api/Dockerfile -t football-api:ci .
       - name: Smoke test
+        if: hashFiles('pnpm-lock.yaml') != ''
         run: |
           docker run -d --name api -p 3000:3000 -e VK_APP_ID=54809461 -e VK_APP_SECRET=ci-secret football-api:ci
           for i in $(seq 1 20); do
