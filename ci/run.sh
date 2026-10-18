@@ -12,4 +12,9 @@ if [ "$code" -ne 0 ]; then
   tail_text="$(printf '%s' "$focus" | head -n 100 | tr -d '\r' | sed 's/%/%25/g' | awk '{printf "%s%%0A", $0}')"
   echo "::error title=${title} (код ${code})::${tail_text:0:9000}"
 fi
+# При успехе публикуем краткий итог (последние строки), чтобы результат шага можно было прочитать через API проверок
+if [ "$code" -eq 0 ]; then
+  ok_text="$(printf '%s' "$out" | tail -n 14 | tr -d '\r' | sed 's/%/%25/g' | awk '{printf "%s%%0A", $0}')"
+  echo "::notice title=${title} (успешно)::${ok_text:0:3000}"
+fi
 exit "$code"
