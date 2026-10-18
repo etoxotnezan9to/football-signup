@@ -8,6 +8,10 @@ export interface Config {
   migrationsDir: string;
   vkAppId: number;
   vkAppSecret: string;
+  /** Сервисный ключ доступа для личных уведомлений VK; пусто — уведомления выключены */
+  vkServiceKey: string;
+  /** Часовой пояс, в котором время игры показывается в уведомлениях */
+  notifyTimeZone: string;
   /** Только вне production: разрешает заголовок `Authorization: Mock <id>:<имя>:<фамилия>` */
   authDevBypass: boolean;
 }
@@ -28,6 +32,13 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     throw new Error('AUTH_DEV_BYPASS запрещён в production');
   }
 
+  const notifyTimeZone = env.NOTIFY_TIMEZONE ?? 'Europe/Moscow';
+  try {
+    new Intl.DateTimeFormat('ru-RU', { timeZone: notifyTimeZone });
+  } catch {
+    throw new Error('NOTIFY_TIMEZONE должен быть корректным часовым поясом IANA, например Europe/Moscow');
+  }
+
   const port = Number(env.PORT ?? 3000);
   if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('PORT некорректен');
 
@@ -39,6 +50,8 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     migrationsDir: env.MIGRATIONS_DIR ?? join(process.cwd(), 'migrations'),
     vkAppId,
     vkAppSecret,
+    vkServiceKey: env.VK_SERVICE_KEY ?? '',
+    notifyTimeZone,
     authDevBypass,
   };
 }

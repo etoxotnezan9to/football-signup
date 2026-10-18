@@ -21,6 +21,8 @@ const config: Config = {
   migrationsDir: fileURLToPath(new URL('../migrations', import.meta.url)),
   vkAppId: 54809461,
   vkAppSecret: SECRET,
+  vkServiceKey: '',
+  notifyTimeZone: 'Europe/Moscow',
   authDevBypass: false,
 };
 

@@ -4,8 +4,13 @@ import type { DatabaseSync } from 'node:sqlite';
 import {
   FINISH_GRACE_MIN,
   MAX_ACTIVE_GAMES_PER_ORGANIZER,
+  REMINDER_LEAD_MIN,
+  REMINDER_MIN_LEAD_MIN,
   clampPaidSeats,
+  clipMessage,
   computeRoster,
+  groupUsersBy,
+  promotionsBetween,
   parseGameInput,
   parseGameUpdate,
   rosterTotals,
@@ -15,12 +20,14 @@ import type {
   GameDetails,
   GameInput,
   GameSummary,
+  MainSeats,
   RosterEntry,
   ServerEvent,
   User,
 } from '@football/shared';
 import { inTransaction } from './db.ts';
 import { AppError } from './errors.ts';
+import type { Notify } from './notifier.ts';
 
 interface UserRow {
   vk_id: number;
@@ -67,6 +74,10 @@ export interface VkProfile {
 export interface ServiceOptions {
   now?: () => Date;
   emit?: (event: ServerEvent) => void;
+  /** Личные уведомления (VK). Не задан — уведомления отключены. */
+  notify?: Notify;
+  /** Часовой пояс, в котором время игры показывается в уведомлениях */
+  timeZone?: string;
 }
 
 function toUser(r: { vk_id: number; first_name: string; last_name: string; photo_url: string | null }): User {
@@ -76,6 +87,8 @@ function toUser(r: { vk_id: number; first_name: string; last_name: string; photo
 export function createService(db: DatabaseSync, options: ServiceOptions = {}) {
   const now = options.now ?? (() => new Date());
   const emit = options.emit ?? (() => {});
+  const notify = options.notify;
+  const timeZone = options.timeZone ?? 'Europe/Moscow';
 
   function isFinished(startsAt: string): boolean {
     return now().getTime() > Date.parse(startsAt) + FINISH_GRACE_MIN * 60_000;
@@ -180,6 +193,58 @@ export function createService(db: DatabaseSync, options: ServiceOptions = {}) {
     if (game.status !== 'active' || isFinished(game.starts_at)) {
       throw new AppError('GAME_NOT_ACTIVE', 'Игра отменена или уже прошла');
     }
+  }
+
+  // ---- Уведомления ----------------------------------------------------------
+
+  function whenText(iso: string): string {
+    return new Intl.DateTimeFormat('ru-RU', {
+      weekday: 'short',
+      day: 'numeric',
+      month: 'short',
+      hour: '2-digit',
+      minute: '2-digit',
+      timeZone,
+    }).format(new Date(iso));
+  }
+
+  /** Места в составе по пользователям. Снимок нужен только при включённых уведомлениях. */
+  function mainSeatsOf(gameId: number): MainSeats {
+    const out: MainSeats = {};
+    for (const e of buildRoster(getGameRow(gameId)).entries) {
+      if (e.mainSeats > 0) out[e.user.vkId] = e.mainSeats;
+    }
+    return out;
+  }
+
+  const snapshot = (gameId: number): MainSeats => (notify ? mainSeatsOf(gameId) : {});
+
+  function signupUserIds(gameId: number): number[] {
+    const rows = db.prepare('SELECT user_id FROM signups WHERE game_id = ?').all(gameId) as unknown as {
+      user_id: number;
+    }[];
+    return rows.map((r) => r.user_id);
+  }
+
+  const gameFragment = (gameId: number): string => `/game/${gameId}`;
+
+  /** Уведомляет тех, кто из очереди попал в состав после действия `actorId`. Возвращает их id. */
+  function notifyPromotions(gameId: number, before: MainSeats, actorId: number): Set<number> {
+    const notified = new Set<number>();
+    if (!notify) return notified;
+    const game = getGameRow(gameId);
+    if (game.status !== 'active') return notified;
+    for (const p of promotionsBetween(before, mainSeatsOf(gameId), actorId)) {
+      notified.add(p.userId);
+      notify({
+        userIds: [p.userId],
+        message: clipMessage(
+          `Вы в составе! «${game.title}», ${whenText(game.starts_at)}. Мест у вас в составе: ${p.total}.`,
+        ),
+        fragment: gameFragment(gameId),
+      });
+    }
+    return notified;
   }
 
   function upsertUser(p: VkProfile): User {
@@ -310,7 +375,8 @@ export function createService(db: DatabaseSync, options: ServiceOptions = {}) {
       const parsed = parseGameUpdate(body);
       if (!parsed.ok) throw new AppError('VALIDATION_ERROR', 'Неверные данные игры', parsed.errors);
       const patch = parsed.value;
-      inTransaction(db, () => {
+      const before = snapshot(gameId);
+      const old = inTransaction(db, () => {
         const game = getGameRow(gameId);
         requireOrganizer(game, userId);
         if (game.status !== 'active') throw new AppError('GAME_NOT_ACTIVE', 'Игра отменена');
@@ -338,21 +404,52 @@ export function createService(db: DatabaseSync, options: ServiceOptions = {}) {
         sets.push('updated_at = ?');
         values.push(now().toISOString(), gameId);
         db.prepare(`UPDATE games SET ${sets.join(', ')} WHERE id = ?`).run(...values);
+        return game; // состояние до правки
       });
       emitGameChanged(gameId, 'roster');
+      if (notify) {
+        const promoted = notifyPromotions(gameId, before, userId);
+        const current = getGameRow(gameId);
+        const moved =
+          Date.parse(old.starts_at) !== Date.parse(current.starts_at) ||
+          old.venue !== current.venue ||
+          old.address !== current.address;
+        const recipients = signupUserIds(gameId).filter((id) => id !== userId && !promoted.has(id));
+        if (moved && recipients.length > 0) {
+          notify({
+            userIds: recipients,
+            message: clipMessage(
+              `Игра «${current.title}» изменена: ${whenText(current.starts_at)}, ${current.venue}, ${current.address}.`,
+            ),
+            fragment: gameFragment(gameId),
+          });
+        }
+      }
       return details(getGameRow(gameId), userId);
     },
 
     cancelGame(gameId: number, userId: number): GameDetails {
-      inTransaction(db, () => {
+      const { cancelled, recipients } = inTransaction(db, () => {
         const game = getGameRow(gameId);
         requireOrganizer(game, userId);
         db.prepare("UPDATE games SET status = 'cancelled', updated_at = ? WHERE id = ?").run(
           now().toISOString(),
           gameId,
         );
+        // повторная отмена уже отменённой игры никого не беспокоит
+        return game.status === 'active'
+          ? { cancelled: game, recipients: signupUserIds(gameId).filter((id) => id !== userId) }
+          : { cancelled: null, recipients: [] as number[] };
       });
       emitGameChanged(gameId, 'roster');
+      if (notify && cancelled && recipients.length > 0) {
+        const g = cancelled;
+        notify({
+          userIds: recipients,
+          message: clipMessage(`Игра «${g.title}» (${whenText(g.starts_at)}) отменена организатором.`),
+          fragment: gameFragment(gameId),
+        });
+      }
       return details(getGameRow(gameId), userId);
     },
 
@@ -365,6 +462,7 @@ export function createService(db: DatabaseSync, options: ServiceOptions = {}) {
           check.code === 'SEATS_LIMIT_EXCEEDED' ? 'Превышен лимит мест на одного человека' : 'Неверное число мест',
         );
       }
+      const before = snapshot(gameId);
       inTransaction(db, () => {
         const game = getGameRow(gameId);
         requireOpen(game);
@@ -386,12 +484,14 @@ export function createService(db: DatabaseSync, options: ServiceOptions = {}) {
         }
       });
       emitGameChanged(gameId, 'roster');
+      notifyPromotions(gameId, before, userId);
       const game = details(getGameRow(gameId), userId);
       const signup = game.roster.find((e) => e.user.vkId === userId)!;
       return { signup, game };
     },
 
     deleteSignup(gameId: number, userId: number): GameDetails {
+      const before = snapshot(gameId);
       inTransaction(db, () => {
         const game = getGameRow(gameId);
         requireOpen(game);
@@ -399,6 +499,7 @@ export function createService(db: DatabaseSync, options: ServiceOptions = {}) {
         if (Number(res.changes) === 0) throw new AppError('NOT_FOUND', 'Вы не записаны на эту игру');
       });
       emitGameChanged(gameId, 'roster');
+      notifyPromotions(gameId, before, userId);
       return details(getGameRow(gameId), userId);
     },
 
@@ -425,6 +526,7 @@ export function createService(db: DatabaseSync, options: ServiceOptions = {}) {
     },
 
     removeSignup(gameId: number, organizerId: number, signupId: number): GameDetails {
+      const before = snapshot(gameId);
       inTransaction(db, () => {
         const game = getGameRow(gameId);
         requireOrganizer(game, organizerId);
@@ -432,7 +534,50 @@ export function createService(db: DatabaseSync, options: ServiceOptions = {}) {
         if (Number(res.changes) === 0) throw new AppError('NOT_FOUND', 'Запись не найдена');
       });
       emitGameChanged(gameId, 'roster');
+      notifyPromotions(gameId, before, organizerId);
       return details(getGameRow(gameId), organizerId);
+    },
+
+    /**
+     * Напоминание о предстоящей игре: один раз, за сутки до начала, тем, кто в составе.
+     * Не отправляется, если игра создана менее чем за сутки (люди только что записались)
+     * или до начала осталось меньше часа. Вызывается планировщиком раз в минуту.
+     * Возвращает число игр, по которым отправлено напоминание.
+     */
+    sendDueReminders(): number {
+      if (!notify) return 0;
+      const nowMs = now().getTime();
+      const candidates = db
+        .prepare(
+          `SELECT * FROM games WHERE status = 'active' AND reminder_sent_at IS NULL AND starts_at > ?`,
+        )
+        .all(new Date(nowMs).toISOString()) as unknown as (GameRow & { created_at: string })[];
+      let sent = 0;
+      for (const game of candidates) {
+        const startMs = Date.parse(game.starts_at);
+        const leftMin = (startMs - nowMs) / 60_000;
+        if (leftMin > REMINDER_LEAD_MIN || leftMin <= REMINDER_MIN_LEAD_MIN) continue;
+        if (Date.parse(game.created_at) > startMs - REMINDER_LEAD_MIN * 60_000) continue;
+        const claimed = inTransaction(db, () => {
+          const res = db
+            .prepare('UPDATE games SET reminder_sent_at = ? WHERE id = ? AND reminder_sent_at IS NULL')
+            .run(new Date(nowMs).toISOString(), game.id);
+          return Number(res.changes) === 1;
+        });
+        if (!claimed) continue;
+        sent += 1;
+        // сообщение у каждого своё по числу мест, поэтому группируем получателей по этому числу
+        for (const [seats, userIds] of groupUsersBy(mainSeatsOf(game.id))) {
+          notify({
+            userIds,
+            message: clipMessage(
+              `Напоминание: «${game.title}», ${whenText(game.starts_at)}, ${game.venue}. Мест у вас в составе: ${seats}.`,
+            ),
+            fragment: gameFragment(game.id),
+          });
+        }
+      }
+      return sent;
     },
 
     myGames(userId: number): { organized: GameSummary[]; joined: GameSummary[] } {

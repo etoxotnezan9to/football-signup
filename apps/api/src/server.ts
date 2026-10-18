@@ -5,6 +5,7 @@ import { buildApp, authenticateLaunchParams } from './app.ts';
 import { loadConfig } from './config.ts';
 import { openDatabase } from './db.ts';
 import { createHub } from './hub.ts';
+import { createVkNotifier } from './notifier.ts';
 import { createRateLimiter } from './rate-limit.ts';
 import { createService } from './service.ts';
 
@@ -18,7 +19,26 @@ const holder: { service: ReturnType<typeof createService> | null } = { service: 
 const hub = createHub({
   authenticate: (lp) => (holder.service ? authenticateLaunchParams(config, lp, holder.service) : null),
 });
-const service = createService(db, { emit: (e) => hub.publish(e) });
+
+// Логгер приложения появляется после создания сервера, а уведомления нужны сервису раньше
+const logRef: { current: { info(o: object, m?: string): void; warn(o: object, m?: string): void } | null } = {
+  current: null,
+};
+const notifier = config.vkServiceKey
+  ? createVkNotifier({
+      serviceKey: config.vkServiceKey,
+      log: {
+        info: (o, m) => logRef.current?.info(o, m),
+        warn: (o, m) => logRef.current?.warn(o, m),
+      },
+    })
+  : null;
+
+const service = createService(db, {
+  emit: (e) => hub.publish(e),
+  notify: notifier?.notify,
+  timeZone: config.notifyTimeZone,
+});
 holder.service = service;
 
 const require = createRequire(import.meta.url);
@@ -38,9 +58,28 @@ const app = buildApp({
   logger: true,
 });
 
+logRef.current = app.log;
+app.log.info({ notifications: notifier !== null }, notifier ? 'личные уведомления включены' : 'личные уведомления выключены (нет VK_SERVICE_KEY)');
+
+// Напоминания: раз в минуту ищем игры, до которых осталось меньше суток
+const REMINDER_TICK_MS = 60_000;
+const reminderTimer = notifier
+  ? setInterval(() => {
+      try {
+        const games = service.sendDueReminders();
+        if (games > 0) app.log.info({ games }, 'напоминания поставлены в отправку');
+      } catch (err) {
+        app.log.error({ err }, 'сбой планировщика напоминаний');
+      }
+    }, REMINDER_TICK_MS)
+  : null;
+reminderTimer?.unref();
+
 async function shutdown(signal: string): Promise<void> {
   app.log.info({ signal }, 'остановка');
+  if (reminderTimer) clearInterval(reminderTimer);
   try {
+    await notifier?.flush();
     await app.close();
     db.close();
   } finally {
