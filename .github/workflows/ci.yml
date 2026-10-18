@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      # Первый прогон без lockfile: генерируем его и сохраняем артефактом (затем закоммитить и перейти на --frozen-lockfile)
+      - run: pnpm install --no-frozen-lockfile
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pnpm-lock
+          path: pnpm-lock.yaml
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm build
+
+  docker:
+    if: hashFiles('pnpm-lock.yaml') != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build API image
+        run: docker build -f apps/api/Dockerfile -t football-api:ci .
+      - name: Smoke test
+        run: |
+          docker run -d --name api -p 3000:3000 -e VK_APP_ID=54809461 -e VK_APP_SECRET=ci-secret football-api:ci
+          for i in $(seq 1 20); do
+            if curl -fsS http://127.0.0.1:3000/api/health; then ok=1; break; fi
+            sleep 1
+          done
+          docker logs api
+          test "${ok:-0}" = "1"

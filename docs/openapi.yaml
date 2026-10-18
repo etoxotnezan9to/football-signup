@@ -36,6 +36,27 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/User' }
         '401': { $ref: '#/components/responses/Error' }
+    put:
+      summary: Обновить своё отображаемое имя и фото (данные из VKWebAppGetUserInfo)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [firstName]
+              properties:
+                firstName: { type: string, minLength: 1, maxLength: 64 }
+                lastName: { type: string, maxLength: 64 }
+                photoUrl: { type: string, nullable: true }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/User' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
   /games:
     get:
       summary: Список предстоящих активных игр
@@ -256,7 +277,12 @@ components:
                 - ACTIVE_GAMES_LIMIT
                 - STARTS_AT_IN_PAST
                 - RATE_LIMITED
+                - INTERNAL
             message: { type: string }
+            details:
+              type: object
+              additionalProperties: { type: string }
+              description: Ошибки по полям (для VALIDATION_ERROR)
     User:
       type: object
       required: [vkId, firstName, lastName]

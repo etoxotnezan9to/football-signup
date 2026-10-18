@@ -182,8 +182,7 @@ export function createService(db: DatabaseSync, options: ServiceOptions = {}) {
     }
   }
 
-  return {
-    upsertUser(p: VkProfile): User {
+  function upsertUser(p: VkProfile): User {
       const ts = now().toISOString();
       db.prepare(
         `INSERT INTO users (vk_id, first_name, last_name, photo_url, created_at, updated_at)
@@ -195,6 +194,48 @@ export function createService(db: DatabaseSync, options: ServiceOptions = {}) {
            updated_at = excluded.updated_at`,
       ).run(p.vkId, p.firstName, p.lastName, p.photoUrl ?? null, ts, ts);
       return getUser(p.vkId);
+    }
+
+  return {
+    upsertUser,
+
+    /** Гарантирует, что пользователь существует (имя-заглушка, если профиль ещё не передан). */
+    ensureUser(vkId: number): User {
+      const ts = now().toISOString();
+      db.prepare(
+        `INSERT OR IGNORE INTO users (vk_id, first_name, last_name, photo_url, created_at, updated_at)
+         VALUES (?, ?, '', NULL, ?, ?)`,
+      ).run(vkId, `Игрок ${vkId}`, ts, ts);
+      return getUser(vkId);
+    },
+
+    /**
+     * Профиль присылает клиент (VKWebAppGetUserInfo). Идентификатор подтверждён подписью,
+     * а отображаемое имя пользователь может задать только для себя.
+     */
+    updateProfile(vkId: number, body: unknown): User {
+      const b = typeof body === 'object' && body !== null ? (body as Record<string, unknown>) : {};
+      const errors: Record<string, string> = {};
+      const name = (key: 'firstName' | 'lastName', min: number): string => {
+        const v = b[key];
+        if (typeof v !== 'string' || v.trim().length < min || v.trim().length > 64) {
+          errors[key] = `длина от ${min} до 64`;
+          return '';
+        }
+        return v.trim();
+      };
+      const firstName = name('firstName', 1);
+      const lastName = name('lastName', 0);
+      let photoUrl: string | null = null;
+      if (b.photoUrl !== undefined && b.photoUrl !== null) {
+        if (typeof b.photoUrl !== 'string' || b.photoUrl.length > 500 || !/^https:\/\//.test(b.photoUrl)) {
+          errors.photoUrl = 'ожидается https-ссылка';
+        } else {
+          photoUrl = b.photoUrl;
+        }
+      }
+      if (Object.keys(errors).length > 0) throw new AppError('VALIDATION_ERROR', 'Неверный профиль', errors);
+      return upsertUser({ vkId, firstName, lastName, photoUrl });
     },
 
     createGame(organizerId: number, body: unknown): GameDetails {

@@ -10,6 +10,7 @@ const STATUS: Record<ErrorCode, number> = {
   ACTIVE_GAMES_LIMIT: 422,
   STARTS_AT_IN_PAST: 422,
   RATE_LIMITED: 429,
+  INTERNAL: 500,
 };
 
 export class AppError extends Error {

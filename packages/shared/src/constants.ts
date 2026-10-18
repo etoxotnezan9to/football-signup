@@ -20,6 +20,7 @@ export const ERROR_CODES = [
   'ACTIVE_GAMES_LIMIT',
   'STARTS_AT_IN_PAST',
   'RATE_LIMITED',
+  'INTERNAL',
 ] as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[number];
