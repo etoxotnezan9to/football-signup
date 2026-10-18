@@ -19,16 +19,21 @@ jobs:
         with:
           node-version: 22
       - name: Install dependencies
+        # Строго по lockfile; если он устарел (добавили зависимости), обновляем его — см. следующий шаг
         run: |
-          if [ -f pnpm-lock.yaml ]; then pnpm install --frozen-lockfile; else pnpm install --no-frozen-lockfile; fi
-      - name: Commit lockfile if it is not tracked yet
+          if [ -f pnpm-lock.yaml ] && pnpm install --frozen-lockfile; then exit 0; fi
+          pnpm install --no-frozen-lockfile
+      - name: Commit lockfile if it changed
+        # Только для develop-claude: разработка идёт без доступа к реестру npm, lockfile обновляет CI.
+        # В остальных ветках и PR устаревший lockfile остаётся ошибкой (шаг выше упадёт).
         if: github.event_name == 'push' && github.ref_name == 'develop-claude'
         run: |
-          if ! git ls-files --error-unmatch pnpm-lock.yaml >/dev/null 2>&1; then
+          if [ -n "$(git status --porcelain pnpm-lock.yaml)" ]; then
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
             git add pnpm-lock.yaml
-            git commit -m "chore: add pnpm-lock.yaml"
+            git commit -m "chore: update pnpm-lock.yaml"
+            git pull --rebase origin develop-claude
             git push
           fi
       - run: ci/run.sh lint pnpm lint
