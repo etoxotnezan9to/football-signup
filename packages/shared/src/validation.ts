@@ -2,7 +2,6 @@
 import { MAX_CAPACITY, MAX_FEE_RUB, MAX_SEATS_PER_USER, MIN_CAPACITY } from './constants.ts';
 
 export interface GameInput {
-  title: string;
   startsAt: string;
   placeId: number;
   format: string;
@@ -101,7 +100,6 @@ export function parseGameInput(body: unknown): ParseResult<GameInput> {
   if (!isRecord(body)) return { ok: false, errors: { body: 'ожидается объект' } };
   const errors: FieldErrors = {};
   const out: Raw = {};
-  checkString(body, 'title', 1, 80, errors, out, true);
   checkDate(body, 'startsAt', errors, out, true);
   checkPlaceId(body, errors, out, true);
   checkString(body, 'format', 0, 120, errors, out, false);
@@ -114,7 +112,6 @@ export function parseGameInput(body: unknown): ParseResult<GameInput> {
   return {
     ok: true,
     value: {
-      title: out.title as string,
       startsAt: out.startsAt as string,
       placeId: out.placeId as number,
       format: (out.format as string | undefined) ?? '',
@@ -132,7 +129,6 @@ export function parseGameUpdate(body: unknown): ParseResult<Partial<GameInput>> 
   if (!isRecord(body)) return { ok: false, errors: { body: 'ожидается объект' } };
   const errors: FieldErrors = {};
   const out: Raw = {};
-  checkString(body, 'title', 1, 80, errors, out, false);
   checkDate(body, 'startsAt', errors, out, false);
   checkPlaceId(body, errors, out, false);
   checkString(body, 'format', 0, 120, errors, out, false);

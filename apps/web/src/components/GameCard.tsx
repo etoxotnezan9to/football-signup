@@ -1,6 +1,6 @@
 import { Button } from '@vkontakte/vkui';
 import type { GameSummary } from '@football/shared';
-import { fillLabel, formatWhen } from '../format.ts';
+import { fillLabel, gameLabel } from '../format.ts';
 
 interface Props {
   game: GameSummary;
@@ -14,10 +14,7 @@ export function GameCard({ game, onOpen, onPlus }: Props) {
   return (
     <div className={`card${cancelled ? ' card--cancelled' : ''}`}>
       <div className="card__body" onClick={() => onOpen(game)}>
-        <div className="card__title">{game.title}</div>
-        <div className="card__meta">
-          {formatWhen(game.startsAt)} · {game.venue}
-        </div>
+        <div className="card__title">{gameLabel(game)}</div>
         <div className="card__meta">
           {fillLabel(game.taken, game.capacity, game.queued)} · {game.feeRub} ₽
         </div>

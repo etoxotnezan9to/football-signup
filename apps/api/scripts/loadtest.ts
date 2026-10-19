@@ -102,7 +102,6 @@ async function main(): Promise<void> {
   check(place.status === 201 || place.status === 200, `создание места вернуло ${place.status}`);
   const placeId = (place.json as { id: number }).id;
   const created = await call('POST', '/games', ORGANIZER, {
-    title: 'Нагрузочный тест',
     startsAt,
     placeId,
     feeRub: 0,

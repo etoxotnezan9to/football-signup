@@ -21,7 +21,6 @@ describe('numberLabel', () => {
 
 describe('formatRosterText', () => {
   const game = {
-    title: 'Футбол в четверг',
     whenLabel: 'чт, 22 октября, 21:00',
     venue: 'Ф.Ц. «Орловский»',
     address: 'Суздальское шоссе 62',
@@ -44,7 +43,7 @@ describe('formatRosterText', () => {
     assert.ok(lines.includes('⚠ Мест нет! В очереди:'));
     assert.ok(lines.includes('1) Григорий Захарьин'));
     assert.ok(lines.includes('2,3) Филипп Коркунов (2)'));
-    assert.equal(lines[0], 'Футбол в четверг');
+    assert.equal(lines[0], '📅 чт, 22 октября, 21:00');
   });
 
   it('без очереди блок «Мест нет» не выводится', () => {
@@ -72,7 +71,6 @@ describe('checkSeats', () => {
 
 describe('parseGameInput / parseGameUpdate', () => {
   const valid = {
-    title: ' Четверг ',
     startsAt: '2026-10-22T18:00:00.000Z',
     placeId: 1,
     feeRub: 650,
@@ -82,15 +80,15 @@ describe('parseGameInput / parseGameUpdate', () => {
   it('нормализует и подставляет значения по умолчанию', () => {
     const r = parseGameInput(valid);
     assert.ok(r.ok);
-    assert.equal(r.value.title, 'Четверг');
+    assert.equal(r.value.placeId, 1);
     assert.equal(r.value.format, '');
     assert.equal(r.value.capacity, 24);
   });
 
   it('сообщает обо всех ошибках полей', () => {
-    const r = parseGameInput({ title: '', capacity: 1, feeRub: -5 });
+    const r = parseGameInput({ capacity: 1, feeRub: -5 });
     assert.ok(!r.ok);
-    for (const k of ['title', 'startsAt', 'placeId', 'feeRub', 'capacity']) {
+    for (const k of ['startsAt', 'placeId', 'feeRub', 'capacity']) {
       assert.ok(k in r.errors, k);
     }
   });

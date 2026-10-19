@@ -40,7 +40,6 @@ function launch(userId: number): string {
 const auth = (userId: number) => ({ authorization: `VK ${launch(userId)}` });
 
 const gameBody = (over: Record<string, unknown> = {}) => ({
-  title: 'Четверг',
   startsAt: new Date(Date.now() + 2 * 86_400_000).toISOString(),
   placeId: placeId,
   feeRub: 650,
@@ -232,10 +231,10 @@ describe('HTTP API', () => {
       method: 'POST',
       url: '/api/games',
       headers: auth(621),
-      payload: { title: '' },
+      payload: { placeId: 0 },
     });
     assert.equal(bad.statusCode, 400);
-    assert.ok(bad.json().error.details.title);
+    assert.ok(bad.json().error.details.placeId);
     const nf = await app.inject({ method: 'GET', url: '/api/games/999999', headers: auth(621) });
     assert.equal(nf.statusCode, 404);
     const nan = await app.inject({ method: 'GET', url: '/api/games/abc', headers: auth(621) });

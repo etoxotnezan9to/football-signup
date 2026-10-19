@@ -27,7 +27,6 @@ CREATE TABLE places (
 CREATE TABLE games (
   id                INTEGER PRIMARY KEY AUTOINCREMENT,
   organizer_id      INTEGER NOT NULL REFERENCES users(vk_id),
-  title             TEXT NOT NULL,
   starts_at         TEXT NOT NULL,
   place_id          INTEGER REFERENCES places(id),  -- миграция 0003, заменила venue и address
   format            TEXT NOT NULL DEFAULT '',
@@ -59,6 +58,8 @@ CREATE TABLE signups (
 CREATE INDEX idx_signups_game ON signups (game_id, created_at, id);
 CREATE INDEX idx_signups_user ON signups (user_id);
 ```
+
+Колонка `title` у игр удалена миграцией 0004.
 
 `place_id` обязателен на уровне API (SQLite не позволяет добавить `NOT NULL`-ссылку через `ALTER TABLE`). Миграция 0003 превратила каждую пару (площадка, адрес) существующих игр в место. В ответах API `venue` и `address` игры берутся из её места.
 

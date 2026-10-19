@@ -23,6 +23,11 @@ export function formatWhen(iso: string, timeZone?: string): string {
   return new Intl.DateTimeFormat('ru-RU', opts).format(new Date(iso));
 }
 
+/** Обозначение игры вместо названия: дата и время, затем название места. */
+export function gameLabel(g: { startsAt: string; venue: string }, timeZone?: string): string {
+  return `${formatWhen(g.startsAt, timeZone)} · ${g.venue}`;
+}
+
 /** Значение для <input type="datetime-local"> из ISO (в локальном времени). */
 export function toLocalInput(iso: string): string {
   const d = new Date(iso);

@@ -57,6 +57,12 @@ describe('миграция 0003_places', () => {
         .all()
         .map((c) => c.name);
       assert.ok(!cols.includes('venue') && !cols.includes('address'));
+
+      copyFileSync(join(MIGRATIONS, '0004_drop_game_title.sql'), join(dir, '0004_drop_game_title.sql'));
+      assert.deepEqual(migrate(db, dir), ['0004_drop_game_title.sql']);
+      const after = db.prepare('PRAGMA table_info(games)').all().map((c) => c.name);
+      assert.ok(!after.includes('title'));
+      assert.equal(db.prepare('SELECT COUNT(*) AS n FROM games').get()!.n, 3);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

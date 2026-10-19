@@ -41,7 +41,6 @@ interface UserRow {
 interface GameRow {
   id: number;
   organizer_id: number;
-  title: string;
   starts_at: string;
   place_id: number;
   /** Название места (из JOIN с places) */
@@ -171,7 +170,6 @@ export function createService(db: DatabaseSync, options: ServiceOptions = {}) {
     const { entries, taken, queued } = buildRoster(game);
     const s: GameSummary = {
       id: game.id,
-      title: game.title,
       startsAt: game.starts_at,
       placeId: game.place_id,
       venue: game.venue,
@@ -267,7 +265,7 @@ export function createService(db: DatabaseSync, options: ServiceOptions = {}) {
       notify({
         userIds: [p.userId],
         message: clipMessage(
-          `Вы в составе! «${game.title}», ${whenText(game.starts_at)}. Мест у вас в составе: ${p.total}.`,
+          `Вы в составе! ${whenText(game.starts_at)}, ${game.venue}. Мест у вас в составе: ${p.total}.`,
         ),
         fragment: gameFragment(gameId),
       });
@@ -381,13 +379,12 @@ export function createService(db: DatabaseSync, options: ServiceOptions = {}) {
         const ts = now().toISOString();
         const res = db
           .prepare(
-            `INSERT INTO games (organizer_id, title, starts_at, place_id, format, fee_rub, capacity,
+            `INSERT INTO games (organizer_id, starts_at, place_id, format, fee_rub, capacity,
                                 description, payment_info, organizer_contact, status, created_at, updated_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?)`,
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?)`,
           )
           .run(
             organizerId,
-            input.title,
             input.startsAt,
             input.placeId,
             input.format,
@@ -440,7 +437,6 @@ export function createService(db: DatabaseSync, options: ServiceOptions = {}) {
         }
         if (patch.placeId !== undefined) requirePlace(patch.placeId);
         const columns: Record<keyof GameInput, string> = {
-          title: 'title',
           startsAt: 'starts_at',
           placeId: 'place_id',
           format: 'format',
@@ -474,7 +470,7 @@ export function createService(db: DatabaseSync, options: ServiceOptions = {}) {
           notify({
             userIds: recipients,
             message: clipMessage(
-              `Игра «${current.title}» изменена: ${whenText(current.starts_at)}, ${current.venue}, ${current.address}.`,
+              `Игра ${whenText(old.starts_at)}, ${old.venue} изменена. Теперь: ${whenText(current.starts_at)}, ${current.venue}, ${current.address}.`,
             ),
             fragment: gameFragment(gameId),
           });
@@ -501,7 +497,7 @@ export function createService(db: DatabaseSync, options: ServiceOptions = {}) {
         const g = cancelled;
         notify({
           userIds: recipients,
-          message: clipMessage(`Игра «${g.title}» (${whenText(g.starts_at)}) отменена организатором.`),
+          message: clipMessage(`Игра ${whenText(g.starts_at)}, ${g.venue} отменена организатором.`),
           fragment: gameFragment(gameId),
         });
       }
@@ -632,7 +628,7 @@ export function createService(db: DatabaseSync, options: ServiceOptions = {}) {
           notify({
             userIds,
             message: clipMessage(
-              `Напоминание: «${game.title}», ${whenText(game.starts_at)}, ${game.venue}. Мест у вас в составе: ${seats}.`,
+              `Напоминание: игра ${whenText(game.starts_at)}, ${game.venue}. Мест у вас в составе: ${seats}.`,
             ),
             fragment: gameFragment(game.id),
           });

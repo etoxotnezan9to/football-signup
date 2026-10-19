@@ -19,7 +19,6 @@ export type GameStatus = 'active' | 'cancelled';
 
 export interface GameSummary {
   id: number;
-  title: string;
   startsAt: string;
   placeId: number;
   /** Название места (из сущности «Место») */

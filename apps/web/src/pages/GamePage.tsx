@@ -4,7 +4,7 @@ import { formatRosterText, numberLabel, type GameDetails, type RosterEntry } fro
 import { api, type ApiError } from '../api.ts';
 import { Empty } from '../components/Empty.tsx';
 import { useApp } from '../context.ts';
-import { fillLabel, formatWhen, fullName, gameLink, routeToHash, seatsLabel } from '../format.ts';
+import { fillLabel, formatWhen, fullName, gameLabel, gameLink, routeToHash, seatsLabel } from '../format.ts';
 import { useGame } from '../hooks.ts';
 import { confirmPopout, entryMenuPopout } from '../seats.tsx';
 import { VK_APP_ID } from '../session.ts';
@@ -56,7 +56,7 @@ function GameView({ id }: { id: number }) {
   const back = () => navigate(routeToHash({ name: 'list' }));
 
   const header = (
-    <PanelHeader before={<PanelHeaderBack onClick={back} />}>{game ? game.title : 'Игра'}</PanelHeader>
+    <PanelHeader before={<PanelHeaderBack onClick={back} />}>{game ? gameLabel(game) : 'Игра'}</PanelHeader>
   );
 
   if (loading) {
@@ -93,7 +93,6 @@ function GameView({ id }: { id: number }) {
   const copyList = async () => {
     const text = formatRosterText(
       {
-        title: game.title,
         whenLabel: formatWhen(game.startsAt),
         venue: game.venue,
         address: game.address,

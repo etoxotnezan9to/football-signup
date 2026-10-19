@@ -43,7 +43,6 @@ test('создание игры, запись нескольких мест, о�
   // 1. Организатор создаёт игру на 4 места
   const org = await openAs(browser, ORGANIZER);
   await org.getByRole('button', { name: 'Создать игру', exact: true }).click();
-  await org.getByLabel('Название', { exact: true }).fill('E2E игра');
   await choosePlace(org, 'Тест-арена', 'ул. Тестовая, 1');
   await org.getByLabel('Взнос, ₽', { exact: true }).fill('650');
   await org.getByLabel('Число мест в составе', { exact: true }).fill('4');
@@ -54,7 +53,7 @@ test('создание игры, запись нескольких мест, о�
 
   // 2. Мария видит игру в списке и записывается на 3 места кнопкой «+»
   const maria = await openAs(browser, MARIA);
-  await expect(maria.getByText('E2E игра')).toBeVisible();
+  await expect(maria.getByText(/Тест-арена/)).toBeVisible();
   await maria.getByRole('button', { name: '+', exact: true }).click();
   await maria.getByRole('button', { name: '+3', exact: true }).click();
   await expect(maria.getByText('Вы записаны: 3 места в составе')).toBeVisible();
@@ -75,7 +74,7 @@ test('создание игры, запись нескольких мест, о�
   await expect(maria.getByText('занято 4/4, в очереди 1')).toBeVisible();
 
   // 6. Мария отменяет запись: очередь продвигается, у организатора остаются 2 места Алексея без очереди
-  await maria.getByText('E2E игра').click();
+  await maria.getByText(/Тест-арена/).click();
   await maria.getByRole('button', { name: 'Изменить запись (3)', exact: true }).click();
   await maria.getByRole('button', { name: 'Отменить запись', exact: true }).click();
   await maria.getByRole('button', { name: 'Отменить запись', exact: true }).click();
@@ -86,7 +85,6 @@ test('создание игры, запись нескольких мест, о�
 test('лимит: нельзя записаться больше чем на 5 мест суммарно', async ({ browser }) => {
   const org = await openAs(browser, ORGANIZER);
   await org.getByRole('button', { name: 'Создать игру', exact: true }).click();
-  await org.getByLabel('Название', { exact: true }).fill('Лимит');
   await choosePlace(org, 'Арена', 'ул. Лимитная, 5');
   await org.getByLabel('Взнос, ₽', { exact: true }).fill('0');
   await org.getByLabel('Число мест в составе', { exact: true }).fill('20');
@@ -101,8 +99,9 @@ test('лимит: нельзя записаться больше чем на 5 �
 test('форма создания показывает ошибки валидации и не создаёт игру', async ({ browser }) => {
   const org = await openAs(browser, ORGANIZER, '/#/create');
   await org.getByRole('button', { name: 'Создать игру', exact: true }).last().click();
-  await expect(org.getByText('длина от 1 до 80').first()).toBeVisible();
   await expect(org.getByText('выберите место', { exact: true })).toBeVisible();
+  await expect(org.getByText('целое число от 2 до 60')).toBeVisible();
+  await expect(org.getByLabel('Название', { exact: true })).toHaveCount(0);
   await expect(org).toHaveURL(/#\/create$/);
 });
 
@@ -118,7 +117,6 @@ test('место: создаётся на отдельной странице и
   await expect(org).toHaveURL(/#\/$/);
 
   await org.getByRole('button', { name: 'Создать игру', exact: true }).click();
-  await org.getByLabel('Название', { exact: true }).fill('Игра в манеже');
   await org.getByLabel('Место', { exact: true }).click();
   await org.getByRole('option', { name: /Манеж E2E/ }).click();
   await org.getByLabel('Взнос, ₽', { exact: true }).fill('500');
@@ -126,4 +124,7 @@ test('место: создаётся на отдельной странице и
   await org.getByRole('button', { name: 'Создать игру', exact: true }).last().click();
   await expect(org).toHaveURL(/#\/game\/\d+$/);
   await expect(org.getByText('Манеж E2E, пр. Спортивный, 3')).toBeVisible();
+  // вместо названия у игры дата и место
+  await org.goto('/#/');
+  await expect(org.getByText(/· Манеж E2E$/).first()).toBeVisible();
 });

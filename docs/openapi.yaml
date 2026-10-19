@@ -342,9 +342,8 @@ components:
         address: { type: string, minLength: 1, maxLength: 160 }
     GameInput:
       type: object
-      required: [title, startsAt, placeId, feeRub, capacity]
+      required: [startsAt, placeId, feeRub, capacity]
       properties:
-        title: { type: string, minLength: 1, maxLength: 80 }
         startsAt: { type: string, format: date-time }
         placeId: { type: integer, minimum: 1, description: 'Место; неизвестное — VALIDATION_ERROR с details.placeId' }
         format: { type: string, maxLength: 120, default: '' }
@@ -357,7 +356,6 @@ components:
       type: object
       description: Любое подмножество полей GameInput
       properties:
-        title: { type: string, minLength: 1, maxLength: 80 }
         startsAt: { type: string, format: date-time }
         placeId: { type: integer, minimum: 1 }
         format: { type: string, maxLength: 120 }
@@ -368,10 +366,9 @@ components:
         organizerContact: { type: string, maxLength: 120 }
     GameSummary:
       type: object
-      required: [id, title, startsAt, placeId, venue, feeRub, capacity, status, isFinished, taken, queued, organizer]
+      required: [id, startsAt, placeId, venue, feeRub, capacity, status, isFinished, taken, queued, organizer]
       properties:
         id: { type: integer }
-        title: { type: string }
         startsAt: { type: string, format: date-time }
         placeId: { type: integer }
         venue: { type: string, description: Название места }
