@@ -30,11 +30,12 @@
 **Place** (место): `id`, `name` (1–80), `address` (1–160), `createdBy` (User). Создать место может любой пользователь, список мест общий. Повторное создание места с тем же названием и адресом возвращает существующее.
 
 **Game**:
-- `id`, `organizerId` (User), `title` (1–80), `startsAt` (UTC, будущее на момент создания),
+- `id`, `organizerId` (User), `startsAt` (UTC, будущее на момент создания),
 - `placeId` (Place; в ответах также `venue` = название места и `address` = адрес места), `format` (0–120, текст, например «6х6, 3 или 4 команды»),
 - `feeRub` (0..`MAX_FEE_RUB`), `capacity` (`MIN_CAPACITY`..`MAX_CAPACITY`),
 - `description` (0–1000), `paymentInfo` (0–300: реквизиты предоплаты текстом), `organizerContact` (0–120: ссылка VK или телефон для чека),
 - `status`: `active` | `cancelled`, `createdAt`, `updatedAt`.
+- Названия у игры нет (убрано миграцией 0004): в интерфейсе игра обозначается датой и временем начала и названием места.
 - Статус `finished` не хранится: игра считается завершённой, когда `now > startsAt + FINISH_GRACE_MIN` (вычисляется, поле `isFinished` в ответах).
 
 **Signup**: `id`, `gameId`, `userId`, `seats` (1..`MAX_SEATS_PER_USER`), `paidSeats` (0..`seats`), `createdAt`, `updatedAt`. Одна запись на пару (игра, пользователь).
@@ -106,7 +107,6 @@
 Формат повторяет сообщение организатора:
 
 ```
-{title}
 📅 {дата и время}
 📍 {venue}, {address}
 💰 Взнос {feeRub}₽

@@ -23,7 +23,6 @@ const tick = () => void (clockMs += 1000);
 
 function gameBody(over: Record<string, unknown> = {}) {
   return {
-    title: 'Четверг',
     startsAt: '2026-10-22T18:00:00.000Z', // 21:00 по Москве
     placeId: PLACE,
     feeRub: 650,
@@ -65,7 +64,7 @@ describe('уведомление о попадании в состав', () => {
     const n = sent[0]!;
     assert.deepEqual(n.userIds, [B]);
     assert.match(n.message, /Вы в составе/);
-    assert.match(n.message, /«Четверг»/);
+    assert.match(n.message, /Орловский/);
     assert.match(n.message, /21:00/, 'время показывается по Москве');
     assert.equal(n.fragment, `/game/${g.id}`);
   });

@@ -81,7 +81,6 @@ function fakeSocket() {
 
 const summary = (id: number): GameSummary => ({
   id,
-  title: 'g',
   startsAt: '2026-10-22T18:00:00.000Z',
   placeId: 1,
   venue: 'v',

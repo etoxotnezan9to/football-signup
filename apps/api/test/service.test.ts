@@ -20,7 +20,6 @@ let PLACE = 0;
 
 function gameBody(over: Record<string, unknown> = {}) {
   return {
-    title: 'Четверг',
     startsAt: '2026-10-22T18:00:00.000Z',
     placeId: PLACE,
     feeRub: 650,
@@ -68,22 +67,22 @@ describe('создание и список игр', () => {
   });
 
   it('ограничивает число активных игр организатора', () => {
-    for (let i = 0; i < 10; i++) svc.createGame(ORG, gameBody({ title: `Игра ${i}` }));
+    for (let i = 0; i < 10; i++) svc.createGame(ORG, gameBody());
     expectCode(() => svc.createGame(ORG, gameBody()), 'ACTIVE_GAMES_LIMIT');
     svc.createGame(U1, gameBody()); // у другого организатора лимит свой
   });
 
   it('список: по возрастанию времени, пагинация, mySeats', () => {
-    svc.createGame(ORG, gameBody({ title: 'Поздняя', startsAt: '2026-10-25T18:00:00.000Z' }));
-    const early = svc.createGame(ORG, gameBody({ title: 'Ранняя', startsAt: '2026-10-21T18:00:00.000Z' }));
+    const late = svc.createGame(ORG, gameBody({ startsAt: '2026-10-25T18:00:00.000Z' }));
+    const early = svc.createGame(ORG, gameBody({ startsAt: '2026-10-21T18:00:00.000Z' }));
     svc.putSignup(early.id, U1, 2);
     const page1 = svc.listGames(U1, { limit: 1 });
     assert.equal(page1.items.length, 1);
-    assert.equal(page1.items[0]?.title, 'Ранняя');
+    assert.equal(page1.items[0]?.id, early.id);
     assert.equal(page1.items[0]?.mySeats, 2);
     assert.equal(page1.nextCursor, '1');
     const page2 = svc.listGames(U1, { limit: 1, cursor: page1.nextCursor! });
-    assert.equal(page2.items[0]?.title, 'Поздняя');
+    assert.equal(page2.items[0]?.id, late.id);
     assert.equal(page2.items[0]?.mySeats, 0);
     assert.equal(page2.nextCursor, null);
   });
@@ -202,7 +201,7 @@ describe('функции организатора', () => {
   it('только организатор редактирует, отменяет, отмечает оплату и удаляет', () => {
     const g = svc.createGame(ORG, gameBody());
     const s = svc.putSignup(g.id, U1, 2).signup;
-    expectCode(() => svc.updateGame(g.id, U1, { title: 'x' }), 'FORBIDDEN');
+    expectCode(() => svc.updateGame(g.id, U1, { capacity: 10 }), 'FORBIDDEN');
     expectCode(() => svc.cancelGame(g.id, U1), 'FORBIDDEN');
     expectCode(() => svc.setPaid(g.id, U1, s.signupId, 1), 'FORBIDDEN');
     expectCode(() => svc.removeSignup(g.id, U1, s.signupId), 'FORBIDDEN');
@@ -255,7 +254,7 @@ describe('функции организатора', () => {
     );
     expectCode(() => svc.updateGame(g.id, ORG, {}), 'VALIDATION_ERROR');
     svc.cancelGame(g.id, ORG);
-    expectCode(() => svc.updateGame(g.id, ORG, { title: 'новое' }), 'GAME_NOT_ACTIVE');
+    expectCode(() => svc.updateGame(g.id, ORG, { capacity: 10 }), 'GAME_NOT_ACTIVE');
   });
 
   it('организатор может записаться на свою игру', () => {
@@ -267,8 +266,8 @@ describe('функции организатора', () => {
 
 describe('мои игры', () => {
   it('разделяет созданные и те, куда я записан', () => {
-    const mine = svc.createGame(U1, gameBody({ title: 'Моя' }));
-    const other = svc.createGame(ORG, gameBody({ title: 'Чужая' }));
+    const mine = svc.createGame(U1, gameBody());
+    const other = svc.createGame(ORG, gameBody());
     svc.putSignup(other.id, U1, 1);
     const my = svc.myGames(U1);
     assert.deepEqual(

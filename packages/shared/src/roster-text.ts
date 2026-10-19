@@ -1,7 +1,6 @@
 // Текстовый список для кнопки «Скопировать список» (docs/spec.md, раздел 10).
 
 export interface TextGameInfo {
-  title: string;
   /** Уже отформатированная дата и время, чтобы функция не зависела от часового пояса */
   whenLabel: string;
   venue: string;
@@ -36,7 +35,6 @@ function paidLabel(paidSeats: number, seats: number): string {
 
 export function formatRosterText(game: TextGameInfo, entries: readonly TextRosterEntry[]): string {
   const lines: string[] = [
-    game.title,
     `📅 ${game.whenLabel}`,
     `📍 ${game.venue}, ${game.address}`,
     `💰 Взнос ${game.feeRub}₽`,

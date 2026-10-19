@@ -18,7 +18,6 @@ import { defaultStartsAt, fromLocalInput, routeToHash, toLocalInput } from '../f
 import { useGame } from '../hooks.ts';
 
 interface FormState {
-  title: string;
   startsAt: string;
   /** id выбранного места строкой ('' — не выбрано) */
   placeId: string;
@@ -39,7 +38,6 @@ interface Field {
 }
 
 const FIELDS: Field[] = [
-  { key: 'title', label: 'Название', hint: 'Например: Футбольный сбор' },
   { key: 'startsAt', label: 'Дата и время начала', type: 'datetime-local' },
   { key: 'placeId', label: 'Место', type: 'place', hint: 'Выберите из списка или добавьте новое' },
   { key: 'format', label: 'Формат', hint: 'Например: 6х6, 3 команды, 6 игр по 9 минут' },
@@ -56,7 +54,6 @@ const FIELDS: Field[] = [
 
 function toForm(g?: GameDetails): FormState {
   return {
-    title: g?.title ?? '',
     startsAt: g ? toLocalInput(g.startsAt) : defaultStartsAt(new Date()),
     placeId: g ? String(g.placeId) : '',
     format: g?.format ?? '',
@@ -148,7 +145,6 @@ export function GameForm({ initial }: { initial?: GameDetails }) {
 
   const submit = async () => {
     const parsed = parseGameInput({
-      title: form.title,
       startsAt: fromLocalInput(form.startsAt),
       placeId: toNumber(form.placeId),
       format: form.format,
