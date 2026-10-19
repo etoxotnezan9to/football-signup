@@ -63,6 +63,12 @@ say "Окружение: $ENV_NAME, домен: $DOMAIN, порт API: 127.0.0.1
 for cmd in nginx docker; do
   command -v "$cmd" >/dev/null || { echo "Не найден $cmd" >&2; exit 1; }
 done
+# release.sh вызывает «docker compose» (v2); пакет docker.io из Ubuntu ставит docker без этого плагина
+docker compose version >/dev/null 2>&1 || {
+  echo "Не найден плагин docker compose. Установите docker-compose-v2 (Docker из пакета Ubuntu docker.io)" \
+    "или docker-compose-plugin (Docker из репозитория Docker, docker-ce)" >&2
+  exit 1
+}
 if ss -tln | awk '{print $4}' | grep -Eq "[:.]${API_PORT}\$"; then
   echo "Порт $API_PORT уже занят, выберите другой (ss -tlnp)" >&2; exit 1
 fi
