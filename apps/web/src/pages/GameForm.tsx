@@ -1,8 +1,18 @@
-import { useState } from 'react';
-import { Button, FormItem, Group, Input, PanelHeader, PanelHeaderBack, Textarea } from '@vkontakte/vkui';
-import { parseGameInput, type GameDetails, type GameInput } from '@football/shared';
+import { useEffect, useState } from 'react';
+import {
+  Button,
+  CustomSelect,
+  FormItem,
+  Group,
+  Input,
+  PanelHeader,
+  PanelHeaderBack,
+  Textarea,
+} from '@vkontakte/vkui';
+import { parseGameInput, type GameDetails, type GameInput, type Place } from '@football/shared';
 import { api, ApiError } from '../api.ts';
 import { Empty } from '../components/Empty.tsx';
+import { PlaceForm } from '../components/PlaceForm.tsx';
 import { useApp } from '../context.ts';
 import { defaultStartsAt, fromLocalInput, routeToHash, toLocalInput } from '../format.ts';
 import { useGame } from '../hooks.ts';
@@ -10,8 +20,8 @@ import { useGame } from '../hooks.ts';
 interface FormState {
   title: string;
   startsAt: string;
-  venue: string;
-  address: string;
+  /** id выбранного места строкой ('' — не выбрано) */
+  placeId: string;
   format: string;
   feeRub: string;
   capacity: string;
@@ -23,7 +33,7 @@ interface FormState {
 interface Field {
   key: keyof FormState;
   label: string;
-  type?: 'text' | 'datetime-local' | 'number';
+  type?: 'text' | 'datetime-local' | 'number' | 'place';
   multiline?: boolean;
   hint?: string;
 }
@@ -31,12 +41,15 @@ interface Field {
 const FIELDS: Field[] = [
   { key: 'title', label: 'Название', hint: 'Например: Футбольный сбор' },
   { key: 'startsAt', label: 'Дата и время начала', type: 'datetime-local' },
-  { key: 'venue', label: 'Площадка', hint: 'Например: Ф.Ц. «Орловский»' },
-  { key: 'address', label: 'Адрес' },
+  { key: 'placeId', label: 'Место', type: 'place', hint: 'Выберите из списка или добавьте новое' },
   { key: 'format', label: 'Формат', hint: 'Например: 6х6, 3 команды, 6 игр по 9 минут' },
   { key: 'feeRub', label: 'Взнос, ₽', type: 'number' },
   { key: 'capacity', label: 'Число мест в составе', type: 'number', hint: 'От 2 до 60' },
-  { key: 'paymentInfo', label: 'Реквизиты для предоплаты', hint: 'Телефон и банк. Оплату вы отмечаете вручную' },
+  {
+    key: 'paymentInfo',
+    label: 'Реквизиты для предоплаты',
+    hint: 'Телефон и банк. Оплату вы отмечаете вручную',
+  },
   { key: 'organizerContact', label: 'Контакт для чека', hint: 'Ссылка VK или телефон' },
   { key: 'description', label: 'Описание', multiline: true },
 ];
@@ -45,8 +58,7 @@ function toForm(g?: GameDetails): FormState {
   return {
     title: g?.title ?? '',
     startsAt: g ? toLocalInput(g.startsAt) : defaultStartsAt(new Date()),
-    venue: g?.venue ?? '',
-    address: g?.address ?? '',
+    placeId: g ? String(g.placeId) : '',
     format: g?.format ?? '',
     feeRub: g ? String(g.feeRub) : '',
     capacity: g ? String(g.capacity) : '',
@@ -67,16 +79,78 @@ export function GameForm({ initial }: { initial?: GameDetails }) {
   const [form, setForm] = useState<FormState>(() => toForm(initial));
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
+  const [places, setPlaces] = useState<Place[] | null>(null);
+  const [addingPlace, setAddingPlace] = useState(false);
 
-  const back = () =>
-    navigate(routeToHash(initial ? { name: 'game', id: initial.id } : { name: 'list' }));
+  useEffect(() => {
+    let alive = true;
+    api
+      .listPlaces()
+      .then((r) => alive && setPlaces(r.items))
+      .catch(() => alive && setPlaces([]));
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const onPlaceCreated = (place: Place) => {
+    setPlaces((prev) => {
+      const rest = (prev ?? []).filter((p) => p.id !== place.id);
+      return [...rest, place].sort(
+        (a, b) => a.name.localeCompare(b.name, 'ru') || a.address.localeCompare(b.address, 'ru'),
+      );
+    });
+    setForm((f) => ({ ...f, placeId: String(place.id) }));
+    setErrors((e) => {
+      const { placeId: _drop, ...rest } = e;
+      return rest;
+    });
+    setAddingPlace(false);
+  };
+
+  const renderPlace = (f: Field) => (
+    <>
+      <FormItem
+        key={f.key}
+        htmlFor={f.key}
+        top={f.label}
+        status={errors[f.key] ? 'error' : 'default'}
+        bottom={errors[f.key] ?? f.hint}
+      >
+        <CustomSelect
+          id={f.key}
+          searchable
+          placeholder={places === null ? 'Загрузка…' : 'Выберите место'}
+          emptyText="Мест пока нет, добавьте новое"
+          fetching={places === null}
+          options={(places ?? []).map((p) => ({
+            value: String(p.id),
+            label: p.name,
+            description: p.address,
+          }))}
+          value={form.placeId === '' ? null : form.placeId}
+          onChange={(_e, value) => setForm({ ...form, placeId: value === null ? '' : String(value) })}
+        />
+      </FormItem>
+      {addingPlace ? (
+        <PlaceForm onCreated={onPlaceCreated} onCancel={() => setAddingPlace(false)} />
+      ) : (
+        <FormItem>
+          <Button size="s" mode="link" onClick={() => setAddingPlace(true)}>
+            + Новое место
+          </Button>
+        </FormItem>
+      )}
+    </>
+  );
+
+  const back = () => navigate(routeToHash(initial ? { name: 'game', id: initial.id } : { name: 'list' }));
 
   const submit = async () => {
     const parsed = parseGameInput({
       title: form.title,
       startsAt: fromLocalInput(form.startsAt),
-      venue: form.venue,
-      address: form.address,
+      placeId: toNumber(form.placeId),
       format: form.format,
       feeRub: toNumber(form.feeRub),
       capacity: toNumber(form.capacity),
@@ -103,7 +177,8 @@ export function GameForm({ initial }: { initial?: GameDetails }) {
       for (const key of Object.keys(parsed.value) as (keyof GameInput)[]) {
         const next = parsed.value[key];
         const before = initial[key];
-        const same = key === 'startsAt' ? Date.parse(String(before)) === Date.parse(String(next)) : before === next;
+        const same =
+          key === 'startsAt' ? Date.parse(String(before)) === Date.parse(String(next)) : before === next;
         if (!same) patch[key] = next;
       }
       if (Object.keys(patch).length === 0) {
@@ -131,26 +206,34 @@ export function GameForm({ initial }: { initial?: GameDetails }) {
         {initial ? 'Редактирование игры' : 'Новая игра'}
       </PanelHeader>
       <Group>
-        {FIELDS.map((f) => (
-          <FormItem
-            key={f.key}
-            htmlFor={f.key}
-            top={f.label}
-            status={errors[f.key] ? 'error' : 'default'}
-            bottom={errors[f.key] ?? f.hint}
-          >
-            {f.multiline ? (
-              <Textarea id={f.key} value={form[f.key]} onChange={(e) => setForm({ ...form, [f.key]: e.target.value })} />
-            ) : (
-              <Input
-                id={f.key}
-                type={f.type ?? 'text'}
-                value={form[f.key]}
-                onChange={(e) => setForm({ ...form, [f.key]: e.target.value })}
-              />
-            )}
-          </FormItem>
-        ))}
+        {FIELDS.map((f) =>
+          f.type === 'place' ? (
+            <div key={f.key}>{renderPlace(f)}</div>
+          ) : (
+            <FormItem
+              key={f.key}
+              htmlFor={f.key}
+              top={f.label}
+              status={errors[f.key] ? 'error' : 'default'}
+              bottom={errors[f.key] ?? f.hint}
+            >
+              {f.multiline ? (
+                <Textarea
+                  id={f.key}
+                  value={form[f.key]}
+                  onChange={(e) => setForm({ ...form, [f.key]: e.target.value })}
+                />
+              ) : (
+                <Input
+                  id={f.key}
+                  type={f.type ?? 'text'}
+                  value={form[f.key]}
+                  onChange={(e) => setForm({ ...form, [f.key]: e.target.value })}
+                />
+              )}
+            </FormItem>
+          ),
+        )}
         <FormItem>
           <Button size="l" stretched loading={busy} onClick={() => void submit()}>
             {initial ? 'Сохранить' : 'Создать игру'}

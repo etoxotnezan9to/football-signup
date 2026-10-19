@@ -24,6 +24,9 @@ export function ListPage() {
         <Button size="m" mode="secondary" onClick={() => navigate(routeToHash({ name: 'my' }))}>
           Мои игры
         </Button>
+        <Button size="m" mode="secondary" onClick={() => navigate(routeToHash({ name: 'newPlace' }))}>
+          Добавить место
+        </Button>
       </div>
       <MockBar />
       <NotificationsPrompt />

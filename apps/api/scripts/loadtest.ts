@@ -32,12 +32,18 @@ const check = (ok: boolean, message: string): void => {
   if (!ok) failures.push(message);
 };
 
-const mockAuth = (id: number): string => `${id}:${encodeURIComponent('Нагрузка')}:${encodeURIComponent(String(id))}`;
+const mockAuth = (id: number): string =>
+  `${id}:${encodeURIComponent('Нагрузка')}:${encodeURIComponent(String(id))}`;
 
 const latencies: number[] = [];
 const statuses = new Map<number, number>();
 
-async function call(method: string, path: string, userId: number, body?: unknown): Promise<{ status: number; json: unknown }> {
+async function call(
+  method: string,
+  path: string,
+  userId: number,
+  body?: unknown,
+): Promise<{ status: number; json: unknown }> {
   const started = performance.now();
   const res = await fetch(`${BASE}/api${path}`, {
     method,
@@ -83,54 +89,85 @@ async function observe(gameId: number, userId: number): Promise<Observer> {
       }
     });
     ws.addEventListener('error', () => reject(new Error('WebSocket: ошибка соединения')));
-    ws.addEventListener('open', () => ws.send(JSON.stringify({ type: 'auth', launchParams: `mock:${mockAuth(userId)}` })));
+    ws.addEventListener('open', () =>
+      ws.send(JSON.stringify({ type: 'auth', launchParams: `mock:${mockAuth(userId)}` })),
+    );
   });
   return obs;
 }
 
 async function main(): Promise<void> {
   const startsAt = new Date(Date.now() + 3 * 86_400_000).toISOString();
+  const place = await call('POST', '/places', ORGANIZER, { name: 'Тест', address: 'Тест' });
+  check(place.status === 201 || place.status === 200, `создание места вернуло ${place.status}`);
+  const placeId = (place.json as { id: number }).id;
   const created = await call('POST', '/games', ORGANIZER, {
     title: 'Нагрузочный тест',
     startsAt,
-    venue: 'Тест',
-    address: 'Тест',
+    placeId,
     feeRub: 0,
     capacity: CAPACITY,
   });
   check(created.status === 201, `создание игры вернуло ${created.status}`);
   const gameId = (created.json as { id: number }).id;
 
-  const observers = await Promise.all(Array.from({ length: OBSERVERS }, (_, i) => observe(gameId, 800_000 + i)));
+  const observers = await Promise.all(
+    Array.from({ length: OBSERVERS }, (_, i) => observe(gameId, 800_000 + i)),
+  );
 
   // Все записываются одновременно; число мест детерминировано, чтобы ожидаемый итог был известен заранее
   const wanted = Array.from({ length: USERS }, (_, i) => 1 + (i % 5));
   const started = performance.now();
-  const results = await Promise.all(wanted.map((seats, i) => call('PUT', `/games/${gameId}/signup`, 1000 + i, { seats })));
+  const results = await Promise.all(
+    wanted.map((seats, i) => call('PUT', `/games/${gameId}/signup`, 1000 + i, { seats })),
+  );
   const writeMs = performance.now() - started;
-  check(results.every((r) => r.status === 200), `не все записи прошли: ${JSON.stringify([...statuses])}`);
+  check(
+    results.every((r) => r.status === 200),
+    `не все записи прошли: ${JSON.stringify([...statuses])}`,
+  );
 
   // Часть пользователей передумала: освободившиеся места должны достаться очереди без превышения
   const leavers = Array.from({ length: Math.floor(USERS / 4) }, (_, i) => i * 4);
   const leave = await Promise.all(leavers.map((i) => call('DELETE', `/games/${gameId}/signup`, 1000 + i)));
-  check(leave.every((r) => r.status === 200), 'не все отмены прошли');
+  check(
+    leave.every((r) => r.status === 200),
+    'не все отмены прошли',
+  );
 
   const leaverSet = new Set(leavers);
   const expectedTotal = wanted.reduce((sum, seats, i) => sum + (leaverSet.has(i) ? 0 : seats), 0);
 
   const final = (await call('GET', `/games/${gameId}`, ORGANIZER)).json as Roster;
   check(final.taken <= CAPACITY, `состав превышен: ${final.taken} > ${CAPACITY}`);
-  check(final.taken === Math.min(CAPACITY, expectedTotal), `в составе ${final.taken}, ожидалось ${Math.min(CAPACITY, expectedTotal)}`);
-  check(final.taken + final.queued === expectedTotal, `всего мест ${final.taken + final.queued}, ожидалось ${expectedTotal}`);
-  check(final.roster.every((e) => e.mainSeats + e.queueSeats === e.seats), 'у записи mainSeats + queueSeats != seats');
-  check(final.roster.length === USERS - leavers.length, `записей ${final.roster.length}, ожидалось ${USERS - leavers.length}`);
+  check(
+    final.taken === Math.min(CAPACITY, expectedTotal),
+    `в составе ${final.taken}, ожидалось ${Math.min(CAPACITY, expectedTotal)}`,
+  );
+  check(
+    final.taken + final.queued === expectedTotal,
+    `всего мест ${final.taken + final.queued}, ожидалось ${expectedTotal}`,
+  );
+  check(
+    final.roster.every((e) => e.mainSeats + e.queueSeats === e.seats),
+    'у записи mainSeats + queueSeats != seats',
+  );
+  check(
+    final.roster.length === USERS - leavers.length,
+    `записей ${final.roster.length}, ожидалось ${USERS - leavers.length}`,
+  );
 
   // Наблюдатели получают итоговый состав (даём секунду на доставку последних событий)
   const deadline = Date.now() + 5000;
-  while (Date.now() < deadline && observers.some((o) => o.last?.taken !== final.taken || o.last?.queued !== final.queued)) {
+  while (
+    Date.now() < deadline &&
+    observers.some((o) => o.last?.taken !== final.taken || o.last?.queued !== final.queued)
+  ) {
     await new Promise((r) => setTimeout(r, 100));
   }
-  const stale = observers.filter((o) => o.last?.taken !== final.taken || o.last?.queued !== final.queued).length;
+  const stale = observers.filter(
+    (o) => o.last?.taken !== final.taken || o.last?.queued !== final.queued,
+  ).length;
   check(stale === 0, `${stale} из ${OBSERVERS} наблюдателей не получили итоговый состав`);
   observers.forEach((o) => o.close());
 

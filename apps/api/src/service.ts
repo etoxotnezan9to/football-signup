@@ -13,6 +13,7 @@ import {
   promotionsBetween,
   parseGameInput,
   parseGameUpdate,
+  parsePlaceInput,
   rosterTotals,
   checkSeats,
 } from '@football/shared';
@@ -21,6 +22,7 @@ import type {
   GameInput,
   GameSummary,
   MainSeats,
+  Place,
   RosterEntry,
   ServerEvent,
   User,
@@ -41,7 +43,10 @@ interface GameRow {
   organizer_id: number;
   title: string;
   starts_at: string;
+  place_id: number;
+  /** Название места (из JOIN с places) */
   venue: string;
+  /** Адрес места (из JOIN с places) */
   address: string;
   format: string;
   fee_rub: number;
@@ -51,6 +56,16 @@ interface GameRow {
   organizer_contact: string;
   status: 'active' | 'cancelled';
 }
+
+interface PlaceRow {
+  id: number;
+  name: string;
+  address: string;
+}
+
+/** Игра вместе с названием и адресом её места. Колонки игр в условиях пишите с префиксом `g.`. */
+const GAME_SELECT = `SELECT g.*, p.name AS venue, p.address AS address
+  FROM games g JOIN places p ON p.id = g.place_id`;
 
 interface SignupRow {
   id: number;
@@ -95,9 +110,16 @@ export function createService(db: DatabaseSync, options: ServiceOptions = {}) {
   }
 
   function getGameRow(gameId: number): GameRow {
-    const row = db.prepare('SELECT * FROM games WHERE id = ?').get(gameId) as unknown as GameRow | undefined;
+    const row = db.prepare(`${GAME_SELECT} WHERE g.id = ?`).get(gameId) as unknown as GameRow | undefined;
     if (!row) throw new AppError('NOT_FOUND', 'Игра не найдена');
     return row;
+  }
+
+  /** Проверяет, что место существует (иначе ошибка поля placeId). */
+  function requirePlace(placeId: number): void {
+    if (!db.prepare('SELECT 1 FROM places WHERE id = ?').get(placeId)) {
+      throw new AppError('VALIDATION_ERROR', 'Место не найдено', { placeId: 'место не найдено' });
+    }
   }
 
   function getUser(vkId: number): User {
@@ -129,7 +151,12 @@ export function createService(db: DatabaseSync, options: ServiceOptions = {}) {
       const r = byId.get(c.signupId)!;
       return {
         signupId: c.signupId,
-        user: toUser({ vk_id: r.user_id, first_name: r.first_name, last_name: r.last_name, photo_url: r.photo_url }),
+        user: toUser({
+          vk_id: r.user_id,
+          first_name: r.first_name,
+          last_name: r.last_name,
+          photo_url: r.photo_url,
+        }),
         seats: c.seats,
         mainSeats: c.mainSeats,
         queueSeats: c.queueSeats,
@@ -146,6 +173,7 @@ export function createService(db: DatabaseSync, options: ServiceOptions = {}) {
       id: game.id,
       title: game.title,
       startsAt: game.starts_at,
+      placeId: game.place_id,
       venue: game.venue,
       feeRub: game.fee_rub,
       capacity: game.capacity,
@@ -248,21 +276,45 @@ export function createService(db: DatabaseSync, options: ServiceOptions = {}) {
   }
 
   function upsertUser(p: VkProfile): User {
-      const ts = now().toISOString();
-      db.prepare(
-        `INSERT INTO users (vk_id, first_name, last_name, photo_url, created_at, updated_at)
+    const ts = now().toISOString();
+    db.prepare(
+      `INSERT INTO users (vk_id, first_name, last_name, photo_url, created_at, updated_at)
          VALUES (?, ?, ?, ?, ?, ?)
          ON CONFLICT(vk_id) DO UPDATE SET
            first_name = excluded.first_name,
            last_name = excluded.last_name,
            photo_url = COALESCE(excluded.photo_url, users.photo_url),
            updated_at = excluded.updated_at`,
-      ).run(p.vkId, p.firstName, p.lastName, p.photoUrl ?? null, ts, ts);
-      return getUser(p.vkId);
-    }
+    ).run(p.vkId, p.firstName, p.lastName, p.photoUrl ?? null, ts, ts);
+    return getUser(p.vkId);
+  }
 
   return {
     upsertUser,
+
+    listPlaces(): Place[] {
+      const rows = db
+        .prepare('SELECT id, name, address FROM places ORDER BY name, address, id')
+        .all() as unknown as PlaceRow[];
+      return rows.map((r) => ({ id: r.id, name: r.name, address: r.address }));
+    },
+
+    /** Создаёт место. Если такое же (название и адрес) уже есть, возвращает существующее. */
+    createPlace(userId: number, body: unknown): { place: Place; created: boolean } {
+      const parsed = parsePlaceInput(body);
+      if (!parsed.ok) throw new AppError('VALIDATION_ERROR', 'Неверные данные места', parsed.errors);
+      const { name, address } = parsed.value;
+      return inTransaction(db, () => {
+        const existing = db
+          .prepare('SELECT id, name, address FROM places WHERE name = ? AND address = ?')
+          .get(name, address) as unknown as PlaceRow | undefined;
+        if (existing) return { place: { ...existing }, created: false };
+        const res = db
+          .prepare('INSERT INTO places (name, address, created_by, created_at) VALUES (?, ?, ?, ?)')
+          .run(name, address, userId, now().toISOString());
+        return { place: { id: Number(res.lastInsertRowid), name, address }, created: true };
+      });
+    },
 
     /** Гарантирует, что пользователь существует (имя-заглушка, если профиль ещё не передан). */
     ensureUser(vkId: number): User {
@@ -311,12 +363,16 @@ export function createService(db: DatabaseSync, options: ServiceOptions = {}) {
         throw new AppError('STARTS_AT_IN_PAST', 'Время начала должно быть в будущем');
       }
       const id = inTransaction(db, () => {
+        requirePlace(input.placeId);
         const active = db
           .prepare(
             `SELECT COUNT(*) AS n FROM games
               WHERE organizer_id = ? AND status = 'active' AND starts_at > ?`,
           )
-          .get(organizerId, new Date(now().getTime() - FINISH_GRACE_MIN * 60_000).toISOString()) as unknown as {
+          .get(
+            organizerId,
+            new Date(now().getTime() - FINISH_GRACE_MIN * 60_000).toISOString(),
+          ) as unknown as {
           n: number;
         };
         if (active.n >= MAX_ACTIVE_GAMES_PER_ORGANIZER) {
@@ -325,16 +381,15 @@ export function createService(db: DatabaseSync, options: ServiceOptions = {}) {
         const ts = now().toISOString();
         const res = db
           .prepare(
-            `INSERT INTO games (organizer_id, title, starts_at, venue, address, format, fee_rub, capacity,
+            `INSERT INTO games (organizer_id, title, starts_at, place_id, format, fee_rub, capacity,
                                 description, payment_info, organizer_contact, status, created_at, updated_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?)`,
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?)`,
           )
           .run(
             organizerId,
             input.title,
             input.startsAt,
-            input.venue,
-            input.address,
+            input.placeId,
             input.format,
             input.feeRub,
             input.capacity,
@@ -356,8 +411,8 @@ export function createService(db: DatabaseSync, options: ServiceOptions = {}) {
       const since = new Date(now().getTime() - FINISH_GRACE_MIN * 60_000).toISOString();
       const rows = db
         .prepare(
-          `SELECT * FROM games WHERE status = 'active' AND starts_at > ?
-            ORDER BY starts_at, id LIMIT ? OFFSET ?`,
+          `${GAME_SELECT} WHERE g.status = 'active' AND g.starts_at > ?
+            ORDER BY g.starts_at, g.id LIMIT ? OFFSET ?`,
         )
         .all(since, limit + 1, offset) as unknown as GameRow[];
       const page = rows.slice(0, limit);
@@ -383,11 +438,11 @@ export function createService(db: DatabaseSync, options: ServiceOptions = {}) {
         if (patch.startsAt !== undefined && Date.parse(patch.startsAt) <= now().getTime()) {
           throw new AppError('STARTS_AT_IN_PAST', 'Время начала должно быть в будущем');
         }
+        if (patch.placeId !== undefined) requirePlace(patch.placeId);
         const columns: Record<keyof GameInput, string> = {
           title: 'title',
           startsAt: 'starts_at',
-          venue: 'venue',
-          address: 'address',
+          placeId: 'place_id',
           format: 'format',
           feeRub: 'fee_rub',
           capacity: 'capacity',
@@ -454,12 +509,18 @@ export function createService(db: DatabaseSync, options: ServiceOptions = {}) {
     },
 
     /** Записаться или изменить число мест (идемпотентно): seats — итоговое число мест. */
-    putSignup(gameId: number, userId: number, seatsInput: unknown): { signup: RosterEntry; game: GameDetails } {
+    putSignup(
+      gameId: number,
+      userId: number,
+      seatsInput: unknown,
+    ): { signup: RosterEntry; game: GameDetails } {
       const check = checkSeats(seatsInput);
       if (!check.ok) {
         throw new AppError(
           check.code,
-          check.code === 'SEATS_LIMIT_EXCEEDED' ? 'Превышен лимит мест на одного человека' : 'Неверное число мест',
+          check.code === 'SEATS_LIMIT_EXCEEDED'
+            ? 'Превышен лимит мест на одного человека'
+            : 'Неверное число мест',
         );
       }
       const before = snapshot(gameId);
@@ -549,7 +610,7 @@ export function createService(db: DatabaseSync, options: ServiceOptions = {}) {
       const nowMs = now().getTime();
       const candidates = db
         .prepare(
-          `SELECT * FROM games WHERE status = 'active' AND reminder_sent_at IS NULL AND starts_at > ?`,
+          `${GAME_SELECT} WHERE g.status = 'active' AND g.reminder_sent_at IS NULL AND g.starts_at > ?`,
         )
         .all(new Date(nowMs).toISOString()) as unknown as (GameRow & { created_at: string })[];
       let sent = 0;
@@ -583,13 +644,11 @@ export function createService(db: DatabaseSync, options: ServiceOptions = {}) {
     myGames(userId: number): { organized: GameSummary[]; joined: GameSummary[] } {
       const since = new Date(now().getTime() - FINISH_GRACE_MIN * 60_000).toISOString();
       const organized = db
-        .prepare(
-          `SELECT * FROM games WHERE organizer_id = ? AND starts_at > ? ORDER BY starts_at, id`,
-        )
+        .prepare(`${GAME_SELECT} WHERE g.organizer_id = ? AND g.starts_at > ? ORDER BY g.starts_at, g.id`)
         .all(userId, since) as unknown as GameRow[];
       const joined = db
         .prepare(
-          `SELECT g.* FROM games g JOIN signups s ON s.game_id = g.id
+          `${GAME_SELECT} JOIN signups s ON s.game_id = g.id
             WHERE s.user_id = ? AND g.starts_at > ? ORDER BY g.starts_at, g.id`,
         )
         .all(userId, since) as unknown as GameRow[];

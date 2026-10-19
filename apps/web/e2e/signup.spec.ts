@@ -7,6 +7,16 @@ const ALEXEY = 1003; // Алексей Смирнов
 
 const opened: BrowserContext[] = [];
 
+/** Выбор места в комбобоксе формы игры; если места ещё нет, создаём его прямо из формы. */
+async function choosePlace(page: Page, name: string, address: string): Promise<void> {
+  await page.getByRole('button', { name: '+ Новое место', exact: true }).click();
+  await page.getByLabel('Название места', { exact: true }).fill(name);
+  await page.getByLabel('Адрес места', { exact: true }).fill(address);
+  await page.getByRole('button', { name: 'Сохранить место', exact: true }).click();
+  // новое место сразу выбрано в комбобоксе
+  await expect(page.getByText(name, { exact: true })).toBeVisible();
+}
+
 /** Отдельный браузерный контекст = отдельный пользователь (mockUser хранится в localStorage). */
 async function openAs(browser: Browser, userId: number, path = '/'): Promise<Page> {
   const ctx = await browser.newContext();
@@ -34,8 +44,7 @@ test('создание игры, запись нескольких мест, о�
   const org = await openAs(browser, ORGANIZER);
   await org.getByRole('button', { name: 'Создать игру', exact: true }).click();
   await org.getByLabel('Название', { exact: true }).fill('E2E игра');
-  await org.getByLabel('Площадка', { exact: true }).fill('Тест-арена');
-  await org.getByLabel('Адрес', { exact: true }).fill('ул. Тестовая, 1');
+  await choosePlace(org, 'Тест-арена', 'ул. Тестовая, 1');
   await org.getByLabel('Взнос, ₽', { exact: true }).fill('650');
   await org.getByLabel('Число мест в составе', { exact: true }).fill('4');
   await org.getByRole('button', { name: 'Создать игру', exact: true }).last().click();
@@ -78,8 +87,7 @@ test('лимит: нельзя записаться больше чем на 5 �
   const org = await openAs(browser, ORGANIZER);
   await org.getByRole('button', { name: 'Создать игру', exact: true }).click();
   await org.getByLabel('Название', { exact: true }).fill('Лимит');
-  await org.getByLabel('Площадка', { exact: true }).fill('Арена');
-  await org.getByLabel('Адрес', { exact: true }).fill('ул. Лимитная, 5');
+  await choosePlace(org, 'Арена', 'ул. Лимитная, 5');
   await org.getByLabel('Взнос, ₽', { exact: true }).fill('0');
   await org.getByLabel('Число мест в составе', { exact: true }).fill('20');
   await org.getByRole('button', { name: 'Создать игру', exact: true }).last().click();
@@ -94,5 +102,28 @@ test('форма создания показывает ошибки валида
   const org = await openAs(browser, ORGANIZER, '/#/create');
   await org.getByRole('button', { name: 'Создать игру', exact: true }).last().click();
   await expect(org.getByText('длина от 1 до 80').first()).toBeVisible();
+  await expect(org.getByText('выберите место', { exact: true })).toBeVisible();
   await expect(org).toHaveURL(/#\/create$/);
+});
+
+test('место: создаётся на отдельной странице и выбирается в форме игры из списка', async ({ browser }) => {
+  const org = await openAs(browser, ORGANIZER);
+  await org.getByRole('button', { name: 'Добавить место', exact: true }).click();
+  await expect(org).toHaveURL(/#\/places\/new$/);
+  await org.getByRole('button', { name: 'Сохранить место', exact: true }).click();
+  await expect(org.getByText('длина от 1 до 80').first()).toBeVisible();
+  await org.getByLabel('Название места', { exact: true }).fill('Манеж E2E');
+  await org.getByLabel('Адрес места', { exact: true }).fill('пр. Спортивный, 3');
+  await org.getByRole('button', { name: 'Сохранить место', exact: true }).click();
+  await expect(org).toHaveURL(/#\/$/);
+
+  await org.getByRole('button', { name: 'Создать игру', exact: true }).click();
+  await org.getByLabel('Название', { exact: true }).fill('Игра в манеже');
+  await org.getByLabel('Место', { exact: true }).click();
+  await org.getByRole('option', { name: /Манеж E2E/ }).click();
+  await org.getByLabel('Взнос, ₽', { exact: true }).fill('500');
+  await org.getByLabel('Число мест в составе', { exact: true }).fill('12');
+  await org.getByRole('button', { name: 'Создать игру', exact: true }).last().click();
+  await expect(org).toHaveURL(/#\/game\/\d+$/);
+  await expect(org.getByText('Манеж E2E, пр. Спортивный, 3')).toBeVisible();
 });

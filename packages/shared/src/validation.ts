@@ -4,8 +4,7 @@ import { MAX_CAPACITY, MAX_FEE_RUB, MAX_SEATS_PER_USER, MIN_CAPACITY } from './c
 export interface GameInput {
   title: string;
   startsAt: string;
-  venue: string;
-  address: string;
+  placeId: number;
   format: string;
   feeRub: number;
   capacity: number;
@@ -69,6 +68,19 @@ function checkInt(
   out[key] = v;
 }
 
+function checkPlaceId(raw: Raw, errors: FieldErrors, out: Raw, required: boolean): void {
+  const v = raw.placeId;
+  if (v === undefined) {
+    if (required) errors.placeId = 'выберите место';
+    return;
+  }
+  if (typeof v !== 'number' || !Number.isInteger(v) || v < 1) {
+    errors.placeId = 'выберите место';
+    return;
+  }
+  out.placeId = v;
+}
+
 function checkDate(raw: Raw, key: string, errors: FieldErrors, out: Raw, required: boolean): void {
   const v = raw[key];
   if (v === undefined) {
@@ -91,8 +103,7 @@ export function parseGameInput(body: unknown): ParseResult<GameInput> {
   const out: Raw = {};
   checkString(body, 'title', 1, 80, errors, out, true);
   checkDate(body, 'startsAt', errors, out, true);
-  checkString(body, 'venue', 1, 80, errors, out, true);
-  checkString(body, 'address', 1, 160, errors, out, true);
+  checkPlaceId(body, errors, out, true);
   checkString(body, 'format', 0, 120, errors, out, false);
   checkInt(body, 'feeRub', 0, MAX_FEE_RUB, errors, out, true);
   checkInt(body, 'capacity', MIN_CAPACITY, MAX_CAPACITY, errors, out, true);
@@ -105,8 +116,7 @@ export function parseGameInput(body: unknown): ParseResult<GameInput> {
     value: {
       title: out.title as string,
       startsAt: out.startsAt as string,
-      venue: out.venue as string,
-      address: out.address as string,
+      placeId: out.placeId as number,
       format: (out.format as string | undefined) ?? '',
       feeRub: out.feeRub as number,
       capacity: out.capacity as number,
@@ -124,8 +134,7 @@ export function parseGameUpdate(body: unknown): ParseResult<Partial<GameInput>> 
   const out: Raw = {};
   checkString(body, 'title', 1, 80, errors, out, false);
   checkDate(body, 'startsAt', errors, out, false);
-  checkString(body, 'venue', 1, 80, errors, out, false);
-  checkString(body, 'address', 1, 160, errors, out, false);
+  checkPlaceId(body, errors, out, false);
   checkString(body, 'format', 0, 120, errors, out, false);
   checkInt(body, 'feeRub', 0, MAX_FEE_RUB, errors, out, false);
   checkInt(body, 'capacity', MIN_CAPACITY, MAX_CAPACITY, errors, out, false);
@@ -137,8 +146,25 @@ export function parseGameUpdate(body: unknown): ParseResult<Partial<GameInput>> 
   return { ok: true, value: out as Partial<GameInput> };
 }
 
+export interface PlaceInput {
+  name: string;
+  address: string;
+}
+
+/** Разбор тела создания места: название и адрес обязательны. */
+export function parsePlaceInput(body: unknown): ParseResult<PlaceInput> {
+  if (!isRecord(body)) return { ok: false, errors: { body: 'ожидается объект' } };
+  const errors: FieldErrors = {};
+  const out: Raw = {};
+  checkString(body, 'name', 1, 80, errors, out, true);
+  checkString(body, 'address', 1, 160, errors, out, true);
+  if (Object.keys(errors).length > 0) return { ok: false, errors };
+  return { ok: true, value: { name: out.name as string, address: out.address as string } };
+}
+
 /** Число мест для записи: 1..MAX_SEATS_PER_USER. Превышение лимита отличается от прочих ошибок. */
-export type SeatsCheck = { ok: true; seats: number } | { ok: false; code: 'VALIDATION_ERROR' | 'SEATS_LIMIT_EXCEEDED' };
+export type SeatsCheck =
+  { ok: true; seats: number } | { ok: false; code: 'VALIDATION_ERROR' | 'SEATS_LIMIT_EXCEEDED' };
 
 export function checkSeats(value: unknown): SeatsCheck {
   if (typeof value !== 'number' || !Number.isInteger(value) || value < 1) {

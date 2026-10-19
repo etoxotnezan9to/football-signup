@@ -11,6 +11,7 @@ const ORG = 100;
 const A = 1;
 const B = 2;
 const C = 3;
+let PLACE = 0;
 
 let clockMs = 0;
 let sent: Notification[] = [];
@@ -24,8 +25,7 @@ function gameBody(over: Record<string, unknown> = {}) {
   return {
     title: 'Четверг',
     startsAt: '2026-10-22T18:00:00.000Z', // 21:00 по Москве
-    venue: 'Орловский',
-    address: 'Суздальское шоссе 62',
+    placeId: PLACE,
     feeRub: 650,
     capacity: 2,
     ...over,
@@ -41,6 +41,7 @@ function setup(timeZone?: string) {
     ...(timeZone ? { timeZone } : {}),
   });
   for (const id of [ORG, A, B, C]) svc.upsertUser({ vkId: id, firstName: `Имя${id}`, lastName: `Фам${id}` });
+  PLACE = svc.createPlace(ORG, { name: 'Орловский', address: 'Суздальское шоссе 62' }).place.id;
 }
 
 function signup(gameId: number, userId: number, seats: number) {
@@ -76,7 +77,10 @@ describe('уведомление о попадании в состав', () => {
     sent = [];
     tick();
     svc.putSignup(g.id, A, 1); // A уменьшается, место достаётся B
-    assert.deepEqual(sent.map((n) => n.userIds), [[B]]);
+    assert.deepEqual(
+      sent.map((n) => n.userIds),
+      [[B]],
+    );
   });
 
   it('организатор удалил участника: человек из очереди уведомлён', () => {
@@ -85,7 +89,10 @@ describe('уведомление о попадании в состав', () => {
     signup(g.id, B, 1);
     tick();
     svc.removeSignup(g.id, ORG, first.signup.signupId);
-    assert.deepEqual(sent.map((n) => n.userIds), [[B]]);
+    assert.deepEqual(
+      sent.map((n) => n.userIds),
+      [[B]],
+    );
   });
 
   it('увеличение вместимости организатором поднимает людей из очереди', () => {
@@ -94,7 +101,10 @@ describe('уведомление о попадании в состав', () => {
     signup(g.id, B, 2); // в очереди
     tick();
     svc.updateGame(g.id, ORG, { capacity: 4 });
-    assert.deepEqual(sent.map((n) => n.userIds), [[B]]);
+    assert.deepEqual(
+      sent.map((n) => n.userIds),
+      [[B]],
+    );
     assert.match(sent[0]!.message, /Мест у вас в составе: 2/);
   });
 
@@ -145,7 +155,8 @@ describe('уведомления об изменении и отмене игр�
     signup(g.id, A, 2);
     signup(g.id, B, 1); // очередь
     tick();
-    svc.updateGame(g.id, ORG, { capacity: 3, venue: 'Другой зал' });
+    const other = svc.createPlace(ORG, { name: 'Другой зал', address: 'ул. Другая, 1' }).place.id;
+    svc.updateGame(g.id, ORG, { capacity: 3, placeId: other });
     const toB = sent.filter((n) => n.userIds.includes(B));
     assert.equal(toB.length, 1);
     assert.match(toB[0]!.message, /Вы в составе/);
