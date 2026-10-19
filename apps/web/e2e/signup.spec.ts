@@ -137,3 +137,17 @@ test('место: создаётся кнопкой + в форме игры и 
   await expect(org).toHaveURL(/#\/game\/\d+$/);
   await expect(org.getByText('Манеж E2E, пр. Спортивный, 3')).toBeVisible();
 });
+
+test('фильтр игр по месту на главной', async ({ browser }) => {
+  // к этому моменту есть игры в «Тест-арене», «Арене» и «Манеже E2E» (предыдущие тесты)
+  const page = await openAs(browser, MARIA);
+  await expect(page.getByText(/· Тест-арена$/).first()).toBeVisible();
+  await page.getByLabel('Место', { exact: true }).click();
+  await page.getByRole('option', { name: 'Манеж E2E' }).click();
+  await expect(page.getByText(/· Манеж E2E$/).first()).toBeVisible();
+  await expect(page.getByText(/· Тест-арена$/)).toHaveCount(0);
+  // выбор запоминается после перезагрузки
+  await page.reload();
+  await expect(page.getByText(/· Манеж E2E$/).first()).toBeVisible();
+  await expect(page.getByText(/· Тест-арена$/)).toHaveCount(0);
+});

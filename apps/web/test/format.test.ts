@@ -7,6 +7,7 @@ import {
   gameLink,
   notificationsEnabledFromSearch,
   parseRoute,
+  placeOptions,
   plural,
   routeToHash,
   seatsLabel,
@@ -100,5 +101,20 @@ describe('notificationsEnabledFromSearch', () => {
   it('без параметра или с мусором — неизвестно', () => {
     assert.equal(notificationsEnabledFromSearch(''), null);
     assert.equal(notificationsEnabledFromSearch('?vk_are_notifications_enabled=yes'), null);
+  });
+});
+
+describe('placeOptions', () => {
+  it('уникальные места по алфавиту', () => {
+    const games = [
+      { placeId: 2, venue: 'Орловский' },
+      { placeId: 1, venue: 'Арена' },
+      { placeId: 2, venue: 'Орловский' },
+    ];
+    assert.deepEqual(placeOptions(games), [
+      { id: 1, name: 'Арена' },
+      { id: 2, name: 'Орловский' },
+    ]);
+    assert.deepEqual(placeOptions([]), []);
   });
 });

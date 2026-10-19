@@ -28,6 +28,17 @@ export function gameLabel(g: { startsAt: string; venue: string }, timeZone?: str
   return `${formatWhen(g.startsAt, timeZone)} · ${g.venue}`;
 }
 
+/** Места, в которых есть игры из списка, для фильтра на главной: без повторов, по алфавиту. */
+export function placeOptions(
+  games: readonly { placeId: number; venue: string }[],
+): { id: number; name: string }[] {
+  const byId = new Map<number, string>();
+  for (const g of games) byId.set(g.placeId, g.venue);
+  return [...byId]
+    .map(([id, name]) => ({ id, name }))
+    .sort((a, b) => a.name.localeCompare(b.name, 'ru') || a.id - b.id);
+}
+
 /** Значение для <input type="datetime-local"> из ISO (в локальном времени). */
 export function toLocalInput(iso: string): string {
   const d = new Date(iso);
