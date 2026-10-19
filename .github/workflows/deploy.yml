@@ -68,7 +68,17 @@ jobs:
           KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
         run: |
           install -d -m 700 ~/.ssh
-          printf '%s\n' "$KEY" > ~/.ssh/id_deploy && chmod 600 ~/.ssh/id_deploy
+          # ключ, скопированный в Windows, приходит с \r и пробелами по краям строк, OpenSSH такой не читает
+          printf '%s\n' "$KEY" | tr -d '\r' | sed 's/^[[:space:]]*//; s/[[:space:]]*$//; /^$/d' > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          if ! ssh-keygen -y -P '' -f ~/.ssh/id_deploy > /dev/null; then
+            # содержимое ключа не печатаем, только признаки формата
+            grep -q -- '-----BEGIN .*PRIVATE KEY-----' ~/.ssh/id_deploy && b=есть || b=нет
+            grep -q -- '-----END .*PRIVATE KEY-----' ~/.ssh/id_deploy && e=есть || e=нет
+            grep -q 'PuTTY-User-Key-File' ~/.ssh/id_deploy && p=да || p=нет
+            echo "::error::DEPLOY_SSH_KEY не читается как приватный ключ OpenSSH без пароля (строк: $(wc -l < ~/.ssh/id_deploy), BEGIN: $b, END: $e, формат PuTTY: $p)"
+            exit 1
+          fi
           # отпечаток сервера берём из секрета (ssh-keyscan -p <порт> <хост>), а не доверяем при первом подключении
           printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
       - name: Upload web, compose and scripts
