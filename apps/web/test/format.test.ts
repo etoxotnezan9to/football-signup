@@ -55,7 +55,6 @@ describe('маршруты', () => {
     ['#/', { name: 'list' }],
     ['#/my', { name: 'my' }],
     ['#/create', { name: 'create' }],
-    ['#/places/new', { name: 'newPlace' }],
     ['#/game/12', { name: 'game', id: 12 }],
     ['#game/12', { name: 'game', id: 12 }],
     ['#/game/12/edit', { name: 'edit', id: 12 }],

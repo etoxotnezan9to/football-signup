@@ -9,7 +9,7 @@ const opened: BrowserContext[] = [];
 
 /** Выбор места в комбобоксе формы игры; если места ещё нет, создаём его прямо из формы. */
 async function choosePlace(page: Page, name: string, address: string): Promise<void> {
-  await page.getByRole('button', { name: '+ Новое место', exact: true }).click();
+  await page.getByRole('button', { name: 'Добавить место', exact: true }).click();
   await page.getByLabel('Название места', { exact: true }).fill(name);
   await page.getByLabel('Адрес места', { exact: true }).fill(address);
   await page.getByRole('button', { name: 'Сохранить место', exact: true }).click();
@@ -105,20 +105,19 @@ test('форма создания показывает ошибки валида
   await expect(org).toHaveURL(/#\/create$/);
 });
 
-test('место: создаётся на отдельной странице и выбирается в форме игры из списка', async ({ browser }) => {
+test('место: создаётся кнопкой + в форме игры и потом выбирается из списка', async ({ browser }) => {
   const org = await openAs(browser, ORGANIZER);
+  // отдельной кнопки на главной больше нет
+  await expect(org.getByRole('button', { name: 'Добавить место', exact: true })).toHaveCount(0);
+
+  await org.getByRole('button', { name: 'Создать игру', exact: true }).click();
   await org.getByRole('button', { name: 'Добавить место', exact: true }).click();
-  await expect(org).toHaveURL(/#\/places\/new$/);
   await org.getByRole('button', { name: 'Сохранить место', exact: true }).click();
   await expect(org.getByText('длина от 1 до 80').first()).toBeVisible();
   await org.getByLabel('Название места', { exact: true }).fill('Манеж E2E');
   await org.getByLabel('Адрес места', { exact: true }).fill('пр. Спортивный, 3');
   await org.getByRole('button', { name: 'Сохранить место', exact: true }).click();
-  await expect(org).toHaveURL(/#\/$/);
-
-  await org.getByRole('button', { name: 'Создать игру', exact: true }).click();
-  await org.getByLabel('Место', { exact: true }).click();
-  await org.getByRole('option', { name: /Манеж E2E/ }).click();
+  await expect(org.getByText('Манеж E2E', { exact: true })).toBeVisible();
   await org.getByLabel('Взнос, ₽', { exact: true }).fill('500');
   await org.getByLabel('Число мест в составе', { exact: true }).fill('12');
   await org.getByRole('button', { name: 'Создать игру', exact: true }).last().click();
@@ -127,4 +126,14 @@ test('место: создаётся на отдельной странице и
   // вместо названия у игры дата и место
   await org.goto('/#/');
   await expect(org.getByText(/· Манеж E2E$/).first()).toBeVisible();
+
+  // второй раз место выбирается из списка
+  await org.getByRole('button', { name: 'Создать игру', exact: true }).click();
+  await org.getByLabel('Место', { exact: true }).click();
+  await org.getByRole('option', { name: /Манеж E2E/ }).click();
+  await org.getByLabel('Взнос, ₽', { exact: true }).fill('500');
+  await org.getByLabel('Число мест в составе', { exact: true }).fill('10');
+  await org.getByRole('button', { name: 'Создать игру', exact: true }).last().click();
+  await expect(org).toHaveURL(/#\/game\/\d+$/);
+  await expect(org.getByText('Манеж E2E, пр. Спортивный, 3')).toBeVisible();
 });

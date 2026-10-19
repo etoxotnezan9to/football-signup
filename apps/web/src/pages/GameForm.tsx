@@ -4,11 +4,13 @@ import {
   CustomSelect,
   FormItem,
   Group,
+  IconButton,
   Input,
   PanelHeader,
   PanelHeaderBack,
   Textarea,
 } from '@vkontakte/vkui';
+import { Icon28AddOutline } from '@vkontakte/icons';
 import { parseGameInput, type GameDetails, type GameInput, type Place } from '@football/shared';
 import { api, ApiError } from '../api.ts';
 import { Empty } from '../components/Empty.tsx';
@@ -39,7 +41,7 @@ interface Field {
 
 const FIELDS: Field[] = [
   { key: 'startsAt', label: 'Дата и время начала', type: 'datetime-local' },
-  { key: 'placeId', label: 'Место', type: 'place', hint: 'Выберите из списка или добавьте новое' },
+  { key: 'placeId', label: 'Место', type: 'place', hint: 'Выберите из списка или добавьте новое кнопкой +' },
   { key: 'format', label: 'Формат', hint: 'Например: 6х6, 3 команды, 6 игр по 9 минут' },
   { key: 'feeRub', label: 'Взнос, ₽', type: 'number' },
   { key: 'capacity', label: 'Число мест в составе', type: 'number', hint: 'От 2 до 60' },
@@ -114,30 +116,33 @@ export function GameForm({ initial }: { initial?: GameDetails }) {
         status={errors[f.key] ? 'error' : 'default'}
         bottom={errors[f.key] ?? f.hint}
       >
-        <CustomSelect
-          id={f.key}
-          searchable
-          placeholder={places === null ? 'Загрузка…' : 'Выберите место'}
-          emptyText="Мест пока нет, добавьте новое"
-          fetching={places === null}
-          options={(places ?? []).map((p) => ({
-            value: String(p.id),
-            label: p.name,
-            description: p.address,
-          }))}
-          value={form.placeId === '' ? null : form.placeId}
-          onChange={(_e, value) => setForm({ ...form, placeId: value === null ? '' : String(value) })}
-        />
+        <div className="place-picker">
+          <CustomSelect
+            className="place-picker__select"
+            id={f.key}
+            searchable
+            placeholder={places === null ? 'Загрузка…' : 'Выберите место'}
+            emptyText="Мест пока нет, добавьте новое"
+            fetching={places === null}
+            options={(places ?? []).map((p) => ({
+              value: String(p.id),
+              label: p.name,
+              description: p.address,
+            }))}
+            value={form.placeId === '' ? null : form.placeId}
+            onChange={(_e, value) => setForm({ ...form, placeId: value === null ? '' : String(value) })}
+          />
+          <IconButton
+            className="place-picker__add"
+            label="Добавить место"
+            aria-expanded={addingPlace}
+            onClick={() => setAddingPlace((v) => !v)}
+          >
+            <Icon28AddOutline />
+          </IconButton>
+        </div>
       </FormItem>
-      {addingPlace ? (
-        <PlaceForm onCreated={onPlaceCreated} onCancel={() => setAddingPlace(false)} />
-      ) : (
-        <FormItem>
-          <Button size="s" mode="link" onClick={() => setAddingPlace(true)}>
-            + Новое место
-          </Button>
-        </FormItem>
-      )}
+      {addingPlace && <PlaceForm onCreated={onPlaceCreated} onCancel={() => setAddingPlace(false)} />}
     </>
   );
 

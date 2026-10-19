@@ -17,7 +17,6 @@ import { GameForm, EditGamePage } from './pages/GameForm.tsx';
 import { GamePage } from './pages/GamePage.tsx';
 import { ListPage } from './pages/ListPage.tsx';
 import { MyPage } from './pages/MyPage.tsx';
-import { NewPlacePage } from './pages/NewPlacePage.tsx';
 import type { Realtime } from './realtime.ts';
 import type { Session } from './session.ts';
 
@@ -94,9 +93,6 @@ export function App({ session, realtime }: Props) {
                   </Panel>
                   <Panel id="create">
                     <GameForm />
-                  </Panel>
-                  <Panel id="newPlace">
-                    <NewPlacePage />
                   </Panel>
                   <Panel id="game">
                     <GamePage id={gameId} />
