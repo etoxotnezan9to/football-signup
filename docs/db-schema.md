@@ -14,13 +14,22 @@ CREATE TABLE users (
   updated_at  TEXT NOT NULL
 );
 
+-- миграция 0003: место проведения игр (создаёт любой пользователь, видят все)
+CREATE TABLE places (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  name        TEXT NOT NULL,
+  address     TEXT NOT NULL,
+  created_by  INTEGER REFERENCES users(vk_id),
+  created_at  TEXT NOT NULL,
+  UNIQUE (name, address)
+);
+
 CREATE TABLE games (
   id                INTEGER PRIMARY KEY AUTOINCREMENT,
   organizer_id      INTEGER NOT NULL REFERENCES users(vk_id),
   title             TEXT NOT NULL,
   starts_at         TEXT NOT NULL,
-  venue             TEXT NOT NULL,
-  address           TEXT NOT NULL,
+  place_id          INTEGER REFERENCES places(id),  -- миграция 0003, заменила venue и address
   format            TEXT NOT NULL DEFAULT '',
   fee_rub           INTEGER NOT NULL CHECK (fee_rub >= 0),
   capacity          INTEGER NOT NULL CHECK (capacity BETWEEN 2 AND 60),
@@ -34,6 +43,7 @@ CREATE TABLE games (
 );
 CREATE INDEX idx_games_starts_at ON games (status, starts_at);
 CREATE INDEX idx_games_organizer ON games (organizer_id);
+CREATE INDEX idx_games_place ON games (place_id);
 
 CREATE TABLE signups (
   id          INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -49,6 +59,8 @@ CREATE TABLE signups (
 CREATE INDEX idx_signups_game ON signups (game_id, created_at, id);
 CREATE INDEX idx_signups_user ON signups (user_id);
 ```
+
+`place_id` обязателен на уровне API (SQLite не позволяет добавить `NOT NULL`-ссылку через `ALTER TABLE`). Миграция 0003 превратила каждую пару (площадка, адрес) существующих игр в место. В ответах API `venue` и `address` игры берутся из её места.
 
 Верхняя граница `seats` (5) дублирует `MAX_SEATS_PER_USER`; при изменении константы нужна новая миграция.
 

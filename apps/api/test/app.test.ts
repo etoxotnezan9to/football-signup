@@ -42,13 +42,13 @@ const auth = (userId: number) => ({ authorization: `VK ${launch(userId)}` });
 const gameBody = (over: Record<string, unknown> = {}) => ({
   title: 'Четверг',
   startsAt: new Date(Date.now() + 2 * 86_400_000).toISOString(),
-  venue: 'Орловский',
-  address: 'Суздальское шоссе 62',
+  placeId: placeId,
   feeRub: 650,
   capacity: 4,
   ...over,
 });
 
+let placeId = 0;
 let app: FastifyInstance;
 let service: Service;
 
@@ -60,6 +60,8 @@ before(async () => {
   });
   service = createService(db, { emit: (e) => hub.publish(e) });
   holder.service = service;
+  service.ensureUser(1);
+  placeId = service.createPlace(1, { name: 'Орловский', address: 'Суздальское шоссе 62' }).place.id;
   app = buildApp({
     config,
     service,
@@ -103,12 +105,22 @@ describe('HTTP API', () => {
     assert.equal(put.statusCode, 200);
     const get = await app.inject({ method: 'GET', url: '/api/me', headers: auth(501) });
     assert.equal(get.json().firstName, 'Иван');
-    const bad = await app.inject({ method: 'PUT', url: '/api/me', headers: auth(501), payload: { firstName: '' } });
+    const bad = await app.inject({
+      method: 'PUT',
+      url: '/api/me',
+      headers: auth(501),
+      payload: { firstName: '' },
+    });
     assert.equal(bad.statusCode, 400);
   });
 
   it('полный сценарий: создать игру, записаться, превысить лимит, отменить запись', async () => {
-    const created = await app.inject({ method: 'POST', url: '/api/games', headers: auth(601), payload: gameBody() });
+    const created = await app.inject({
+      method: 'POST',
+      url: '/api/games',
+      headers: auth(601),
+      payload: gameBody(),
+    });
     assert.equal(created.statusCode, 201);
     const id = created.json().id as number;
 
@@ -139,8 +151,67 @@ describe('HTTP API', () => {
     assert.equal(del.json().taken, 0);
   });
 
+  it('места: создать, получить список, выбрать в игре', async () => {
+    const created = await app.inject({
+      method: 'POST',
+      url: '/api/places',
+      headers: auth(701),
+      payload: { name: 'Арена-701', address: 'ул. Новая, 7' },
+    });
+    assert.equal(created.statusCode, 201);
+    const place = created.json() as { id: number; name: string; address: string };
+    assert.equal(place.name, 'Арена-701');
+
+    const again = await app.inject({
+      method: 'POST',
+      url: '/api/places',
+      headers: auth(702),
+      payload: { name: 'Арена-701', address: 'ул. Новая, 7' },
+    });
+    assert.equal(again.statusCode, 200);
+    assert.equal(again.json().id, place.id);
+
+    const bad = await app.inject({
+      method: 'POST',
+      url: '/api/places',
+      headers: auth(701),
+      payload: { name: '' },
+    });
+    assert.equal(bad.statusCode, 400);
+    assert.ok('address' in bad.json().error.details);
+
+    const list = await app.inject({ method: 'GET', url: '/api/places', headers: auth(702) });
+    assert.equal(list.statusCode, 200);
+    assert.ok((list.json().items as { id: number }[]).some((p) => p.id === place.id));
+
+    const game = await app.inject({
+      method: 'POST',
+      url: '/api/games',
+      headers: auth(701),
+      payload: gameBody({ placeId: place.id }),
+    });
+    assert.equal(game.statusCode, 201);
+    assert.equal(game.json().placeId, place.id);
+    assert.equal(game.json().venue, 'Арена-701');
+    assert.equal(game.json().address, 'ул. Новая, 7');
+
+    const missing = await app.inject({
+      method: 'POST',
+      url: '/api/games',
+      headers: auth(701),
+      payload: gameBody({ placeId: 999_999 }),
+    });
+    assert.equal(missing.statusCode, 400);
+    assert.equal(missing.json().error.details.placeId, 'место не найдено');
+  });
+
   it('права: чужой не может отменить игру; организатор может', async () => {
-    const created = await app.inject({ method: 'POST', url: '/api/games', headers: auth(611), payload: gameBody() });
+    const created = await app.inject({
+      method: 'POST',
+      url: '/api/games',
+      headers: auth(611),
+      payload: gameBody(),
+    });
     const id = created.json().id as number;
     const denied = await app.inject({ method: 'POST', url: `/api/games/${id}/cancel`, headers: auth(612) });
     assert.equal(denied.statusCode, 403);
@@ -157,7 +228,12 @@ describe('HTTP API', () => {
   });
 
   it('валидация: плохое тело и неизвестная игра', async () => {
-    const bad = await app.inject({ method: 'POST', url: '/api/games', headers: auth(621), payload: { title: '' } });
+    const bad = await app.inject({
+      method: 'POST',
+      url: '/api/games',
+      headers: auth(621),
+      payload: { title: '' },
+    });
     assert.equal(bad.statusCode, 400);
     assert.ok(bad.json().error.details.title);
     const nf = await app.inject({ method: 'GET', url: '/api/games/999999', headers: auth(621) });
@@ -210,13 +286,23 @@ describe('WebSocket', () => {
     await waitFor(() => received.some((m) => m.type === 'auth.ok'));
     ws.send(JSON.stringify({ type: 'subscribe', topic: 'games' }));
 
-    const created = await app.inject({ method: 'POST', url: '/api/games', headers: auth(802), payload: gameBody() });
+    const created = await app.inject({
+      method: 'POST',
+      url: '/api/games',
+      headers: auth(802),
+      payload: gameBody(),
+    });
     const id = created.json().id as number;
     await waitFor(() => received.some((m) => m.type === 'game.created' && m.game?.id === id));
 
     ws.send(JSON.stringify({ type: 'subscribe', topic: 'game', gameId: id }));
     await new Promise((r) => setTimeout(r, 50));
-    await app.inject({ method: 'PUT', url: `/api/games/${id}/signup`, headers: auth(803), payload: { seats: 2 } });
+    await app.inject({
+      method: 'PUT',
+      url: `/api/games/${id}/signup`,
+      headers: auth(803),
+      payload: { seats: 2 },
+    });
     await waitFor(() => received.some((m) => m.type === 'roster.updated' && m.game?.id === id));
     ws.close();
   });

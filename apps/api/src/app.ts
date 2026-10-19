@@ -42,7 +42,11 @@ export function authenticateLaunchParams(
     const id = Number(idRaw);
     if (!Number.isInteger(id) || id <= 0) return null;
     try {
-      service.upsertUser({ vkId: id, firstName: decodeURIComponent(first), lastName: decodeURIComponent(last) });
+      service.upsertUser({
+        vkId: id,
+        firstName: decodeURIComponent(first),
+        lastName: decodeURIComponent(last),
+      });
     } catch {
       return null;
     }
@@ -67,7 +71,11 @@ function authenticateHeader(config: Config, service: Service, header: string | u
     const id = Number(idRaw);
     if (Number.isInteger(id) && id > 0) {
       try {
-        service.upsertUser({ vkId: id, firstName: decodeURIComponent(first), lastName: decodeURIComponent(last) });
+        service.upsertUser({
+          vkId: id,
+          firstName: decodeURIComponent(first),
+          lastName: decodeURIComponent(last),
+        });
       } catch {
         throw new AppError('UNAUTHORIZED', 'Некорректный Mock-заголовок');
       }
@@ -103,7 +111,11 @@ export function buildApp(deps: AppDeps): FastifyInstance {
 
   void app.register(
     async (api) => {
-      api.get('/health', async () => ({ status: 'ok', version: deps.version, time: new Date().toISOString() }));
+      api.get('/health', async () => ({
+        status: 'ok',
+        version: deps.version,
+        time: new Date().toISOString(),
+      }));
 
       api.register(async (secured) => {
         secured.decorateRequest('vkId', 0);
@@ -117,6 +129,12 @@ export function buildApp(deps: AppDeps): FastifyInstance {
         secured.get('/me', async (req) => service.ensureUser(req.vkId));
         secured.put('/me', async (req) => service.updateProfile(req.vkId, req.body));
         secured.get('/me/games', async (req) => service.myGames(req.vkId));
+
+        secured.get('/places', async () => ({ items: service.listPlaces() }));
+        secured.post('/places', async (req, reply) => {
+          const { place, created } = service.createPlace(req.vkId, req.body);
+          return reply.status(created ? 201 : 200).send(place);
+        });
 
         secured.get('/games', async (req) => {
           const q = req.query as { cursor?: string; limit?: string };
@@ -142,7 +160,9 @@ export function buildApp(deps: AppDeps): FastifyInstance {
         );
 
         secured.put('/games/:gameId/signup', async (req) => {
-          const body = (typeof req.body === 'object' && req.body !== null ? req.body : {}) as { seats?: unknown };
+          const body = (typeof req.body === 'object' && req.body !== null ? req.body : {}) as {
+            seats?: unknown;
+          };
           return service.putSignup(parseId((req.params as { gameId: string }).gameId), req.vkId, body.seats);
         });
         secured.delete('/games/:gameId/signup', async (req) =>
@@ -151,7 +171,9 @@ export function buildApp(deps: AppDeps): FastifyInstance {
 
         secured.patch('/games/:gameId/signups/:signupId', async (req) => {
           const p = req.params as { gameId: string; signupId: string };
-          const body = (typeof req.body === 'object' && req.body !== null ? req.body : {}) as { paidSeats?: unknown };
+          const body = (typeof req.body === 'object' && req.body !== null ? req.body : {}) as {
+            paidSeats?: unknown;
+          };
           return service.setPaid(parseId(p.gameId), req.vkId, parseId(p.signupId), body.paidSeats);
         });
         secured.delete('/games/:gameId/signups/:signupId', async (req) => {

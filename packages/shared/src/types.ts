@@ -8,12 +8,21 @@ export interface User {
   photoUrl: string | null;
 }
 
+/** Место проведения игр. Создать может любой пользователь, видят все. */
+export interface Place {
+  id: number;
+  name: string;
+  address: string;
+}
+
 export type GameStatus = 'active' | 'cancelled';
 
 export interface GameSummary {
   id: number;
   title: string;
   startsAt: string;
+  placeId: number;
+  /** Название места (из сущности «Место») */
   venue: string;
   feeRub: number;
   capacity: number;
@@ -39,6 +48,7 @@ export interface RosterEntry {
 }
 
 export interface GameDetails extends GameSummary {
+  /** Адрес места (из сущности «Место») */
   address: string;
   format: string;
   description: string;

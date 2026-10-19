@@ -83,6 +83,7 @@ const summary = (id: number): GameSummary => ({
   id,
   title: 'g',
   startsAt: '2026-10-22T18:00:00.000Z',
+  placeId: 1,
   venue: 'v',
   feeRub: 1,
   capacity: 4,
@@ -106,7 +107,10 @@ describe('hub', () => {
     conn.onMessage(JSON.stringify({ type: 'auth', launchParams: 'good' }));
     conn.onMessage(JSON.stringify({ type: 'subscribe', topic: 'games' }));
     hub.publish({ type: 'game.created', game: summary(1) });
-    assert.deepEqual(c.sent.map((m) => (m as { type: string }).type), ['auth.ok', 'game.created']);
+    assert.deepEqual(
+      c.sent.map((m) => (m as { type: string }).type),
+      ['auth.ok', 'game.created'],
+    );
   });
 
   it('неверная авторизация закрывает соединение с кодом 4401', () => {
@@ -121,12 +125,26 @@ describe('hub', () => {
     const hub = createHub({ authenticate });
     const a = fakeSocket();
     const b = fakeSocket();
-    for (const [c, gameId] of [[a, 1], [b, 2]] as const) {
+    for (const [c, gameId] of [
+      [a, 1],
+      [b, 2],
+    ] as const) {
       const conn = hub.connect(c.socket);
       conn.onMessage(JSON.stringify({ type: 'auth', launchParams: 'good' }));
       conn.onMessage(JSON.stringify({ type: 'subscribe', topic: 'game', gameId }));
     }
-    hub.publish({ type: 'roster.updated', game: { ...summary(1), roster: [], address: '', format: '', description: '', paymentInfo: '', organizerContact: '' } as GameDetails });
+    hub.publish({
+      type: 'roster.updated',
+      game: {
+        ...summary(1),
+        roster: [],
+        address: '',
+        format: '',
+        description: '',
+        paymentInfo: '',
+        organizerContact: '',
+      } as GameDetails,
+    });
     assert.equal(a.sent.filter((m) => (m as { type: string }).type === 'roster.updated').length, 1);
     assert.equal(b.sent.filter((m) => (m as { type: string }).type === 'roster.updated').length, 0);
   });
@@ -142,7 +160,10 @@ describe('hub', () => {
     conn.onMessage(JSON.stringify({ type: 'subscribe', topic: 'games' }));
     conn.onMessage(JSON.stringify({ type: 'unsubscribe', topic: 'games' }));
     hub.publish({ type: 'game.updated', game: summary(1) });
-    assert.deepEqual(c.sent.map((m) => (m as { type: string }).type), ['auth.ok', 'pong']);
+    assert.deepEqual(
+      c.sent.map((m) => (m as { type: string }).type),
+      ['auth.ok', 'pong'],
+    );
     conn.onClose();
     assert.equal(hub.size(), 0);
   });

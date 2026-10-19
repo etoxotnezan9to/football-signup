@@ -16,13 +16,13 @@ const ORG = 100;
 const U1 = 1;
 const U2 = 2;
 const U3 = 3;
+let PLACE = 0;
 
 function gameBody(over: Record<string, unknown> = {}) {
   return {
     title: 'Четверг',
     startsAt: '2026-10-22T18:00:00.000Z',
-    venue: 'Орловский',
-    address: 'Суздальское шоссе 62',
+    placeId: PLACE,
     feeRub: 650,
     capacity: 4,
     ...over,
@@ -44,7 +44,9 @@ beforeEach(() => {
     },
     emit: (e) => events.push(e),
   });
-  for (const id of [ORG, U1, U2, U3]) svc.upsertUser({ vkId: id, firstName: `Имя${id}`, lastName: `Фам${id}` });
+  for (const id of [ORG, U1, U2, U3])
+    svc.upsertUser({ vkId: id, firstName: `Имя${id}`, lastName: `Фам${id}` });
+  PLACE = svc.createPlace(ORG, { name: 'Орловский', address: 'Суздальское шоссе 62' }).place.id;
 });
 
 describe('создание и список игр', () => {
@@ -57,7 +59,10 @@ describe('создание и список игр', () => {
   });
 
   it('отвергает прошедшее время и неверные поля', () => {
-    expectCode(() => svc.createGame(ORG, gameBody({ startsAt: '2026-10-19T18:00:00.000Z' })), 'STARTS_AT_IN_PAST');
+    expectCode(
+      () => svc.createGame(ORG, gameBody({ startsAt: '2026-10-19T18:00:00.000Z' })),
+      'STARTS_AT_IN_PAST',
+    );
     expectCode(() => svc.createGame(ORG, gameBody({ capacity: 1 })), 'VALIDATION_ERROR');
     expectCode(() => svc.createGame(ORG, null), 'VALIDATION_ERROR');
   });
@@ -244,7 +249,10 @@ describe('функции организатора', () => {
 
   it('нельзя редактировать отменённую игру и ставить время в прошлое', () => {
     const g = svc.createGame(ORG, gameBody());
-    expectCode(() => svc.updateGame(g.id, ORG, { startsAt: '2026-10-01T10:00:00.000Z' }), 'STARTS_AT_IN_PAST');
+    expectCode(
+      () => svc.updateGame(g.id, ORG, { startsAt: '2026-10-01T10:00:00.000Z' }),
+      'STARTS_AT_IN_PAST',
+    );
     expectCode(() => svc.updateGame(g.id, ORG, {}), 'VALIDATION_ERROR');
     svc.cancelGame(g.id, ORG);
     expectCode(() => svc.updateGame(g.id, ORG, { title: 'новое' }), 'GAME_NOT_ACTIVE');
@@ -263,8 +271,14 @@ describe('мои игры', () => {
     const other = svc.createGame(ORG, gameBody({ title: 'Чужая' }));
     svc.putSignup(other.id, U1, 1);
     const my = svc.myGames(U1);
-    assert.deepEqual(my.organized.map((g) => g.id), [mine.id]);
-    assert.deepEqual(my.joined.map((g) => g.id), [other.id]);
+    assert.deepEqual(
+      my.organized.map((g) => g.id),
+      [mine.id],
+    );
+    assert.deepEqual(
+      my.joined.map((g) => g.id),
+      [other.id],
+    );
   });
 });
 
@@ -272,8 +286,45 @@ describe('профиль', () => {
   it('фамилия необязательна, имя обязательно, фото только по https', () => {
     assert.equal(svc.updateProfile(U1, { firstName: 'Иван' }).lastName, '');
     expectCode(() => svc.updateProfile(U1, { firstName: '' }), 'VALIDATION_ERROR');
-    expectCode(() => svc.updateProfile(U1, { firstName: 'И', photoUrl: 'javascript:alert(1)' }), 'VALIDATION_ERROR');
-    const ok = svc.updateProfile(U1, { firstName: 'Иван', lastName: 'Петров', photoUrl: 'https://example.com/a.jpg' });
+    expectCode(
+      () => svc.updateProfile(U1, { firstName: 'И', photoUrl: 'javascript:alert(1)' }),
+      'VALIDATION_ERROR',
+    );
+    const ok = svc.updateProfile(U1, {
+      firstName: 'Иван',
+      lastName: 'Петров',
+      photoUrl: 'https://example.com/a.jpg',
+    });
     assert.equal(ok.photoUrl, 'https://example.com/a.jpg');
+  });
+});
+
+describe('места', () => {
+  it('создаются любым пользователем, дубликат возвращает существующее', () => {
+    const a = svc.createPlace(U1, { name: ' Зал ', address: 'ул. Мира, 1' });
+    assert.equal(a.created, true);
+    assert.deepEqual(a.place, { id: a.place.id, name: 'Зал', address: 'ул. Мира, 1' });
+    const b = svc.createPlace(U2, { name: 'Зал', address: 'ул. Мира, 1' });
+    assert.equal(b.created, false);
+    assert.equal(b.place.id, a.place.id);
+    expectCode(() => svc.createPlace(U1, { name: 'Без адреса' }), 'VALIDATION_ERROR');
+    assert.deepEqual(
+      svc.listPlaces().map((p) => p.name),
+      ['Зал', 'Орловский'],
+    );
+  });
+
+  it('игра показывает название и адрес места, смена места меняет их', () => {
+    const g = svc.createGame(ORG, gameBody());
+    assert.equal(g.placeId, PLACE);
+    assert.equal(g.venue, 'Орловский');
+    assert.equal(g.address, 'Суздальское шоссе 62');
+    const other = svc.createPlace(U1, { name: 'Зал', address: 'ул. Мира, 1' }).place.id;
+    const u = svc.updateGame(g.id, ORG, { placeId: other });
+    assert.equal(u.venue, 'Зал');
+    assert.equal(u.address, 'ул. Мира, 1');
+    expectCode(() => svc.updateGame(g.id, ORG, { placeId: 12345 }), 'VALIDATION_ERROR');
+    expectCode(() => svc.createGame(ORG, gameBody({ placeId: 12345 })), 'VALIDATION_ERROR');
+    expectCode(() => svc.createGame(ORG, gameBody({ placeId: undefined })), 'VALIDATION_ERROR');
   });
 });

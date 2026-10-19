@@ -27,9 +27,11 @@
 
 **User**: `vkId` (число, уникален), `firstName`, `lastName`, `photoUrl` (может отсутствовать), `createdAt`.
 
+**Place** (место): `id`, `name` (1–80), `address` (1–160), `createdBy` (User). Создать место может любой пользователь, список мест общий. Повторное создание места с тем же названием и адресом возвращает существующее.
+
 **Game**:
 - `id`, `organizerId` (User), `title` (1–80), `startsAt` (UTC, будущее на момент создания),
-- `venue` (1–80), `address` (1–160), `format` (0–120, текст, например «6х6, 3 или 4 команды»),
+- `placeId` (Place; в ответах также `venue` = название места и `address` = адрес места), `format` (0–120, текст, например «6х6, 3 или 4 команды»),
 - `feeRub` (0..`MAX_FEE_RUB`), `capacity` (`MIN_CAPACITY`..`MAX_CAPACITY`),
 - `description` (0–1000), `paymentInfo` (0–300: реквизиты предоплаты текстом), `organizerContact` (0–120: ссылка VK или телефон для чека),
 - `status`: `active` | `cancelled`, `createdAt`, `updatedAt`.

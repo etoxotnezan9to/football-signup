@@ -6,6 +6,7 @@ import {
   numberLabel,
   parseGameInput,
   parseGameUpdate,
+  parsePlaceInput,
   MAX_SEATS_PER_USER,
 } from '../src/index.ts';
 
@@ -47,7 +48,9 @@ describe('formatRosterText', () => {
   });
 
   it('без очереди блок «Мест нет» не выводится', () => {
-    const text = formatRosterText(game, [{ name: 'Иван', seats: 1, mainSeats: 1, queueSeats: 0, paidSeats: 0 }]);
+    const text = formatRosterText(game, [
+      { name: 'Иван', seats: 1, mainSeats: 1, queueSeats: 0, paidSeats: 0 },
+    ]);
     assert.ok(!text.includes('Мест нет'));
   });
 });
@@ -71,8 +74,7 @@ describe('parseGameInput / parseGameUpdate', () => {
   const valid = {
     title: ' Четверг ',
     startsAt: '2026-10-22T18:00:00.000Z',
-    venue: 'Орловский',
-    address: 'Суздальское шоссе 62',
+    placeId: 1,
     feeRub: 650,
     capacity: 24,
   };
@@ -88,7 +90,7 @@ describe('parseGameInput / parseGameUpdate', () => {
   it('сообщает обо всех ошибках полей', () => {
     const r = parseGameInput({ title: '', capacity: 1, feeRub: -5 });
     assert.ok(!r.ok);
-    for (const k of ['title', 'startsAt', 'venue', 'address', 'feeRub', 'capacity']) {
+    for (const k of ['title', 'startsAt', 'placeId', 'feeRub', 'capacity']) {
       assert.ok(k in r.errors, k);
     }
   });
@@ -98,10 +100,39 @@ describe('parseGameInput / parseGameUpdate', () => {
     assert.ok(!parseGameInput([]).ok);
   });
 
+  it('placeId: только положительное целое', () => {
+    for (const v of [0, -1, 1.5, '1', null]) {
+      const r = parseGameInput({ ...valid, placeId: v });
+      assert.ok(!r.ok && r.errors.placeId === 'выберите место', String(v));
+    }
+    const r = parseGameUpdate({ placeId: 3 });
+    assert.ok(r.ok);
+    assert.deepEqual(r.value, { placeId: 3 });
+  });
+
   it('обновление: пустое тело отвергается, подмножество принимается', () => {
     assert.ok(!parseGameUpdate({}).ok);
     const r = parseGameUpdate({ capacity: 10 });
     assert.ok(r.ok);
     assert.deepEqual(r.value, { capacity: 10 });
+  });
+});
+
+describe('parsePlaceInput', () => {
+  it('обрезает пробелы и требует оба поля', () => {
+    const r = parsePlaceInput({ name: ' Ф.Ц. «Орловский» ', address: 'Суздальское шоссе 62 ' });
+    assert.ok(r.ok);
+    assert.deepEqual(r.value, { name: 'Ф.Ц. «Орловский»', address: 'Суздальское шоссе 62' });
+    const bad = parsePlaceInput({ name: '  ' });
+    assert.ok(!bad.ok);
+    assert.ok('name' in bad.errors && 'address' in bad.errors);
+    assert.ok(!parsePlaceInput('x').ok);
+  });
+
+  it('ограничивает длину', () => {
+    const r = parsePlaceInput({ name: 'x'.repeat(81), address: 'y'.repeat(161) });
+    assert.ok(!r.ok);
+    assert.equal(r.errors.name, 'длина от 1 до 80');
+    assert.equal(r.errors.address, 'длина от 1 до 160');
   });
 });
