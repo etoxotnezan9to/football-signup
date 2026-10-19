@@ -1,0 +1,77 @@
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+permissions:
+  contents: write
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install dependencies
+        # Строго по lockfile; если он устарел (добавили зависимости), обновляем его — см. следующий шаг
+        run: |
+          if [ -f pnpm-lock.yaml ] && pnpm install --frozen-lockfile; then exit 0; fi
+          pnpm install --no-frozen-lockfile
+      - name: Commit lockfile if it changed
+        # Только для develop-claude: разработка идёт без доступа к реестру npm, lockfile обновляет CI.
+        # В остальных ветках и PR устаревший lockfile остаётся ошибкой (шаг выше упадёт).
+        if: github.event_name == 'push' && github.ref_name == 'develop-claude'
+        run: |
+          if [ -n "$(git status --porcelain pnpm-lock.yaml)" ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add pnpm-lock.yaml
+            git commit -m "chore: update pnpm-lock.yaml"
+            git pull --rebase origin develop-claude
+            git push
+          fi
+      - run: ci/run.sh lint pnpm lint
+      - run: ci/run.sh typecheck pnpm typecheck
+      - run: ci/run.sh test pnpm test
+      - run: ci/run.sh build pnpm build
+      - name: Install Playwright browser
+        run: pnpm --filter @football/web exec playwright install --with-deps chromium
+      - run: ci/run.sh e2e pnpm --filter @football/web test:e2e
+      - name: Load test (200 concurrent signups, WebSocket observers)
+        run: |
+          (cd apps/api && NODE_ENV=development AUTH_DEV_BYPASS=1 VK_APP_ID=54809461 DATABASE_FILE=:memory: \
+            HOST=127.0.0.1 PORT=3200 node src/server.ts > /tmp/api-load.log 2>&1 & echo $! > /tmp/api-load.pid)
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:3200/api/health > /dev/null; then break; fi
+            sleep 1
+          done
+          code=0
+          ci/run.sh loadtest node apps/api/scripts/loadtest.ts --base http://127.0.0.1:3200 --users 200 --observers 10 || code=$?
+          echo "--- API log (tail)"; tail -n 15 /tmp/api-load.log
+          kill "$(cat /tmp/api-load.pid)" 2>/dev/null || true
+          exit "$code"
+
+  docker:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build API image
+        if: hashFiles('pnpm-lock.yaml') != ''
+        run: docker build -f apps/api/Dockerfile -t football-api:ci .
+      - name: Smoke test
+        if: hashFiles('pnpm-lock.yaml') != ''
+        run: |
+          docker run -d --name api -p 3000:3000 -e VK_APP_ID=54809461 -e VK_APP_SECRET=ci-secret football-api:ci
+          for i in $(seq 1 20); do
+            if curl -fsS http://127.0.0.1:3000/api/health; then ok=1; break; fi
+            sleep 1
+          done
+          docker logs api
+          test "${ok:-0}" = "1"

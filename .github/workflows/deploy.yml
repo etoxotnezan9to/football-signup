@@ -1,0 +1,96 @@
+name: Deploy
+
+# Ручной запуск. Сборка образа и статики всегда выполняется; выкладка на сервер включается переменной
+# репозитория DEPLOY_ENABLED=true и секретами окружения (см. docs/runbook.md).
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Окружение
+        type: choice
+        options: [staging, prod]
+        default: staging
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    outputs:
+      tag: ${{ steps.meta.outputs.tag }}
+      owner: ${{ steps.meta.outputs.owner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @football/web build
+      - id: meta
+        run: |
+          echo "tag=${GITHUB_SHA::12}" >> "$GITHUB_OUTPUT"
+          echo "owner=$(echo "$GITHUB_REPOSITORY_OWNER" | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build and push API image
+        run: |
+          IMAGE="ghcr.io/${{ steps.meta.outputs.owner }}/football-api"
+          docker build -f apps/api/Dockerfile -t "$IMAGE:${{ steps.meta.outputs.tag }}" .
+          docker push "$IMAGE:${{ steps.meta.outputs.tag }}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: web-dist
+          path: apps/web/dist
+          if-no-files-found: error
+
+  deploy:
+    needs: build
+    if: vars.DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment: ${{ inputs.environment }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: web-dist
+          path: web-dist
+      - name: Prepare SSH
+        env:
+          KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$KEY" > ~/.ssh/id_deploy && chmod 600 ~/.ssh/id_deploy
+          # отпечаток сервера берём из секрета (ssh-keyscan -p <порт> <хост>), а не доверяем при первом подключении
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+      - name: Upload web, compose and scripts
+        env:
+          HOST: ${{ secrets.DEPLOY_HOST }}
+          PORT: ${{ secrets.DEPLOY_PORT }}
+          USER_: ${{ secrets.DEPLOY_USER }}
+          ENVN: ${{ inputs.environment }}
+        run: |
+          SSH="ssh -i ~/.ssh/id_deploy -p $PORT -o StrictHostKeyChecking=yes"
+          rsync -az --delete -e "$SSH" web-dist/ "$USER_@$HOST:/var/www/football/$ENVN/"
+          rsync -az -e "$SSH" deploy/docker-compose.yml deploy/backup.sh deploy/release.sh "$USER_@$HOST:/opt/football/$ENVN/"
+      - name: Release (health check and rollback on the server)
+        env:
+          HOST: ${{ secrets.DEPLOY_HOST }}
+          PORT: ${{ secrets.DEPLOY_PORT }}
+          USER_: ${{ secrets.DEPLOY_USER }}
+          ENVN: ${{ inputs.environment }}
+          TAG: ${{ needs.build.outputs.tag }}
+        run: |
+          ssh -i ~/.ssh/id_deploy -p "$PORT" -o StrictHostKeyChecking=yes "$USER_@$HOST" \
+            "chmod +x /opt/football/$ENVN/*.sh && /opt/football/$ENVN/release.sh /opt/football/$ENVN $TAG"
+      - name: Check over HTTPS
+        if: vars.DEPLOY_DOMAIN != ''
+        run: curl -fsS --retry 5 --retry-delay 3 "https://${{ vars.DEPLOY_DOMAIN }}/api/health"

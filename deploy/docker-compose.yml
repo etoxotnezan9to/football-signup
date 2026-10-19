@@ -1,0 +1,16 @@
+# Один набор контейнеров на окружение. Запуск из /opt/football/<env>:
+#   GHCR_OWNER=<владелец репозитория в нижнем регистре> API_PORT=<порт> TAG=<тег образа> docker compose up -d
+services:
+  api:
+    image: ghcr.io/${GHCR_OWNER}/football-api:${TAG:-latest}
+    restart: unless-stopped
+    env_file: .env
+    # порт доступен только с самого сервера, наружу его публикует nginx
+    ports:
+      - '127.0.0.1:${API_PORT}:3000'
+    volumes:
+      - ./data:/data
+    mem_limit: 300m
+    logging:
+      driver: json-file
+      options: { max-size: '10m', max-file: '3' }
