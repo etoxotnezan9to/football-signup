@@ -10,6 +10,12 @@
 - Личные уведомления VK только с сервера и только по трём поводам (в состав, отмена или перенос, напоминание): у VK лимит 1 уведомление в час и 3 в сутки на человека. Новые поводы добавляйте с оглядкой на этот лимит, см. `docs/spec.md`, раздел 12.
 - SQLite (`node:sqlite`), один процесс API. Секреты (`VK_APP_SECRET`) только в переменных окружения на сервере, не в репозитории, логах и чатах.
 
+## Ветка, пуш и деплой
+
+- Работаем прямо в ветке `main`: без отдельных веток и PR, если владелец не попросил иначе.
+- После завершения правок: проверки (`pnpm lint`, `pnpm typecheck`, `pnpm test`, e2e), коммит, `git push origin main`, затем запуск деплоя: `gh workflow run deploy.yml --ref main -f environment=staging`. Дождаться, что деплой и CI зелёные.
+- Деплой по умолчанию на `staging`; на `prod` только по прямой просьбе владельца.
+
 ## Структура и команды
 
 `apps/api`, `apps/web`, `packages/shared`; команды из корня: `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm build`, e2e: `pnpm --filter @football/web test:e2e`; нагрузка: `node apps/api/scripts/loadtest.ts` (против API с `AUTH_DEV_BYPASS=1`).
