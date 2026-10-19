@@ -30,10 +30,10 @@ bash /root/football-deploy/server-setup.sh --env staging --domain football-test.
 
 ## 2. Секреты и переменные GitHub
 
-Settings → Environments: создайте `staging` и `prod`, в каждом секреты `DEPLOY_HOST`, `DEPLOY_PORT` (10022), `DEPLOY_USER` (`deploy`), `DEPLOY_SSH_KEY` (приватный ключ целиком), `DEPLOY_KNOWN_HOSTS` (вывод `ssh-keyscan -p 10022 <хост>`, чтобы не доверять серверу вслепую).
-Settings → Variables: `DEPLOY_ENABLED=true`, в окружениях `DEPLOY_DOMAIN` (домен для проверки по HTTPS).
+Settings → Environments → New environment: создайте `staging` и `prod`, в каждом в блоке Environment secrets секреты `DEPLOY_HOST`, `DEPLOY_PORT` (10022), `DEPLOY_USER` (`deploy`), `DEPLOY_SSH_KEY` (приватный ключ целиком), `DEPLOY_KNOWN_HOSTS` (вывод `ssh-keyscan -p 10022 <хост>`, чтобы не доверять серверу вслепую), а в блоке Environment variables переменную `DEPLOY_DOMAIN` (домен для проверки по HTTPS).
+Settings → Secrets and variables → Actions → вкладка Variables → New repository variable: `DEPLOY_ENABLED=true`.
 
-Запуск: Actions → Deploy → Run workflow → выбрать окружение. Образ собирается в CI, статика выкладывается на сервер, `release.sh` перезапускает контейнер, ждёт `/api/health` и **откатывается на предыдущий тег**, если новая версия не отвечает.
+Запуск: Actions → Deploy → Run workflow → выбрать окружение. Workflow с ручным запуском GitHub показывает, только когда `.github/workflows/deploy.yml` есть в ветке по умолчанию (`main`), поэтому сначала влейте рабочую ветку в `main`. Образ собирается в CI, статика выкладывается на сервер, `release.sh` перезапускает контейнер, ждёт `/api/health` и **откатывается на предыдущий тег**, если новая версия не отвечает.
 
 ## 3. Настройка приложения VK
 
