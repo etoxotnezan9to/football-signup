@@ -104,3 +104,10 @@
 .place-picker__add {
   color: var(--vkui--color_icon_accent);
 }
+.actions {
+  align-items: center;
+}
+.actions__add {
+  margin-left: auto;
+  color: var(--vkui--color_icon_accent);
+}

@@ -1,4 +1,5 @@
-import { Button, PanelHeader } from '@vkontakte/vkui';
+import { Icon28AddOutline } from '@vkontakte/icons';
+import { Button, IconButton, PanelHeader } from '@vkontakte/vkui';
 import { Empty } from '../components/Empty.tsx';
 import { GameCard } from '../components/GameCard.tsx';
 import { MockBar } from '../components/MockBar.tsx';
@@ -18,12 +19,17 @@ export function ListPage() {
     <>
       <PanelHeader>Запись на футбол</PanelHeader>
       <div className="actions">
-        <Button size="m" onClick={() => navigate(routeToHash({ name: 'create' }))}>
-          Создать игру
-        </Button>
         <Button size="m" mode="secondary" onClick={() => navigate(routeToHash({ name: 'my' }))}>
           Мои игры
         </Button>
+        {/* правая часть шапки в VK занята системными кнопками, поэтому «+» в правом верхнем углу под шапкой */}
+        <IconButton
+          className="actions__add"
+          label="Создать игру"
+          onClick={() => navigate(routeToHash({ name: 'create' }))}
+        >
+          <Icon28AddOutline />
+        </IconButton>
       </div>
       <MockBar />
       <NotificationsPrompt />
