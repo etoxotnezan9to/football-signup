@@ -1,5 +1,14 @@
 import type { ReactNode } from 'react';
-import { Avatar, Button, Div, Group, Header, PanelHeader, PanelHeaderBack, SimpleCell } from '@vkontakte/vkui';
+import {
+  Avatar,
+  Button,
+  Div,
+  Group,
+  Header,
+  PanelHeader,
+  PanelHeaderBack,
+  SimpleCell,
+} from '@vkontakte/vkui';
 import { formatRosterText, numberLabel, type GameDetails, type RosterEntry } from '@football/shared';
 import { api, type ApiError } from '../api.ts';
 import { Empty } from '../components/Empty.tsx';
@@ -11,10 +20,16 @@ import { VK_APP_ID } from '../session.ts';
 import { copyText, shareLink } from '../share.ts';
 import { useSignupFlow } from '../signup.ts';
 
-function Row({ label, children }: { label: string; children: ReactNode }) {
+/** Строка сведений об игре. Иконки те же, что в тексте «Скопировать список» и в сообщении организатора. */
+function Row({ icon, label, children }: { icon: string; label: string; children: ReactNode }) {
   return (
     <div className="info-row">
-      <div className="info-row__label">{label}</div>
+      <div className="info-row__label">
+        <span className="info-row__icon" aria-hidden="true">
+          {icon}
+        </span>
+        {label}
+      </div>
       <div>{children}</div>
     </div>
   );
@@ -179,21 +194,47 @@ function GameView({ id }: { id: number }) {
       {header}
       <Group>
         <Div>
-          {game.status === 'cancelled' && <Row label="Статус">Игра отменена</Row>}
-          {game.isFinished && game.status === 'active' && <Row label="Статус">Игра прошла</Row>}
-          <Row label="Когда">{formatWhen(game.startsAt)}</Row>
-          <Row label="Где">
+          {game.status === 'cancelled' && (
+            <Row icon="⚠" label="Статус">
+              Игра отменена
+            </Row>
+          )}
+          {game.isFinished && game.status === 'active' && (
+            <Row icon="⚠" label="Статус">
+              Игра прошла
+            </Row>
+          )}
+          <Row icon="📅" label="Когда">
+            {formatWhen(game.startsAt)}
+          </Row>
+          <Row icon="📍" label="Где">
             {game.venue}, {game.address}
           </Row>
-          {game.format && <Row label="Формат">{game.format}</Row>}
-          <Row label="Взнос">{game.feeRub} ₽</Row>
-          <Row label="Организатор">
+          {game.format && (
+            <Row icon="⚽" label="Формат">
+              {game.format}
+            </Row>
+          )}
+          <Row icon="💰" label="Взнос">
+            {game.feeRub} ₽
+          </Row>
+          <Row icon="🕺" label="Организатор">
             {fullName(game.organizer)}
             {game.organizerContact ? `, ${game.organizerContact}` : ''}
           </Row>
-          {game.paymentInfo && <Row label="Предоплата">{game.paymentInfo}</Row>}
-          {game.description && <Row label="Описание">{game.description}</Row>}
-          <Row label="Места">{fillLabel(game.taken, game.capacity, game.queued)}</Row>
+          {game.paymentInfo && (
+            <Row icon="❗" label="Предоплата">
+              {game.paymentInfo}
+            </Row>
+          )}
+          {game.description && (
+            <Row icon="📝" label="Описание">
+              {game.description}
+            </Row>
+          )}
+          <Row icon="👥" label="Места">
+            {fillLabel(game.taken, game.capacity, game.queued)}
+          </Row>
         </Div>
         <div className="actions">
           {active && (
@@ -212,7 +253,11 @@ function GameView({ id }: { id: number }) {
         </div>
         {isOrganizer && active && (
           <div className="actions">
-            <Button size="m" mode="outline" onClick={() => navigate(routeToHash({ name: 'edit', id: game.id }))}>
+            <Button
+              size="m"
+              mode="outline"
+              onClick={() => navigate(routeToHash({ name: 'edit', id: game.id }))}
+            >
               Редактировать
             </Button>
             <Button size="m" mode="outline" appearance="negative" onClick={cancelGame}>
