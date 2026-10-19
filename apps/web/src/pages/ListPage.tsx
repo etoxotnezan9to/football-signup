@@ -1,6 +1,6 @@
 import { Icon28AddOutline } from '@vkontakte/icons';
 import { useState } from 'react';
-import { Button, CustomSelect, FormItem, IconButton, PanelHeader } from '@vkontakte/vkui';
+import { CustomSelect, FormItem, IconButton, PanelHeader } from '@vkontakte/vkui';
 import { Empty } from '../components/Empty.tsx';
 import { GameCard } from '../components/GameCard.tsx';
 import { MockBar } from '../components/MockBar.tsx';
@@ -31,9 +31,6 @@ export function ListPage() {
     <>
       <PanelHeader>Запись на футбол</PanelHeader>
       <div className="actions">
-        <Button size="m" mode="secondary" onClick={() => navigate(routeToHash({ name: 'my' }))}>
-          Мои игры
-        </Button>
         {/* правая часть шапки в VK занята системными кнопками, поэтому «+» в правом верхнем углу под шапкой */}
         <IconButton
           className="actions__add"
