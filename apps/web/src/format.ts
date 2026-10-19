@@ -80,15 +80,17 @@ export type Route =
   | { name: 'list' }
   | { name: 'my' }
   | { name: 'create' }
+  | { name: 'newPlace' }
   | { name: 'game'; id: number }
   | { name: 'edit'; id: number };
 
-/** Разбор hash: `#/`, `#/my`, `#/create`, `#/game/12`, `#/game/12/edit` (допускается и `#game/12`). */
+/** Разбор hash: `#/`, `#/my`, `#/create`, `#/places/new`, `#/game/12`, `#/game/12/edit` (допускается и `#game/12`). */
 export function parseRoute(hash: string): Route {
   const path = hash.replace(/^#\/?/, '');
   const parts = path.split('/').filter(Boolean);
   if (parts[0] === 'my') return { name: 'my' };
   if (parts[0] === 'create') return { name: 'create' };
+  if (parts[0] === 'places' && parts[1] === 'new') return { name: 'newPlace' };
   if (parts[0] === 'game' && /^\d+$/.test(parts[1] ?? '')) {
     const id = Number(parts[1]);
     return parts[2] === 'edit' ? { name: 'edit', id } : { name: 'game', id };
@@ -104,6 +106,8 @@ export function routeToHash(r: Route): string {
       return '#/my';
     case 'create':
       return '#/create';
+    case 'newPlace':
+      return '#/places/new';
     case 'game':
       return `#/game/${r.id}`;
     case 'edit':

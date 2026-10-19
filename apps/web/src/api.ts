@@ -1,4 +1,4 @@
-import type { GameDetails, GameSummary, RosterEntry, User } from '@football/shared';
+import type { GameDetails, GameSummary, Place, RosterEntry, User } from '@football/shared';
 
 export class ApiError extends Error {
   code: string;
@@ -43,8 +43,9 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
     }
   }
   if (!res.ok) {
-    const err = (data as { error?: { code?: string; message?: string; details?: Record<string, string> } } | null)
-      ?.error;
+    const err = (
+      data as { error?: { code?: string; message?: string; details?: Record<string, string> } } | null
+    )?.error;
     throw new ApiError(res.status, err?.code ?? 'ERROR', err?.message ?? 'Ошибка запроса', err?.details);
   }
   return data as T;
@@ -58,6 +59,8 @@ export interface GamesPage {
 export const api = {
   putMe: (profile: { firstName: string; lastName: string; photoUrl: string | null }) =>
     request<User>('PUT', '/me', profile),
+  listPlaces: () => request<{ items: Place[] }>('GET', '/places'),
+  createPlace: (body: { name: string; address: string }) => request<Place>('POST', '/places', body),
   listGames: () => request<GamesPage>('GET', '/games?limit=50'),
   myGames: () => request<{ organized: GameSummary[]; joined: GameSummary[] }>('GET', '/me/games'),
   getGame: (id: number) => request<GameDetails>('GET', `/games/${id}`),
