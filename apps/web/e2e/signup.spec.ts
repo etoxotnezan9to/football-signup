@@ -128,3 +128,24 @@ test('место: создаётся на отдельной странице и
   await org.goto('/#/');
   await expect(org.getByText(/· Манеж E2E$/).first()).toBeVisible();
 });
+
+test('тестовый режим: в игру можно добавить 30 тестовых игроков', async ({ browser }) => {
+  const org = await openAs(browser, ORGANIZER);
+  await org.getByRole('button', { name: 'Создать игру', exact: true }).click();
+  await choosePlace(org, 'Большая арена', 'ул. Длинная, 30');
+  await org.getByLabel('Взнос, ₽', { exact: true }).fill('0');
+  await org.getByLabel('Число мест в составе', { exact: true }).fill('10');
+  await org.getByRole('button', { name: 'Создать игру', exact: true }).last().click();
+  await expect(org).toHaveURL(/#\/game\/\d+$/);
+  const gamePath = `/${new URL(org.url()).hash}`;
+  const maria = await openAs(browser, MARIA, gamePath);
+  await expect(maria.getByText('занято 0/10')).toBeVisible();
+
+  await expect(org.getByLabel('Число тестовых игроков')).toHaveValue('30');
+  await org.getByRole('button', { name: 'тестовых игроков', exact: true }).click();
+  await expect(org.getByText('Добавлено тестовых игроков: 30')).toBeVisible({ timeout: 30_000 });
+  await expect(org.getByText('занято 10/10, в очереди 20')).toBeVisible();
+  await expect(org.getByText('Тестовый игрок 30')).toBeVisible();
+  // у другого пользователя состав обновился без перезагрузки
+  await expect(maria.getByText('занято 10/10, в очереди 20')).toBeVisible();
+});

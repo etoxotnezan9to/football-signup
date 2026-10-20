@@ -1,5 +1,6 @@
 import bridge from '@vkontakte/vk-bridge';
 import { notificationsEnabledFromSearch } from './format.ts';
+import { mockAuthHeader } from './mock-players.ts';
 
 export const VK_APP_ID = Number(import.meta.env.VITE_VK_APP_ID ?? 54809461);
 
@@ -63,10 +64,10 @@ export async function initSession(): Promise<Session> {
 
   const saved = Number(storageGet('mockUser'));
   const mock = MOCK_USERS.find((u) => u.id === saved) ?? MOCK_USERS[0]!;
-  const enc = `${mock.id}:${encodeURIComponent(mock.firstName)}:${encodeURIComponent(mock.lastName)}`;
+  const authHeader = mockAuthHeader(mock);
   return {
-    authHeader: `Mock ${enc}`,
-    wsAuth: `mock:${enc}`,
+    authHeader,
+    wsAuth: `mock:${authHeader.slice('Mock '.length)}`,
     mock: true,
     notificationsEnabled: null,
     user: { id: mock.id, firstName: mock.firstName, lastName: mock.lastName, photoUrl: null },

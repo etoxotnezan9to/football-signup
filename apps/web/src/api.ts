@@ -19,8 +19,8 @@ export function setAuthHeader(value: string): void {
   authHeader = value;
 }
 
-async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
-  const headers: Record<string, string> = { Authorization: authHeader };
+async function request<T>(method: string, path: string, body?: unknown, auth: string = authHeader): Promise<T> {
+  const headers: Record<string, string> = { Authorization: auth };
   // Content-Type только при наличии тела: Fastify отвергает пустое тело с JSON-типом
   if (body !== undefined) headers['Content-Type'] = 'application/json';
   let res: Response;
@@ -69,6 +69,9 @@ export const api = {
   cancelGame: (id: number) => request<GameDetails>('POST', `/games/${id}/cancel`),
   putSignup: (id: number, seats: number) =>
     request<{ signup: RosterEntry; game: GameDetails }>('PUT', `/games/${id}/signup`, { seats }),
+  /** Только тестовый режим: запись от имени другого тестового пользователя (заголовок `Mock …`). */
+  putSignupAs: (auth: string, id: number, seats: number) =>
+    request<{ signup: RosterEntry; game: GameDetails }>('PUT', `/games/${id}/signup`, { seats }, auth),
   deleteSignup: (id: number) => request<GameDetails>('DELETE', `/games/${id}/signup`),
   setPaid: (id: number, signupId: number, paidSeats: number) =>
     request<GameDetails>('PATCH', `/games/${id}/signups/${signupId}`, { paidSeats }),
