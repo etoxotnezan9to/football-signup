@@ -12,6 +12,7 @@ import {
 import { formatRosterText, numberLabel, type GameDetails, type RosterEntry } from '@football/shared';
 import { api, type ApiError } from '../api.ts';
 import { Empty } from '../components/Empty.tsx';
+import { MockFill } from '../components/MockFill.tsx';
 import { useApp } from '../context.ts';
 import { fillLabel, formatWhen, fullName, gameLabel, gameLink, routeToHash, seatsLabel } from '../format.ts';
 import { useGame } from '../hooks.ts';
@@ -266,6 +267,7 @@ function GameView({ id }: { id: number }) {
             </Button>
           </div>
         )}
+        {active && <MockFill game={game} onUpdate={setData} />}
       </Group>
       {isOrganizer && active && <TestPlayersPanel gameId={game.id} onChanged={setData} />}
       <Group header={<Header indicator={`${game.taken}/${game.capacity}`}>Состав</Header>}>
