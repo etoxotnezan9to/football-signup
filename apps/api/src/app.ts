@@ -130,6 +130,24 @@ export function buildApp(deps: AppDeps): FastifyInstance {
         secured.put('/me', async (req) => service.updateProfile(req.vkId, req.body));
         secured.get('/me/games', async (req) => service.myGames(req.vkId));
 
+        secured.get('/config', async () => ({ testMode: config.testMode }));
+
+        secured.post('/games/:gameId/test-players', async (req) => {
+          const body = (typeof req.body === 'object' && req.body !== null ? req.body : {}) as {
+            count?: unknown;
+            seats?: unknown;
+          };
+          return service.addTestPlayers(
+            parseId((req.params as { gameId: string }).gameId),
+            req.vkId,
+            body.count,
+            body.seats ?? 1,
+          );
+        });
+        secured.delete('/games/:gameId/test-players', async (req) =>
+          service.removeTestPlayers(parseId((req.params as { gameId: string }).gameId), req.vkId),
+        );
+
         secured.get('/places', async () => ({ items: service.listPlaces() }));
         secured.post('/places', async (req, reply) => {
           const { place, created } = service.createPlace(req.vkId, req.body);

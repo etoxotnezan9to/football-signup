@@ -92,7 +92,31 @@ export interface ServiceOptions {
   notify?: Notify;
   /** Часовой пояс, в котором время игры показывается в уведомлениях */
   timeZone?: string;
+  /** Тестовый режим: разрешены тестовые игроки (addTestPlayers) */
+  testMode?: boolean;
 }
+
+/** Не больше стольких тестовых игроков за один запрос */
+export const MAX_TEST_PLAYERS_PER_REQUEST = 50;
+
+const TEST_FIRST_NAMES = [
+  'Артём',
+  'Николай',
+  'Кирилл',
+  'Александр',
+  'Дмитрий',
+  'Валерий',
+  'Иннокентий',
+  'Алексей',
+  'Григорий',
+  'Евгений',
+  'Денис',
+  'Филипп',
+  'Константин',
+  'Сергей',
+  'Михаил',
+  'Павел',
+];
 
 function toUser(r: { vk_id: number; first_name: string; last_name: string; photo_url: string | null }): User {
   return { vkId: r.vk_id, firstName: r.first_name, lastName: r.last_name, photoUrl: r.photo_url };
@@ -101,7 +125,15 @@ function toUser(r: { vk_id: number; first_name: string; last_name: string; photo
 export function createService(db: DatabaseSync, options: ServiceOptions = {}) {
   const now = options.now ?? (() => new Date());
   const emit = options.emit ?? (() => {});
-  const notify = options.notify;
+  // тестовые игроки (отрицательные vk_id) не существуют в VK: уведомления им не отправляются
+  const rawNotify = options.notify;
+  const notify: Notify | undefined = rawNotify
+    ? (n) => {
+        const userIds = n.userIds.filter((id) => id > 0);
+        if (userIds.length > 0) rawNotify({ ...n, userIds });
+      }
+    : undefined;
+  const testMode = options.testMode ?? false;
   const timeZone = options.timeZone ?? 'Europe/Moscow';
 
   function isFinished(startsAt: string): boolean {
@@ -652,6 +684,71 @@ export function createService(db: DatabaseSync, options: ServiceOptions = {}) {
         organized: organized.map((g) => summary(g, userId)),
         joined: joined.map((g) => summary(g, userId)),
       };
+    },
+
+    /**
+     * Тестовый режим: организатор добавляет в свою игру `count` тестовых игроков по `seats` мест.
+     * Тестовые игроки — пользователи с отрицательным vk_id и фамилией «(тест)»; в VK их нет.
+     */
+    addTestPlayers(
+      gameId: number,
+      organizerId: number,
+      countInput: unknown,
+      seatsInput: unknown = 1,
+    ): GameDetails {
+      if (!testMode) throw new AppError('FORBIDDEN', 'Тестовый режим выключен');
+      const count = countInput;
+      if (
+        typeof count !== 'number' ||
+        !Number.isInteger(count) ||
+        count < 1 ||
+        count > MAX_TEST_PLAYERS_PER_REQUEST
+      ) {
+        throw new AppError('VALIDATION_ERROR', `Число игроков от 1 до ${MAX_TEST_PLAYERS_PER_REQUEST}`);
+      }
+      const seats = checkSeats(seatsInput);
+      if (!seats.ok) throw new AppError('VALIDATION_ERROR', 'Неверное число мест');
+      const before = snapshot(gameId);
+      inTransaction(db, () => {
+        const game = getGameRow(gameId);
+        requireOrganizer(game, organizerId);
+        requireOpen(game);
+        const min = db.prepare('SELECT MIN(vk_id) AS m FROM users WHERE vk_id < 0').get() as unknown as {
+          m: number | null;
+        };
+        let nextId = (min.m ?? 0) - 1;
+        const insertUser = db.prepare(
+          'INSERT INTO users (vk_id, first_name, last_name, photo_url, created_at, updated_at) VALUES (?, ?, ?, NULL, ?, ?)',
+        );
+        const insertSignup = db.prepare(
+          'INSERT INTO signups (game_id, user_id, seats, paid_seats, created_at, updated_at) VALUES (?, ?, ?, 0, ?, ?)',
+        );
+        for (let i = 0; i < count; i++) {
+          const n = -nextId;
+          const name = `${TEST_FIRST_NAMES[(n - 1) % TEST_FIRST_NAMES.length]} ${n}`;
+          const ts = now().toISOString();
+          insertUser.run(nextId, name, '(тест)', ts, ts);
+          insertSignup.run(gameId, nextId, seats.seats, ts, ts);
+          nextId -= 1;
+        }
+      });
+      emitGameChanged(gameId, 'roster');
+      notifyPromotions(gameId, before, organizerId);
+      return details(getGameRow(gameId), organizerId);
+    },
+
+    /** Тестовый режим: убирает из игры всех тестовых игроков. */
+    removeTestPlayers(gameId: number, organizerId: number): GameDetails {
+      if (!testMode) throw new AppError('FORBIDDEN', 'Тестовый режим выключен');
+      const before = snapshot(gameId);
+      inTransaction(db, () => {
+        const game = getGameRow(gameId);
+        requireOrganizer(game, organizerId);
+        db.prepare('DELETE FROM signups WHERE game_id = ? AND user_id < 0').run(gameId);
+      });
+      emitGameChanged(gameId, 'roster');
+      notifyPromotions(gameId, before, organizerId);
+      return details(getGameRow(gameId), organizerId);
     },
 
     getGameForText(gameId: number, viewerId: number): GameDetails {

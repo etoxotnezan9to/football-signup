@@ -15,6 +15,7 @@ import { Empty } from '../components/Empty.tsx';
 import { useApp } from '../context.ts';
 import { fillLabel, formatWhen, fullName, gameLabel, gameLink, routeToHash, seatsLabel } from '../format.ts';
 import { useGame } from '../hooks.ts';
+import { TestPlayersPanel } from '../components/TestPlayersPanel.tsx';
 import { confirmPopout, entryMenuPopout } from '../seats.tsx';
 import { VK_APP_ID } from '../session.ts';
 import { copyText, shareLink } from '../share.ts';
@@ -266,6 +267,7 @@ function GameView({ id }: { id: number }) {
           </div>
         )}
       </Group>
+      {isOrganizer && active && <TestPlayersPanel gameId={game.id} onChanged={setData} />}
       <Group header={<Header indicator={`${game.taken}/${game.capacity}`}>Состав</Header>}>
         {mainRows.length === 0 ? (
           <Empty>Пока никто не записался</Empty>

@@ -327,3 +327,47 @@ describe('места', () => {
     expectCode(() => svc.createGame(ORG, gameBody({ placeId: undefined })), 'VALIDATION_ERROR');
   });
 });
+
+describe('тестовые игроки', () => {
+  it('без тестового режима запрещены', () => {
+    const g = svc.createGame(ORG, gameBody());
+    expectCode(() => svc.addTestPlayers(g.id, ORG, 3), 'FORBIDDEN');
+    expectCode(() => svc.removeTestPlayers(g.id, ORG), 'FORBIDDEN');
+  });
+
+  it('организатор добавляет много игроков, лишние встают в очередь, потом их можно убрать', () => {
+    const notified: number[][] = [];
+    const db = openDatabase(':memory:', MIGRATIONS);
+    const t = createService(db, { now: () => clock, testMode: true, notify: (n) => void notified.push(n.userIds) });
+    t.upsertUser({ vkId: ORG, firstName: 'Орг', lastName: '' });
+    t.upsertUser({ vkId: U1, firstName: 'Игрок', lastName: '' });
+    const place = t.createPlace(ORG, { name: 'Зал', address: 'ул. 1' }).place.id;
+    const g = t.createGame(ORG, gameBody({ placeId: place, capacity: 10 }));
+    t.putSignup(g.id, U1, 1);
+
+    expectCode(() => t.addTestPlayers(g.id, U1, 3), 'FORBIDDEN');
+    expectCode(() => t.addTestPlayers(g.id, ORG, 0), 'VALIDATION_ERROR');
+    expectCode(() => t.addTestPlayers(g.id, ORG, 51), 'VALIDATION_ERROR');
+    expectCode(() => t.addTestPlayers(g.id, ORG, 2, 6), 'VALIDATION_ERROR');
+
+    const a = t.addTestPlayers(g.id, ORG, 12);
+    assert.equal(a.roster.length, 13);
+    assert.equal(a.taken, 10);
+    assert.equal(a.queued, 3);
+    const tests = a.roster.filter((e) => e.user.vkId < 0);
+    assert.equal(new Set(tests.map((e) => e.user.vkId)).size, 12);
+    assert.ok(tests.every((e) => e.user.lastName === '(тест)'));
+
+    const b = t.addTestPlayers(g.id, ORG, 2, 3);
+    assert.equal(b.roster.length, 15);
+    assert.equal(b.queued, 9);
+
+    const c = t.removeTestPlayers(g.id, ORG);
+    assert.deepEqual(
+      c.roster.map((e) => e.user.vkId),
+      [U1],
+    );
+    // тестовым игрокам уведомления не уходят
+    assert.ok(notified.flat().every((id) => id > 0));
+  });
+});

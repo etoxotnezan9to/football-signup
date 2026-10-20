@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
+import { loadConfig } from '../src/config.ts';
 import { createHub, type HubSocket } from '../src/hub.ts';
 import { createRateLimiter } from '../src/rate-limit.ts';
 import { signLaunchParams, verifyLaunchParams } from '../src/vk-auth.ts';
@@ -165,5 +166,17 @@ describe('hub', () => {
     );
     conn.onClose();
     assert.equal(hub.size(), 0);
+  });
+});
+
+describe('loadConfig: тестовый режим', () => {
+  const base = { VK_APP_ID: '54809461', VK_APP_SECRET: 's', NODE_ENV: 'production' };
+  it('выключен по умолчанию, включается TEST_MODE=1 и вместе с AUTH_DEV_BYPASS', () => {
+    assert.equal(loadConfig(base).testMode, false);
+    assert.equal(loadConfig({ ...base, TEST_MODE: '1' }).testMode, true);
+    assert.equal(loadConfig({ VK_APP_ID: '1', NODE_ENV: 'development', AUTH_DEV_BYPASS: '1' }).testMode, true);
+  });
+  it('запрещён при TEST_MODE_FORBIDDEN=1', () => {
+    assert.throws(() => loadConfig({ ...base, TEST_MODE: '1', TEST_MODE_FORBIDDEN: '1' }));
   });
 });

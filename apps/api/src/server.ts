@@ -38,6 +38,7 @@ const service = createService(db, {
   emit: (e) => hub.publish(e),
   notify: notifier?.notify,
   timeZone: config.notifyTimeZone,
+  testMode: config.testMode,
 });
 holder.service = service;
 
@@ -59,7 +60,11 @@ const app = buildApp({
 });
 
 logRef.current = app.log;
-app.log.info({ notifications: notifier !== null }, notifier ? 'личные уведомления включены' : 'личные уведомления выключены (нет VK_SERVICE_KEY)');
+app.log.info(
+  { notifications: notifier !== null },
+  notifier ? 'личные уведомления включены' : 'личные уведомления выключены (нет VK_SERVICE_KEY)',
+);
+if (config.testMode) app.log.warn('тестовый режим включён: организаторы могут добавлять тестовых игроков');
 
 // Напоминания: раз в минуту ищем игры, до которых осталось меньше суток
 const REMINDER_TICK_MS = 60_000;

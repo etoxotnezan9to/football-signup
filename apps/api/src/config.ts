@@ -14,6 +14,11 @@ export interface Config {
   notifyTimeZone: string;
   /** Только вне production: разрешает заголовок `Authorization: Mock <id>:<имя>:<фамилия>` */
   authDevBypass: boolean;
+  /**
+   * Тестовый режим: организатор может добавить в свою игру тестовых игроков. Включается TEST_MODE=1
+   * (допустимо на staging) и автоматически вместе с AUTH_DEV_BYPASS. Запрещён при TEST_MODE_FORBIDDEN=1 (prod).
+   */
+  testMode: boolean;
 }
 
 export function loadConfig(env: Record<string, string | undefined> = process.env): Config {
@@ -21,7 +26,8 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
   const production = nodeEnv === 'production';
 
   const vkAppId = Number(env.VK_APP_ID);
-  if (!Number.isInteger(vkAppId) || vkAppId <= 0) throw new Error('VK_APP_ID должен быть положительным числом');
+  if (!Number.isInteger(vkAppId) || vkAppId <= 0)
+    throw new Error('VK_APP_ID должен быть положительным числом');
 
   const vkAppSecret = env.VK_APP_SECRET ?? '';
   const authDevBypass = !production && env.AUTH_DEV_BYPASS === '1';
@@ -30,6 +36,11 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
   }
   if (production && env.AUTH_DEV_BYPASS === '1') {
     throw new Error('AUTH_DEV_BYPASS запрещён в production');
+  }
+
+  const testMode = authDevBypass || env.TEST_MODE === '1';
+  if (testMode && env.TEST_MODE_FORBIDDEN === '1') {
+    throw new Error('TEST_MODE запрещён в этом окружении (TEST_MODE_FORBIDDEN=1)');
   }
 
   const notifyTimeZone = env.NOTIFY_TIMEZONE ?? 'Europe/Moscow';
@@ -53,5 +64,6 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     vkServiceKey: env.VK_SERVICE_KEY ?? '',
     notifyTimeZone,
     authDevBypass,
+    testMode,
   };
 }

@@ -151,3 +151,27 @@ test('фильтр игр по месту на главной', async ({ browser
   await expect(page.getByText(/· Манеж E2E$/).first()).toBeVisible();
   await expect(page.getByText(/· Тест-арена$/)).toHaveCount(0);
 });
+
+test('тестовый режим: организатор добавляет много игроков и убирает их', async ({ browser }) => {
+  const org = await openAs(browser, ORGANIZER, '/#/create');
+  await choosePlace(org, 'Тест-поле', 'ул. Пробная, 2');
+  await org.getByLabel('Взнос, ₽', { exact: true }).fill('0');
+  await org.getByLabel('Число мест в составе', { exact: true }).fill('10');
+  await org.getByRole('button', { name: 'Создать игру', exact: true }).last().click();
+  await expect(org).toHaveURL(/#\/game\/\d+$/);
+  const gamePath = `/${new URL(org.url()).hash}`;
+
+  await expect(org.getByText('🧪 Тестовый режим')).toBeVisible();
+  await org.getByLabel('Тестовых игроков', { exact: true }).fill('14');
+  await org.getByRole('button', { name: 'Добавить игроков', exact: true }).click();
+  await expect(org.getByText('занято 10/10, в очереди 4')).toBeVisible();
+
+  // другой пользователь видит тех же игроков, но не видит тестовую панель
+  const maria = await openAs(browser, MARIA, gamePath);
+  await expect(maria.getByText('занято 10/10, в очереди 4')).toBeVisible();
+  await expect(maria.getByText('🧪 Тестовый режим')).toHaveCount(0);
+
+  await org.getByRole('button', { name: 'Убрать тестовых', exact: true }).click();
+  await expect(org.getByText('занято 0/10', { exact: true })).toBeVisible();
+  await expect(maria.getByText('занято 0/10', { exact: true })).toBeVisible();
+});

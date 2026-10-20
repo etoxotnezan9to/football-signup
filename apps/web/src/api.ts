@@ -59,6 +59,10 @@ export interface GamesPage {
 export const api = {
   putMe: (profile: { firstName: string; lastName: string; photoUrl: string | null }) =>
     request<User>('PUT', '/me', profile),
+  getConfig: () => request<{ testMode: boolean }>('GET', '/config'),
+  addTestPlayers: (id: number, count: number, seats: number) =>
+    request<GameDetails>('POST', `/games/${id}/test-players`, { count, seats }),
+  removeTestPlayers: (id: number) => request<GameDetails>('DELETE', `/games/${id}/test-players`),
   listPlaces: () => request<{ items: Place[] }>('GET', '/places'),
   createPlace: (body: { name: string; address: string }) => request<Place>('POST', '/places', body),
   listGames: () => request<GamesPage>('GET', '/games?limit=50'),

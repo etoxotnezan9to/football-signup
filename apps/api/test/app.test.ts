@@ -24,6 +24,7 @@ const config: Config = {
   vkServiceKey: '',
   notifyTimeZone: 'Europe/Moscow',
   authDevBypass: false,
+  testMode: false,
 };
 
 function launch(userId: number): string {
@@ -148,6 +149,20 @@ describe('HTTP API', () => {
     const del = await app.inject({ method: 'DELETE', url: `/api/games/${id}/signup`, headers: auth(602) });
     assert.equal(del.statusCode, 200);
     assert.equal(del.json().taken, 0);
+  });
+
+  it('конфигурация и тестовые игроки выключены без тестового режима', async () => {
+    const cfg = await app.inject({ method: 'GET', url: '/api/config', headers: auth(801) });
+    assert.equal(cfg.statusCode, 200);
+    assert.deepEqual(cfg.json(), { testMode: false });
+    const g = await app.inject({ method: 'POST', url: '/api/games', headers: auth(801), payload: gameBody() });
+    const add = await app.inject({
+      method: 'POST',
+      url: `/api/games/${g.json().id}/test-players`,
+      headers: auth(801),
+      payload: { count: 5 },
+    });
+    assert.equal(add.statusCode, 403);
   });
 
   it('места: создать, получить список, выбрать в игре', async () => {

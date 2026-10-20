@@ -115,3 +115,10 @@
   margin-left: auto;
   color: var(--vkui--color_icon_accent);
 }
+.test-panel {
+  display: flex;
+  flex-wrap: wrap;
+}
+.test-panel > * {
+  flex: 1 1 140px;
+}
