@@ -12,11 +12,14 @@ import {
 } from '@vkontakte/vkui';
 import { Icon28AddOutline } from '@vkontakte/icons';
 import {
+  DEFAULT_MEETINGS,
   DEFAULT_PLAYERS_PER_TEAM,
   DEFAULT_TEAMS,
   MAX_CAPACITY,
+  MAX_MEETINGS,
   MAX_PLAYERS_PER_TEAM,
   MAX_TEAMS,
+  MIN_MEETINGS,
   MIN_PLAYERS_PER_TEAM,
   MIN_TEAMS,
   gameCapacity,
@@ -38,6 +41,7 @@ interface FormState {
   placeId: string;
   teamsMax: string;
   playersPerTeam: string;
+  meetings: string;
   feeRub: string;
   description: string;
   paymentInfo: string;
@@ -62,6 +66,12 @@ const FIELDS: Field[] = [
     type: 'number',
     hint: `От ${MIN_PLAYERS_PER_TEAM} до ${MAX_PLAYERS_PER_TEAM}`,
   },
+  {
+    key: 'meetings',
+    label: 'Количество встреч команд',
+    type: 'number',
+    hint: `Сколько раз каждая пара команд играет между собой, от ${MIN_MEETINGS} до ${MAX_MEETINGS}`,
+  },
   { key: 'feeRub', label: 'Взнос, ₽', type: 'number' },
   {
     key: 'paymentInfo',
@@ -78,6 +88,7 @@ function toForm(g?: GameDetails): FormState {
     placeId: g ? String(g.placeId) : '',
     teamsMax: String(g?.teamsMax ?? DEFAULT_TEAMS),
     playersPerTeam: String(g?.playersPerTeam ?? DEFAULT_PLAYERS_PER_TEAM),
+    meetings: String(g?.meetings ?? DEFAULT_MEETINGS),
     feeRub: g ? String(g.feeRub) : '',
     description: g?.description ?? '',
     paymentInfo: g?.paymentInfo ?? '',
@@ -183,6 +194,7 @@ export function GameForm({ initial }: { initial?: GameDetails }) {
       placeId: toNumber(form.placeId),
       teamsMax: toNumber(form.teamsMax),
       playersPerTeam: toNumber(form.playersPerTeam),
+      meetings: toNumber(form.meetings),
       feeRub: toNumber(form.feeRub),
       description: form.description,
       paymentInfo: form.paymentInfo,

@@ -207,22 +207,40 @@
   gap: 12px;
   padding: 8px 16px 16px;
 }
-.results__round-title {
-  font-weight: 600;
-  margin-bottom: 4px;
-}
-.results__rest {
+.results__hint {
   font-size: 13px;
   color: var(--vkui--color_text_secondary);
-  padding-top: 2px;
 }
-.match {
+.pair {
+  border: 1px solid var(--vkui--color_separator_primary);
+  border-radius: 12px;
+  padding: 8px 12px;
+}
+.pair__header {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
   gap: 8px;
-  padding: 6px 0;
-  border-bottom: 1px solid var(--vkui--color_separator_primary);
+  font-weight: 600;
+  padding-bottom: 4px;
+}
+.pair__vs {
+  color: var(--vkui--color_text_secondary);
+}
+.leg {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+}
+.leg__title {
+  font-size: 13px;
+  color: var(--vkui--color_text_secondary);
+}
+.leg__actions {
+  display: flex;
+  justify-content: flex-end;
 }
 .match__team {
   display: flex;
@@ -258,11 +276,6 @@
   border-radius: 8px;
   background: var(--vkui--color_field_background);
   color: inherit;
-}
-.match__actions {
-  grid-column: 1 / -1;
-  display: flex;
-  justify-content: center;
 }
 .results__table-wrap {
   overflow-x: auto;

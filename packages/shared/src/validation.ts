@@ -1,10 +1,13 @@
 // Валидация входных данных без внешних библиотек (используется и сервером, и клиентом).
 import {
   MAX_CAPACITY,
+  DEFAULT_MEETINGS,
   MAX_FEE_RUB,
+  MAX_MEETINGS,
   MAX_PLAYERS_PER_TEAM,
   MAX_SEATS_PER_USER,
   MAX_TEAMS,
+  MIN_MEETINGS,
   MIN_PLAYERS_PER_TEAM,
   MIN_TEAMS,
 } from './constants.ts';
@@ -16,6 +19,8 @@ export interface GameInput {
   teamsMax: number;
   /** Игроков в команде */
   playersPerTeam: number;
+  /** Сколько раз каждая пара команд играет между собой; по умолчанию DEFAULT_MEETINGS */
+  meetings: number;
   feeRub: number;
   description: string;
   paymentInfo: string;
@@ -134,6 +139,7 @@ export function parseGameInput(body: unknown): ParseResult<GameInput> {
   checkDate(body, 'startsAt', errors, out, true);
   checkPlaceId(body, errors, out, true);
   checkTeams(body, errors, out, true);
+  checkInt(body, 'meetings', MIN_MEETINGS, MAX_MEETINGS, errors, out, false);
   checkInt(body, 'feeRub', 0, MAX_FEE_RUB, errors, out, true);
   checkString(body, 'description', 0, 1000, errors, out, false);
   checkString(body, 'paymentInfo', 0, 300, errors, out, false);
@@ -146,6 +152,7 @@ export function parseGameInput(body: unknown): ParseResult<GameInput> {
       placeId: out.placeId as number,
       teamsMax: out.teamsMax as number,
       playersPerTeam: out.playersPerTeam as number,
+      meetings: (out.meetings as number | undefined) ?? DEFAULT_MEETINGS,
       feeRub: out.feeRub as number,
       description: (out.description as string | undefined) ?? '',
       paymentInfo: (out.paymentInfo as string | undefined) ?? '',
@@ -165,6 +172,7 @@ export function parseGameUpdate(body: unknown): ParseResult<Partial<GameInput>> 
   checkDate(body, 'startsAt', errors, out, false);
   checkPlaceId(body, errors, out, false);
   checkTeams(body, errors, out, false);
+  checkInt(body, 'meetings', MIN_MEETINGS, MAX_MEETINGS, errors, out, false);
   checkInt(body, 'feeRub', 0, MAX_FEE_RUB, errors, out, false);
   checkString(body, 'description', 0, 1000, errors, out, false);
   checkString(body, 'paymentInfo', 0, 300, errors, out, false);

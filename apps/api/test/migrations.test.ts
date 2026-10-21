@@ -71,10 +71,14 @@ describe('миграция 0003_places', () => {
       const nulls = db.prepare('SELECT COUNT(*) AS n FROM games WHERE teams_max IS NULL AND players_per_team IS NULL').get();
       assert.equal(nulls!.n, 3);
 
+      // 0006–0008, затем счёт без номера встречи переносится в первую встречу (0009)
+      for (const f of ['0006_capacity_from_teams.sql', '0007_teams.sql', '0008_match_results.sql']) {
+        copyFileSync(join(MIGRATIONS, f), join(dir, f));
+      }
+
       // у одной игры значения уже были, причём произведение больше 60
       db.prepare('UPDATE games SET teams_max = 10, players_per_team = 7 WHERE id = 1').run();
-      copyFileSync(join(MIGRATIONS, '0006_capacity_from_teams.sql'), join(dir, '0006_capacity_from_teams.sql'));
-      assert.deepEqual(migrate(db, dir), ['0006_capacity_from_teams.sql']);
+      assert.deepEqual(migrate(db, dir), ['0006_capacity_from_teams.sql', '0007_teams.sql', '0008_match_results.sql']);
       const rows = db.prepare('SELECT id, teams_max, players_per_team, capacity FROM games ORDER BY id').all();
       assert.deepEqual(
         rows.map((g) => [g.teams_max, g.players_per_team, g.capacity]),
@@ -83,6 +87,24 @@ describe('миграция 0003_places', () => {
           [4, 6, 24],
           [4, 6, 24],
         ],
+      );
+
+      db.prepare(
+        "INSERT INTO match_results (game_id, team_a, team_b, goals_a, goals_b, updated_at) VALUES (1, 1, 2, 3, 1, 'x')",
+      ).run();
+      copyFileSync(join(MIGRATIONS, '0009_meetings.sql'), join(dir, '0009_meetings.sql'));
+      assert.deepEqual(migrate(db, dir), ['0009_meetings.sql']);
+      assert.deepEqual(
+        db
+          .prepare('SELECT meetings FROM games ORDER BY id')
+          .all()
+          .map((g) => g.meetings),
+        [2, 2, 2],
+      );
+      const legs = db.prepare('SELECT team_a, team_b, leg, goals_a, goals_b FROM match_results').all();
+      assert.deepEqual(
+        legs.map((m) => [m.team_a, m.team_b, m.leg, m.goals_a, m.goals_b]),
+        [[1, 2, 1, 3, 1]],
       );
     } finally {
       rmSync(dir, { recursive: true, force: true });

@@ -198,13 +198,27 @@ export function buildApp(deps: AppDeps): FastifyInstance {
           const p = req.params as { gameId: string; teamNo: string };
           return service.setTeamName(parseId(p.gameId), req.vkId, parseId(p.teamNo), req.body);
         });
-        secured.put('/games/:gameId/matches/:teamA/:teamB', async (req) => {
-          const p = req.params as { gameId: string; teamA: string; teamB: string };
-          return service.setMatchScore(parseId(p.gameId), req.vkId, parseId(p.teamA), parseId(p.teamB), req.body ?? {});
+        secured.put('/games/:gameId/matches/:teamA/:teamB/:leg', async (req) => {
+          const p = req.params as { gameId: string; teamA: string; teamB: string; leg: string };
+          return service.setMatchScore(
+            parseId(p.gameId),
+            req.vkId,
+            parseId(p.teamA),
+            parseId(p.teamB),
+            parseId(p.leg),
+            req.body ?? {},
+          );
         });
-        secured.delete('/games/:gameId/matches/:teamA/:teamB', async (req) => {
-          const p = req.params as { gameId: string; teamA: string; teamB: string };
-          return service.setMatchScore(parseId(p.gameId), req.vkId, parseId(p.teamA), parseId(p.teamB), null);
+        secured.delete('/games/:gameId/matches/:teamA/:teamB/:leg', async (req) => {
+          const p = req.params as { gameId: string; teamA: string; teamB: string; leg: string };
+          return service.setMatchScore(
+            parseId(p.gameId),
+            req.vkId,
+            parseId(p.teamA),
+            parseId(p.teamB),
+            parseId(p.leg),
+            null,
+          );
         });
         secured.put('/games/:gameId/team-assignment', async (req) =>
           service.assignSeat(parseId((req.params as { gameId: string }).gameId), req.vkId, req.body),

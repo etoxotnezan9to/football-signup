@@ -58,6 +58,7 @@ interface GameRow {
   /** Адрес места (из JOIN с places) */
   address: string;
   teams_max: number;
+  meetings: number;
   players_per_team: number;
   fee_rub: number;
   capacity: number;
@@ -269,15 +270,27 @@ export function createService(db: DatabaseSync, options: ServiceOptions = {}) {
     }
   }
 
-  /** Счёт матчей между командами, которые ещё есть в игре (номер не больше teamsMax). */
+  /** Счёт встреч, которые ещё есть в игре: команды не больше teamsMax, номер встречи не больше meetings. */
   function resultsOf(game: GameRow): MatchResult[] {
     const rows = db
       .prepare(
-        `SELECT team_a, team_b, goals_a, goals_b FROM match_results
-          WHERE game_id = ? AND team_b <= ? ORDER BY team_a, team_b`,
+        `SELECT team_a, team_b, leg, goals_a, goals_b FROM match_results
+          WHERE game_id = ? AND team_b <= ? AND leg <= ? ORDER BY team_a, team_b, leg`,
       )
-      .all(game.id, game.teams_max) as unknown as { team_a: number; team_b: number; goals_a: number; goals_b: number }[];
-    return rows.map((r) => ({ teamA: r.team_a, teamB: r.team_b, goalsA: r.goals_a, goalsB: r.goals_b }));
+      .all(game.id, game.teams_max, game.meetings) as unknown as {
+      team_a: number;
+      team_b: number;
+      leg: number;
+      goals_a: number;
+      goals_b: number;
+    }[];
+    return rows.map((r) => ({
+      teamA: r.team_a,
+      teamB: r.team_b,
+      leg: r.leg,
+      goalsA: r.goals_a,
+      goalsB: r.goals_b,
+    }));
   }
 
   function details(game: GameRow, viewerId?: number): GameDetails {
@@ -287,6 +300,7 @@ export function createService(db: DatabaseSync, options: ServiceOptions = {}) {
       address: game.address,
       teamsMax: game.teams_max,
       playersPerTeam: game.players_per_team,
+      meetings: game.meetings,
       description: game.description,
       paymentInfo: game.payment_info,
       organizerContact: game.organizer_contact,
@@ -512,9 +526,9 @@ export function createService(db: DatabaseSync, options: ServiceOptions = {}) {
         const ts = now().toISOString();
         const res = db
           .prepare(
-            `INSERT INTO games (organizer_id, starts_at, place_id, teams_max, players_per_team, fee_rub, capacity,
-                                description, payment_info, organizer_contact, status, created_at, updated_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?)`,
+            `INSERT INTO games (organizer_id, starts_at, place_id, teams_max, players_per_team, meetings, fee_rub,
+                                capacity, description, payment_info, organizer_contact, status, created_at, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?)`,
           )
           .run(
             organizerId,
@@ -522,6 +536,7 @@ export function createService(db: DatabaseSync, options: ServiceOptions = {}) {
             input.placeId,
             input.teamsMax,
             input.playersPerTeam,
+            input.meetings,
             input.feeRub,
             gameCapacity(input.teamsMax, input.playersPerTeam),
             input.description,
@@ -581,6 +596,7 @@ export function createService(db: DatabaseSync, options: ServiceOptions = {}) {
           placeId: 'place_id',
           teamsMax: 'teams_max',
           playersPerTeam: 'players_per_team',
+          meetings: 'meetings',
           feeRub: 'fee_rub',
           description: 'description',
           paymentInfo: 'payment_info',
@@ -794,10 +810,17 @@ export function createService(db: DatabaseSync, options: ServiceOptions = {}) {
     },
 
     /**
-     * Организатор записывает счёт матча команд teamA и teamB (порядок любой, голы в том же порядке)
-     * или стирает его (body null). Можно и после окончания игры, но не в отменённой игре.
+     * Организатор записывает счёт встречи leg (с 1 до meetings) команд teamA и teamB (порядок любой,
+     * голы в том же порядке) или стирает его (body null). Можно и после окончания игры, но не в отменённой игре.
      */
-    setMatchScore(gameId: number, organizerId: number, teamA: number, teamB: number, body: unknown): GameDetails {
+    setMatchScore(
+      gameId: number,
+      organizerId: number,
+      teamA: number,
+      teamB: number,
+      leg: number,
+      body: unknown,
+    ): GameDetails {
       let goals: [number, number] | null = null;
       if (body !== null) {
         const b = (typeof body === 'object' ? body : {}) as { goalsA?: unknown; goalsB?: unknown };
@@ -810,20 +833,26 @@ export function createService(db: DatabaseSync, options: ServiceOptions = {}) {
         const game = getGameRow(gameId);
         requireOrganizer(game, organizerId);
         if (game.status !== 'active') throw new AppError('GAME_NOT_ACTIVE', 'Игра отменена');
-        if (teamA === teamB || teamA > game.teams_max || teamB > game.teams_max) {
+        if (teamA === teamB || teamA > game.teams_max || teamB > game.teams_max || leg > game.meetings) {
           throw new AppError('NOT_FOUND', 'Такого матча нет');
         }
         const [a, b] = teamA < teamB ? [teamA, teamB] : [teamB, teamA];
         if (goals === null) {
-          db.prepare('DELETE FROM match_results WHERE game_id = ? AND team_a = ? AND team_b = ?').run(gameId, a, b);
+          db.prepare('DELETE FROM match_results WHERE game_id = ? AND team_a = ? AND team_b = ? AND leg = ?').run(
+            gameId,
+            a,
+            b,
+            leg,
+          );
           return;
         }
         const [ga, gb] = teamA < teamB ? goals : [goals[1], goals[0]];
         db.prepare(
-          `INSERT INTO match_results (game_id, team_a, team_b, goals_a, goals_b, updated_at) VALUES (?, ?, ?, ?, ?, ?)
-             ON CONFLICT (game_id, team_a, team_b)
+          `INSERT INTO match_results (game_id, team_a, team_b, leg, goals_a, goals_b, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?)
+             ON CONFLICT (game_id, team_a, team_b, leg)
              DO UPDATE SET goals_a = excluded.goals_a, goals_b = excluded.goals_b, updated_at = excluded.updated_at`,
-        ).run(gameId, a, b, ga, gb, now().toISOString());
+        ).run(gameId, a, b, leg, ga, gb, now().toISOString());
       });
       emitGameChanged(gameId, 'roster');
       return details(getGameRow(gameId), organizerId);

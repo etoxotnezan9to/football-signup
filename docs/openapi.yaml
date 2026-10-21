@@ -325,13 +325,14 @@ paths:
         '403': { $ref: '#/components/responses/Error' }
         '404': { $ref: '#/components/responses/Error' }
         '409': { $ref: '#/components/responses/Error' }
-  /games/{gameId}/matches/{teamA}/{teamB}:
+  /games/{gameId}/matches/{teamA}/{teamB}/{leg}:
     parameters:
       - { $ref: '#/components/parameters/GameId' }
       - { name: teamA, in: path, required: true, schema: { type: integer, minimum: 1 }, description: Номер команды }
       - { name: teamB, in: path, required: true, schema: { type: integer, minimum: 1 }, description: Номер соперника }
+      - { name: leg, in: path, required: true, schema: { type: integer, minimum: 1 }, description: 'Номер встречи этой пары, от 1 до meetings' }
     put:
-      summary: Записать счёт матча команд (только организатор; можно и после окончания игры)
+      summary: Записать счёт встречи команд (только организатор; можно и после окончания игры)
       description: Порядок команд любой, голы в том же порядке. В ответе results хранятся с teamA < teamB.
       requestBody:
         required: true
@@ -355,7 +356,7 @@ paths:
         '404': { $ref: '#/components/responses/Error' }
         '409': { $ref: '#/components/responses/Error' }
     delete:
-      summary: Стереть счёт матча (только организатор)
+      summary: Стереть счёт встречи (только организатор)
       responses:
         '200':
           description: OK
@@ -493,6 +494,7 @@ components:
         placeId: { type: integer, minimum: 1, description: 'Место; неизвестное — VALIDATION_ERROR с details.placeId' }
         teamsMax: { type: integer, minimum: 2, maximum: 10, description: Максимум команд }
         playersPerTeam: { type: integer, minimum: 1, maximum: 11, description: 'Игроков в команде; teamsMax × playersPerTeam не больше 60, иначе VALIDATION_ERROR с details.playersPerTeam' }
+        meetings: { type: integer, minimum: 1, maximum: 10, default: 2, description: Сколько раз каждая пара команд играет между собой }
         feeRub: { type: integer, minimum: 0, maximum: 100000 }
         description: { type: string, maxLength: 1000, default: '' }
         paymentInfo: { type: string, maxLength: 300, default: '' }
@@ -505,6 +507,7 @@ components:
         placeId: { type: integer, minimum: 1 }
         teamsMax: { type: integer, minimum: 2, maximum: 10 }
         playersPerTeam: { type: integer, minimum: 1, maximum: 11 }
+        meetings: { type: integer, minimum: 1, maximum: 10 }
         feeRub: { type: integer, minimum: 0, maximum: 100000 }
         description: { type: string, maxLength: 1000 }
         paymentInfo: { type: string, maxLength: 300 }
@@ -534,11 +537,12 @@ components:
         seat: { type: integer, minimum: 1 }
     MatchResult:
       type: object
-      description: Счёт матча команд teamA < teamB
-      required: [teamA, teamB, goalsA, goalsB]
+      description: Счёт встречи leg команд teamA < teamB
+      required: [teamA, teamB, leg, goalsA, goalsB]
       properties:
         teamA: { type: integer, minimum: 1 }
         teamB: { type: integer, minimum: 2 }
+        leg: { type: integer, minimum: 1, description: 'Номер встречи этой пары, от 1 до meetings' }
         goalsA: { type: integer, minimum: 0, maximum: 99 }
         goalsB: { type: integer, minimum: 0, maximum: 99 }
     Team:
@@ -566,11 +570,12 @@ components:
       allOf:
         - $ref: '#/components/schemas/GameSummary'
         - type: object
-          required: [address, teamsMax, playersPerTeam, description, paymentInfo, organizerContact, roster, teams, unassigned, results]
+          required: [address, teamsMax, playersPerTeam, meetings, description, paymentInfo, organizerContact, roster, teams, unassigned, results]
           properties:
             address: { type: string, description: Адрес места }
             teamsMax: { type: integer }
             playersPerTeam: { type: integer }
+            meetings: { type: integer, description: Сколько раз каждая пара команд играет между собой }
             description: { type: string }
             paymentInfo: { type: string }
             organizerContact: { type: string }
@@ -589,6 +594,6 @@ components:
             results:
               type: array
               description: >-
-                Счёт сыгранных матчей между командами 1..teamsMax (каждая с каждой). Расписание по турам
-                и турнирную таблицу клиент считает функциями roundRobin и standings из packages/shared
+                Счёт сыгранных встреч между командами 1..teamsMax (каждая пара — meetings встреч). Пары и турнирную
+                таблицу клиент считает функциями matchPairs и standings из packages/shared
               items: { $ref: '#/components/schemas/MatchResult' }

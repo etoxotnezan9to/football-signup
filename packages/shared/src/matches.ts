@@ -1,51 +1,39 @@
-// Матчи между командами игры и турнирная таблица (чистые функции, используются сервером и клиентом).
+// Матчи между командами игры (каждая пара встречается meetings раз) и турнирная таблица.
+// Чистые функции, используются сервером и клиентом.
 
 export const MAX_GOALS = 99;
 export const POINTS_WIN = 3;
 export const POINTS_DRAW = 1;
 
-/** Счёт матча команд teamA < teamB (номера с 1); голы — в том же порядке. */
+/** Счёт встречи leg (с 1) команд teamA < teamB (номера с 1); голы — в том же порядке. */
 export interface MatchResult {
   teamA: number;
   teamB: number;
+  leg: number;
   goalsA: number;
   goalsB: number;
 }
 
-export interface Match {
-  /** Номер тура, с 1 */
-  round: number;
+/** Пара команд, которая встречается между собой meetings раз. */
+export interface MatchPair {
   /** Меньший номер команды */
   teamA: number;
   /** Больший номер команды */
   teamB: number;
 }
 
-/**
- * Круговая система: каждая команда с каждой по одному разу, по турам (метод «вращения круга»),
- * чтобы команды играли по очереди. При нечётном числе команд в каждом туре одна отдыхает.
- */
-export function roundRobin(teamsCount: number): Match[] {
-  if (teamsCount < 2) return [];
-  const slots: number[] = Array.from({ length: teamsCount }, (_, i) => i + 1);
-  if (slots.length % 2 === 1) slots.push(0); // 0 — отдых
-  const n = slots.length;
-  const out: Match[] = [];
-  for (let round = 1; round < n; round++) {
-    for (let i = 0; i < n / 2; i++) {
-      const x = slots[i]!;
-      const y = slots[n - 1 - i]!;
-      if (x === 0 || y === 0) continue;
-      out.push({ round, teamA: Math.min(x, y), teamB: Math.max(x, y) });
-    }
-    // первая позиция закреплена, остальные сдвигаются по кругу
-    slots.splice(1, 0, slots.pop()!);
+/** Все пары команд 1..teamsCount (каждая с каждой): 1–2, 1–3, …, 2–3, … */
+export function matchPairs(teamsCount: number): MatchPair[] {
+  const out: MatchPair[] = [];
+  for (let a = 1; a <= teamsCount; a++) {
+    for (let b = a + 1; b <= teamsCount; b++) out.push({ teamA: a, teamB: b });
   }
   return out;
 }
 
-export function matchKey(teamA: number, teamB: number): string {
-  return `${Math.min(teamA, teamB)}-${Math.max(teamA, teamB)}`;
+/** Ключ встречи: пара команд в любом порядке и номер встречи. */
+export function matchKey(teamA: number, teamB: number, leg: number): string {
+  return `${Math.min(teamA, teamB)}-${Math.max(teamA, teamB)}-${leg}`;
 }
 
 /** Число голов: целое 0..MAX_GOALS. */
@@ -66,8 +54,8 @@ export interface StandingRow {
 }
 
 /**
- * Турнирная таблица как в групповом этапе: победа — 3 очка, ничья — 1. Порядок: очки, разница мячей,
- * забитые мячи, затем номер команды. Учитываются только матчи между командами из teamNos.
+ * Турнирная таблица как в групповом этапе: каждая встреча — отдельный матч, победа — 3 очка, ничья — 1.
+ * Порядок: очки, разница мячей, забитые мячи, затем номер команды. Учитываются только матчи между командами из teamNos.
  */
 export function standings(teamNos: readonly number[], results: readonly MatchResult[]): StandingRow[] {
   const rows = new Map<number, StandingRow>(

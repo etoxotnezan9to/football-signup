@@ -498,35 +498,46 @@ describe('команды', () => {
   });
 });
 
-describe('счёт матчей', () => {
-  it('организатор записывает, меняет и стирает счёт; порядок команд любой', () => {
+describe('счёт встреч', () => {
+  it('по умолчанию 2 встречи; организатор записывает, меняет и стирает счёт каждой; порядок команд любой', () => {
     const g = svc.createGame(ORG, gameBody({ teamsMax: 3, playersPerTeam: 2 }));
+    assert.equal(g.meetings, 2);
     assert.deepEqual(g.results, []);
-    let r = svc.setMatchScore(g.id, ORG, 2, 1, { goalsA: 3, goalsB: 1 }); // «Розовые» 3 : 1 «Синие»
-    assert.deepEqual(r.results, [{ teamA: 1, teamB: 2, goalsA: 1, goalsB: 3 }]);
+    let r = svc.setMatchScore(g.id, ORG, 2, 1, 1, { goalsA: 3, goalsB: 1 }); // «Розовые» 3 : 1 «Синие»
+    assert.deepEqual(r.results, [{ teamA: 1, teamB: 2, leg: 1, goalsA: 1, goalsB: 3 }]);
     assert.equal(events.at(-1)?.type, 'roster.updated');
-    r = svc.setMatchScore(g.id, ORG, 1, 2, { goalsA: 2, goalsB: 2 });
-    assert.deepEqual(r.results, [{ teamA: 1, teamB: 2, goalsA: 2, goalsB: 2 }]);
-    r = svc.setMatchScore(g.id, ORG, 1, 2, null);
-    assert.deepEqual(r.results, []);
+    r = svc.setMatchScore(g.id, ORG, 1, 2, 2, { goalsA: 2, goalsB: 2 });
+    assert.deepEqual(r.results, [
+      { teamA: 1, teamB: 2, leg: 1, goalsA: 1, goalsB: 3 },
+      { teamA: 1, teamB: 2, leg: 2, goalsA: 2, goalsB: 2 },
+    ]);
+    r = svc.setMatchScore(g.id, ORG, 1, 2, 1, null);
+    assert.deepEqual(r.results, [{ teamA: 1, teamB: 2, leg: 2, goalsA: 2, goalsB: 2 }]);
   });
 
-  it('права и проверки: только организатор, голы 0..99, команды из игры, не в отменённой игре', () => {
-    const g = svc.createGame(ORG, gameBody({ teamsMax: 2, playersPerTeam: 2 }));
-    expectCode(() => svc.setMatchScore(g.id, U1, 1, 2, { goalsA: 1, goalsB: 0 }), 'FORBIDDEN');
-    expectCode(() => svc.setMatchScore(g.id, ORG, 1, 2, { goalsA: 100, goalsB: 0 }), 'VALIDATION_ERROR');
-    expectCode(() => svc.setMatchScore(g.id, ORG, 1, 2, { goalsA: 1 }), 'VALIDATION_ERROR');
-    expectCode(() => svc.setMatchScore(g.id, ORG, 1, 1, { goalsA: 1, goalsB: 0 }), 'NOT_FOUND');
-    expectCode(() => svc.setMatchScore(g.id, ORG, 1, 3, { goalsA: 1, goalsB: 0 }), 'NOT_FOUND');
+  it('права и проверки: только организатор, голы 0..99, команды и встречи из игры, не в отменённой игре', () => {
+    const g = svc.createGame(ORG, gameBody({ teamsMax: 2, playersPerTeam: 2, meetings: 3 }));
+    expectCode(() => svc.setMatchScore(g.id, U1, 1, 2, 1, { goalsA: 1, goalsB: 0 }), 'FORBIDDEN');
+    expectCode(() => svc.setMatchScore(g.id, ORG, 1, 2, 1, { goalsA: 100, goalsB: 0 }), 'VALIDATION_ERROR');
+    expectCode(() => svc.setMatchScore(g.id, ORG, 1, 2, 1, { goalsA: 1 }), 'VALIDATION_ERROR');
+    expectCode(() => svc.setMatchScore(g.id, ORG, 1, 1, 1, { goalsA: 1, goalsB: 0 }), 'NOT_FOUND');
+    expectCode(() => svc.setMatchScore(g.id, ORG, 1, 3, 1, { goalsA: 1, goalsB: 0 }), 'NOT_FOUND');
+    svc.setMatchScore(g.id, ORG, 1, 2, 3, { goalsA: 0, goalsB: 0 });
+    expectCode(() => svc.setMatchScore(g.id, ORG, 1, 2, 4, { goalsA: 1, goalsB: 0 }), 'NOT_FOUND');
+    expectCode(() => svc.createGame(ORG, gameBody({ meetings: 11 })), 'VALIDATION_ERROR');
     svc.cancelGame(g.id, ORG);
-    expectCode(() => svc.setMatchScore(g.id, ORG, 1, 2, { goalsA: 1, goalsB: 0 }), 'GAME_NOT_ACTIVE');
+    expectCode(() => svc.setMatchScore(g.id, ORG, 1, 2, 1, { goalsA: 1, goalsB: 0 }), 'GAME_NOT_ACTIVE');
   });
 
-  it('после уменьшения числа команд счёт матчей с исчезнувшими командами не показывается', () => {
+  it('меньше команд или встреч: счёт исчезнувших встреч не показывается, а при возврате появляется снова', () => {
     const g = svc.createGame(ORG, gameBody({ teamsMax: 3, playersPerTeam: 2 }));
-    svc.setMatchScore(g.id, ORG, 1, 2, { goalsA: 1, goalsB: 0 });
-    svc.setMatchScore(g.id, ORG, 2, 3, { goalsA: 0, goalsB: 2 });
-    const r = svc.updateGame(g.id, ORG, { teamsMax: 2 });
-    assert.deepEqual(r.results, [{ teamA: 1, teamB: 2, goalsA: 1, goalsB: 0 }]);
+    svc.setMatchScore(g.id, ORG, 1, 2, 1, { goalsA: 1, goalsB: 0 });
+    svc.setMatchScore(g.id, ORG, 1, 2, 2, { goalsA: 0, goalsB: 1 });
+    svc.setMatchScore(g.id, ORG, 2, 3, 1, { goalsA: 0, goalsB: 2 });
+    let r = svc.updateGame(g.id, ORG, { teamsMax: 2, meetings: 1 });
+    assert.equal(r.meetings, 1);
+    assert.deepEqual(r.results, [{ teamA: 1, teamB: 2, leg: 1, goalsA: 1, goalsB: 0 }]);
+    r = svc.updateGame(g.id, ORG, { meetings: 2 });
+    assert.equal(r.results.length, 2);
   });
 });

@@ -55,6 +55,8 @@ export interface GameDetails extends GameSummary {
   teamsMax: number;
   /** Игроков в команде */
   playersPerTeam: number;
+  /** Сколько раз каждая пара команд играет между собой */
+  meetings: number;
   description: string;
   paymentInfo: string;
   organizerContact: string;
@@ -63,7 +65,7 @@ export interface GameDetails extends GameSummary {
   teams: Team[];
   /** Места состава, ещё не распределённые по командам */
   unassigned: TeamSeat[];
-  /** Счёт сыгранных матчей между командами (каждая с каждой) */
+  /** Счёт сыгранных встреч между командами (каждая пара — meetings встреч) */
   results: MatchResult[];
 }
 

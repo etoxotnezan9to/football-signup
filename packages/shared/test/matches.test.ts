@@ -1,32 +1,28 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { isGoals, matchKey, roundRobin, standings } from '../src/index.ts';
+import { isGoals, matchKey, matchPairs, standings } from '../src/index.ts';
 
-describe('roundRobin', () => {
-  for (const n of [2, 3, 4, 5, 6, 10]) {
-    it(`${n} команд: каждая с каждой ровно один раз, в туре никто не играет дважды`, () => {
-      const matches = roundRobin(n);
-      assert.equal(matches.length, (n * (n - 1)) / 2);
-      assert.equal(new Set(matches.map((m) => matchKey(m.teamA, m.teamB))).size, matches.length);
-      assert.ok(matches.every((m) => m.teamA < m.teamB && m.teamA >= 1 && m.teamB <= n));
-      const rounds = new Set(matches.map((m) => m.round));
-      assert.equal(rounds.size, n % 2 === 0 ? n - 1 : n);
-      for (const r of rounds) {
-        const teams = matches.filter((m) => m.round === r).flatMap((m) => [m.teamA, m.teamB]);
-        assert.equal(new Set(teams).size, teams.length, `тур ${r}`);
-      }
+describe('matchPairs', () => {
+  for (const n of [2, 3, 4, 10]) {
+    it(`${n} команд: каждая пара ровно один раз, teamA < teamB`, () => {
+      const pairs = matchPairs(n);
+      assert.equal(pairs.length, (n * (n - 1)) / 2);
+      assert.equal(new Set(pairs.map((p) => matchKey(p.teamA, p.teamB, 1))).size, pairs.length);
+      assert.ok(pairs.every((p) => p.teamA < p.teamB && p.teamA >= 1 && p.teamB <= n));
     });
   }
 
-  it('меньше двух команд — матчей нет', () => {
-    assert.deepEqual(roundRobin(1), []);
+  it('порядок: 1–2, 1–3, 2–3; меньше двух команд — пар нет', () => {
+    assert.deepEqual(
+      matchPairs(3).map((p) => `${p.teamA}-${p.teamB}`),
+      ['1-2', '1-3', '2-3'],
+    );
+    assert.deepEqual(matchPairs(1), []);
   });
 
-  it('4 команды: 3 тура по 2 матча', () => {
-    assert.deepEqual(
-      roundRobin(4).map((m) => `${m.round}:${m.teamA}-${m.teamB}`),
-      ['1:1-4', '1:2-3', '2:1-3', '2:2-4', '3:1-2', '3:3-4'],
-    );
+  it('ключ встречи не зависит от порядка команд и различает встречи', () => {
+    assert.equal(matchKey(2, 1, 1), matchKey(1, 2, 1));
+    assert.notEqual(matchKey(1, 2, 1), matchKey(1, 2, 2));
   });
 });
 
@@ -35,10 +31,10 @@ describe('standings', () => {
     const rows = standings(
       [1, 2, 3, 4],
       [
-        { teamA: 1, teamB: 2, goalsA: 2, goalsB: 0 }, // 1 победила
-        { teamA: 3, teamB: 4, goalsA: 1, goalsB: 1 }, // ничья
-        { teamA: 1, teamB: 3, goalsA: 0, goalsB: 1 }, // 3 победила
-        { teamA: 2, teamB: 4, goalsA: 3, goalsB: 0 }, // 2 победила
+        { teamA: 1, teamB: 2, leg: 1, goalsA: 2, goalsB: 0 }, // 1 победила
+        { teamA: 3, teamB: 4, leg: 1, goalsA: 1, goalsB: 1 }, // ничья
+        { teamA: 1, teamB: 3, leg: 1, goalsA: 0, goalsB: 1 }, // 3 победила
+        { teamA: 2, teamB: 4, leg: 1, goalsA: 3, goalsB: 0 }, // 2 победила
       ],
     );
     assert.deepEqual(
@@ -53,12 +49,31 @@ describe('standings', () => {
   });
 
   it('команды без матчей — с нулями; счёт с неизвестной командой не учитывается', () => {
-    const rows = standings([1, 2], [{ teamA: 1, teamB: 5, goalsA: 3, goalsB: 0 }]);
+    const rows = standings([1, 2], [{ teamA: 1, teamB: 5, leg: 1, goalsA: 3, goalsB: 0 }]);
     assert.deepEqual(
       rows.map((r) => [r.teamNo, r.played, r.points]),
       [
         [1, 0, 0],
         [2, 0, 0],
+      ],
+    );
+  });
+});
+
+describe('встречи в таблице', () => {
+  it('каждая встреча пары — отдельный матч', () => {
+    const rows = standings(
+      [1, 2],
+      [
+        { teamA: 1, teamB: 2, leg: 1, goalsA: 2, goalsB: 1 },
+        { teamA: 1, teamB: 2, leg: 2, goalsA: 0, goalsB: 0 },
+      ],
+    );
+    assert.deepEqual(
+      rows.map((r) => [r.teamNo, r.played, r.won, r.drawn, r.lost, r.points]),
+      [
+        [1, 2, 1, 1, 0, 4],
+        [2, 2, 0, 1, 1, 1],
       ],
     );
   });

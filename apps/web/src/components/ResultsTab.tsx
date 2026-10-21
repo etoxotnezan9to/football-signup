@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { Button } from '@vkontakte/vkui';
-import { MAX_GOALS, matchKey, roundRobin, standings, type GameDetails, type Team } from '@football/shared';
+import { MAX_GOALS, matchKey, matchPairs, standings, type GameDetails, type Team } from '@football/shared';
 import { api, type ApiError } from '../api.ts';
 import { Empty } from './Empty.tsx';
 import { useApp } from '../context.ts';
+import { plural } from '../format.ts';
 
-/** Введённый, но ещё не сохранённый счёт матча (строки полей ввода). */
+/** Введённый, но ещё не сохранённый счёт встречи (строки полей ввода). */
 interface Draft {
   a: string;
   b: string;
@@ -27,7 +28,10 @@ function TeamName({ team, align = 'left' }: { team: Team; align?: 'left' | 'righ
   );
 }
 
-/** Вкладка «Результаты»: матчи каждая команда с каждой по турам, счёт (вводит организатор) и турнирная таблица. */
+/**
+ * Вкладка «Результаты»: каждая пара команд с meetings встречами, счёт каждой встречи (вводит организатор)
+ * и турнирная таблица, где каждая встреча — отдельный матч.
+ */
 export function ResultsTab({
   game,
   editable,
@@ -41,15 +45,15 @@ export function ResultsTab({
   const [drafts, setDrafts] = useState<Record<string, Draft>>({});
   const [busy, setBusy] = useState<string | null>(null);
   const teams = new Map(game.teams.map((t) => [t.no, t]));
-  const saved = new Map(game.results.map((r) => [matchKey(r.teamA, r.teamB), r]));
-  const matches = roundRobin(game.teams.length);
-  const rounds = [...new Set(matches.map((m) => m.round))];
+  const saved = new Map(game.results.map((r) => [matchKey(r.teamA, r.teamB, r.leg), r]));
+  const pairs = matchPairs(game.teams.length);
+  const legs = Array.from({ length: game.meetings }, (_, i) => i + 1);
   const table = standings(
     game.teams.map((t) => t.no),
     game.results,
   );
 
-  if (matches.length === 0) return <Empty>Для матчей нужно хотя бы две команды</Empty>;
+  if (pairs.length === 0) return <Empty>Для матчей нужно хотя бы две команды</Empty>;
 
   const dropDraft = (key: string) =>
     setDrafts((d) => {
@@ -70,15 +74,23 @@ export function ResultsTab({
 
   return (
     <div className="results">
-      {rounds.map((round) => (
-        <section key={round} className="results__round" aria-label={`Тур ${round}`}>
-          <div className="results__round-title">Тур {round}</div>
-          {matches
-            .filter((m) => m.round === round)
-            .map((m) => {
-              const a = teams.get(m.teamA)!;
-              const b = teams.get(m.teamB)!;
-              const key = matchKey(m.teamA, m.teamB);
+      <div className="results__hint">
+        Каждая пара команд играет {game.meetings} {plural(game.meetings, ['раз', 'раза', 'раз'])}
+      </div>
+      {pairs.map(({ teamA, teamB }) => {
+        const a = teams.get(teamA)!;
+        const b = teams.get(teamB)!;
+        return (
+          <section key={`${teamA}-${teamB}`} className="pair" aria-label={`${a.name} — ${b.name}`}>
+            <div className="pair__header">
+              <TeamName team={a} />
+              <span className="pair__vs" aria-hidden="true">
+                —
+              </span>
+              <TeamName team={b} align="right" />
+            </div>
+            {legs.map((leg) => {
+              const key = matchKey(teamA, teamB, leg);
               const result = saved.get(key);
               const draft = drafts[key];
               const value: Draft = draft ?? {
@@ -88,12 +100,11 @@ export function ResultsTab({
               const ga = parseGoals(value.a);
               const gb = parseGoals(value.b);
               const dirty = draft !== undefined && (ga !== result?.goalsA || gb !== result?.goalsB);
-              const title = `${a.name} — ${b.name}`;
               const setValue = (side: 'a' | 'b', v: string) =>
                 setDrafts((d) => ({ ...d, [key]: { ...value, [side]: v } }));
               return (
-                <div key={key} className="match" role="group" aria-label={`Матч ${title}`}>
-                  <TeamName team={a} />
+                <div key={leg} className="leg" role="group" aria-label={`Встреча ${leg}`}>
+                  <span className="leg__title">Встреча {leg}</span>
                   {editable ? (
                     <span className="match__score">
                       <input
@@ -117,47 +128,37 @@ export function ResultsTab({
                       {result ? `${result.goalsA} : ${result.goalsB}` : '– : –'}
                     </span>
                   )}
-                  <TeamName team={b} align="right" />
-                  {editable && (dirty || result) && (
-                    <span className="match__actions">
-                      {dirty ? (
-                        <Button
-                          size="s"
-                          loading={busy === key}
-                          disabled={ga === null || gb === null}
-                          onClick={() =>
-                            ga !== null && gb !== null && run(key, api.setMatchScore(game.id, m.teamA, m.teamB, ga, gb))
-                          }
-                        >
-                          Сохранить
-                        </Button>
-                      ) : (
-                        <Button
-                          size="s"
-                          mode="tertiary"
-                          appearance="negative"
-                          loading={busy === key}
-                          onClick={() => run(key, api.clearMatchScore(game.id, m.teamA, m.teamB))}
-                        >
-                          Стереть
-                        </Button>
-                      )}
-                    </span>
-                  )}
+                  <span className="leg__actions">
+                    {editable && dirty && (
+                      <Button
+                        size="s"
+                        loading={busy === key}
+                        disabled={ga === null || gb === null}
+                        onClick={() =>
+                          ga !== null && gb !== null && run(key, api.setMatchScore(game.id, teamA, teamB, leg, ga, gb))
+                        }
+                      >
+                        Сохранить
+                      </Button>
+                    )}
+                    {editable && !dirty && result && (
+                      <Button
+                        size="s"
+                        mode="tertiary"
+                        appearance="negative"
+                        loading={busy === key}
+                        onClick={() => run(key, api.clearMatchScore(game.id, teamA, teamB, leg))}
+                      >
+                        Стереть
+                      </Button>
+                    )}
+                  </span>
                 </div>
               );
             })}
-          {game.teams.length % 2 === 1 && (
-            <div className="results__rest">
-              Отдыхает:{' '}
-              {game.teams
-                .filter((t) => !matches.some((m) => m.round === round && (m.teamA === t.no || m.teamB === t.no)))
-                .map((t) => t.name)
-                .join(', ')}
-            </div>
-          )}
-        </section>
-      ))}
+          </section>
+        );
+      })}
 
       <div className="results__table-wrap">
         <table className="standings" aria-label="Турнирная таблица">

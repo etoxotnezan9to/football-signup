@@ -65,10 +65,10 @@ export const api = {
   removeTestPlayers: (id: number) => request<GameDetails>('DELETE', `/games/${id}/test-players`),
   setTeamName: (id: number, teamNo: number, name: string) =>
     request<GameDetails>('PUT', `/games/${id}/teams/${teamNo}`, { name }),
-  setMatchScore: (id: number, teamA: number, teamB: number, goalsA: number, goalsB: number) =>
-    request<GameDetails>('PUT', `/games/${id}/matches/${teamA}/${teamB}`, { goalsA, goalsB }),
-  clearMatchScore: (id: number, teamA: number, teamB: number) =>
-    request<GameDetails>('DELETE', `/games/${id}/matches/${teamA}/${teamB}`),
+  setMatchScore: (id: number, teamA: number, teamB: number, leg: number, goalsA: number, goalsB: number) =>
+    request<GameDetails>('PUT', `/games/${id}/matches/${teamA}/${teamB}/${leg}`, { goalsA, goalsB }),
+  clearMatchScore: (id: number, teamA: number, teamB: number, leg: number) =>
+    request<GameDetails>('DELETE', `/games/${id}/matches/${teamA}/${teamB}/${leg}`),
   assignSeat: (id: number, signupId: number, seat: number, teamNo: number | null) =>
     request<GameDetails>('PUT', `/games/${id}/team-assignment`, { signupId, seat, teamNo }),
   listPlaces: () => request<{ items: Place[] }>('GET', '/places'),

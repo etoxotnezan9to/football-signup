@@ -144,6 +144,7 @@ describe('hub', () => {
         address: '',
         teamsMax: 2,
         playersPerTeam: 2,
+        meetings: 2,
         description: '',
         paymentInfo: '',
         organizerContact: '',

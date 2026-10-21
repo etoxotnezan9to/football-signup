@@ -10,6 +10,10 @@ export const MAX_PLAYERS_PER_TEAM = 11;
 /** Значения по умолчанию в форме новой игры: 4 команды по 6 игроков = 24 места */
 export const DEFAULT_TEAMS = 4;
 export const DEFAULT_PLAYERS_PER_TEAM = 6;
+/** Сколько раз каждая пара команд играет между собой */
+export const MIN_MEETINGS = 1;
+export const MAX_MEETINGS = 10;
+export const DEFAULT_MEETINGS = 2;
 export const MAX_FEE_RUB = 100_000;
 export const MAX_ACTIVE_GAMES_PER_ORGANIZER = 10;
 export const LIST_PAGE_SIZE = 20;

@@ -86,6 +86,7 @@ describe('parseGameInput / parseGameUpdate', () => {
     assert.equal(r.value.placeId, 1);
     assert.equal(r.value.teamsMax, 4);
     assert.equal(r.value.playersPerTeam, 6);
+    assert.equal(r.value.meetings, 2, 'встреч по умолчанию 2');
     assert.equal(r.value.description, '');
     assert.ok(!('capacity' in r.value), 'вместимость не задаётся во входных данных');
   });
@@ -119,6 +120,23 @@ describe('parseGameInput / parseGameUpdate', () => {
     const r = parseGameUpdate({ teamsMax: 5 });
     assert.ok(r.ok);
     assert.deepEqual(r.value, { teamsMax: 5 });
+  });
+});
+
+describe('meetings', () => {
+  const valid = { startsAt: '2026-10-22T18:00:00.000Z', placeId: 1, teamsMax: 4, playersPerTeam: 6, feeRub: 0 };
+
+  it('1..10, по умолчанию 2', () => {
+    const one = parseGameInput({ ...valid, meetings: 1 });
+    assert.ok(one.ok && one.value.meetings === 1);
+    assert.ok(parseGameInput({ ...valid, meetings: 10 }).ok);
+    for (const v of [0, 11, 1.5, '2', null]) {
+      const r = parseGameInput({ ...valid, meetings: v });
+      assert.ok(!r.ok && r.errors.meetings === 'целое число от 1 до 10', String(v));
+    }
+    const u = parseGameUpdate({ meetings: 3 });
+    assert.ok(u.ok);
+    assert.deepEqual(u.value, { meetings: 3 });
   });
 });
 

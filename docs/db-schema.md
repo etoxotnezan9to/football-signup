@@ -31,6 +31,7 @@ CREATE TABLE games (
   place_id          INTEGER REFERENCES places(id),  -- миграция 0003, заменила venue и address
   teams_max         INTEGER,          -- миграция 0005, вместе с players_per_team заменила format; с миграции 0006 всегда задано
   players_per_team  INTEGER,
+  meetings          INTEGER NOT NULL DEFAULT 2 CHECK (meetings BETWEEN 1 AND 10),  -- миграция 0009
   fee_rub           INTEGER NOT NULL CHECK (fee_rub >= 0),
   capacity          INTEGER NOT NULL CHECK (capacity BETWEEN 2 AND 60),  -- = teams_max * players_per_team (с миграции 0006)
   description       TEXT NOT NULL DEFAULT '',
@@ -62,15 +63,16 @@ CREATE TABLE team_assignments (      -- место записи (seat_no из 1.
 );
 CREATE INDEX idx_team_assignments_game ON team_assignments (game_id);
 
--- миграция 0008: счёт матчей между командами (каждая с каждой)
+-- миграции 0008 и 0009: счёт каждой встречи команд (каждая пара — games.meetings встреч)
 CREATE TABLE match_results (
   game_id     INTEGER NOT NULL REFERENCES games(id) ON DELETE CASCADE,
   team_a      INTEGER NOT NULL CHECK (team_a >= 1),
   team_b      INTEGER NOT NULL CHECK (team_b > team_a),
+  leg         INTEGER NOT NULL CHECK (leg >= 1),   -- номер встречи пары
   goals_a     INTEGER NOT NULL CHECK (goals_a BETWEEN 0 AND 99),
   goals_b     INTEGER NOT NULL CHECK (goals_b BETWEEN 0 AND 99),
   updated_at  TEXT NOT NULL,
-  PRIMARY KEY (game_id, team_a, team_b)
+  PRIMARY KEY (game_id, team_a, team_b, leg)
 );
 
 CREATE TABLE signups (

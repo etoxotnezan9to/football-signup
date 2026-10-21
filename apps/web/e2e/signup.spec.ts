@@ -320,46 +320,56 @@ test('команды: организатор перераспределяет и
   await expect(maria.getByText('Перетащите игрока в команду', { exact: false })).toHaveCount(0);
 });
 
-test('результаты: матчи каждая с каждой, счёт от организатора и турнирная таблица', async ({ browser }) => {
+test('результаты: пары команд со счётом каждой встречи и турнирная таблица', async ({ browser }) => {
   const org = await openAs(browser, ORGANIZER);
   await org.getByRole('button', { name: 'Создать игру', exact: true }).click();
   await choosePlace(org, 'Стадион результатов', 'ул. Турнирная, 1');
   await org.getByLabel('Взнос, ₽', { exact: true }).fill('0');
   await org.getByLabel('Количество команд (макс)', { exact: true }).fill('3');
   await org.getByLabel('Игроков в команде', { exact: true }).fill('2');
+  // встреч по умолчанию 2, организатор ставит 3
+  await expect(org.getByLabel('Количество встреч команд', { exact: true })).toHaveValue('2');
+  await org.getByLabel('Количество встреч команд', { exact: true }).fill('3');
   await org.getByRole('button', { name: 'Создать игру', exact: true }).last().click();
   await expect(org).toHaveURL(/#\/game\/\d+$/);
   const gamePath = `/${new URL(org.url()).hash}`;
 
   await org.getByRole('tab', { name: 'Результаты' }).click();
-  // 3 команды: 3 матча в 3 турах, в каждом туре одна команда отдыхает
-  await expect(org.getByRole('group', { name: /^Матч / })).toHaveCount(3);
-  await expect(org.getByRole('region', { name: /^Тур / })).toHaveCount(3);
-  await expect(org.getByText(/^Отдыхает:/)).toHaveCount(3);
+  // 3 команды: 3 пары по 3 встречи, без деления на туры
+  await expect(org.getByText(/^Тур /)).toHaveCount(0);
+  await expect(org.getByText('Каждая пара команд играет 3 раза')).toBeVisible();
+  const pair = org.getByRole('region', { name: 'Синие — Розовые' });
+  await expect(org.getByRole('region', { name: / — / })).toHaveCount(3);
+  await expect(pair.getByRole('group', { name: /^Встреча / })).toHaveCount(3);
 
-  const match = org.getByRole('group', { name: 'Матч Синие — Розовые' });
-  await match.getByLabel('Голы Синие', { exact: true }).fill('2');
-  await match.getByLabel('Голы Розовые', { exact: true }).fill('1');
-  await match.getByRole('button', { name: 'Сохранить', exact: true }).click();
-  await expect(match.getByRole('button', { name: 'Стереть', exact: true })).toBeVisible();
+  const first = pair.getByRole('group', { name: 'Встреча 1' });
+  await first.getByLabel('Голы Синие', { exact: true }).fill('2');
+  await first.getByLabel('Голы Розовые', { exact: true }).fill('1');
+  await first.getByRole('button', { name: 'Сохранить', exact: true }).click();
+  await expect(first.getByRole('button', { name: 'Стереть', exact: true })).toBeVisible();
+  const second = pair.getByRole('group', { name: 'Встреча 2' });
+  await second.getByLabel('Голы Синие', { exact: true }).fill('1');
+  await second.getByLabel('Голы Розовые', { exact: true }).fill('1');
+  await second.getByRole('button', { name: 'Сохранить', exact: true }).click();
+  await expect(second.getByRole('button', { name: 'Стереть', exact: true })).toBeVisible();
 
+  // таблица: Синие — победа и ничья (4 очка), Розовые — ничья и поражение (1 очко)
   const table = org.getByRole('table', { name: 'Турнирная таблица' });
   const firstRow = table.getByRole('row').nth(1);
   await expect(firstRow).toContainText('Синие');
-  await expect(firstRow.getByRole('cell').last()).toHaveText('3');
-  await expect(table.getByRole('row').nth(3)).toContainText('Розовые');
+  await expect(firstRow.getByRole('cell').nth(1)).toHaveText('2');
+  await expect(firstRow.getByRole('cell').last()).toHaveText('4');
+  await expect(table.getByRole('row').nth(2)).toContainText('Розовые');
 
-  // участник видит счёт и таблицу, но не может их менять
+  // участник видит счёт встреч и таблицу, но не может их менять
   const maria = await openAs(browser, MARIA, gamePath);
   await maria.getByRole('tab', { name: 'Результаты' }).click();
-  const seen = maria.getByRole('group', { name: 'Матч Синие — Розовые' });
-  await expect(seen.getByText('2 : 1')).toBeVisible();
+  const seen = maria.getByRole('region', { name: 'Синие — Розовые' });
+  await expect(seen.getByRole('group', { name: 'Встреча 1' }).getByText('2 : 1')).toBeVisible();
+  await expect(seen.getByRole('group', { name: 'Встреча 2' }).getByText('1 : 1')).toBeVisible();
   await expect(seen.getByRole('textbox')).toHaveCount(0);
-  await expect(maria.getByRole('table', { name: 'Турнирная таблица' }).getByRole('row').nth(1)).toContainText(
-    'Синие',
-  );
 
-  // организатор стирает счёт: у участника обновляется без перезагрузки
-  await match.getByRole('button', { name: 'Стереть', exact: true }).click();
-  await expect(seen.getByText('– : –')).toBeVisible();
+  // организатор стирает первую встречу: у участника обновляется без перезагрузки
+  await first.getByRole('button', { name: 'Стереть', exact: true }).click();
+  await expect(seen.getByRole('group', { name: 'Встреча 1' }).getByText('– : –')).toBeVisible();
 });
