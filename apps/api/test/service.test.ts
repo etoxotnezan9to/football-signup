@@ -434,7 +434,7 @@ describe('команды', () => {
       { signupId: s1, seat: 1 },
       { signupId: s2, seat: 1 },
     ]);
-    assert.deepEqual(r.teams[1]!.members, []);
+    assert.equal(r.teams[1]!.members.length, 0);
 
     // организатор переставил U2 во вторую команду и убрал U1 из команд
     svc.assignSeat(g.id, ORG, { signupId: s2, seat: 1, teamNo: 2 });
