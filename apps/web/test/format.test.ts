@@ -13,8 +13,7 @@ import {
   routeToHash,
   seatsLabel,
   seatName,
-  toLocalInput,
-  withTimeOf,
+  nextWeekOf,
   signupResultText,
   defaultStartsAt,
   type Route,
@@ -56,12 +55,16 @@ describe('seatName', () => {
   });
 });
 
-describe('withTimeOf', () => {
-  it('оставляет дату поля, а время берёт из копируемого сбора', () => {
-    const iso = new Date(2026, 9, 1, 19, 30).toISOString(); // 1 октября, 19:30 по местному времени
-    assert.equal(toLocalInput(iso).slice(11), '19:30');
-    assert.equal(withTimeOf('2026-10-25T21:00', iso), '2026-10-25T19:30');
-    assert.equal(withTimeOf('', iso), toLocalInput(iso), 'пустое поле — дата и время копируемого');
+describe('nextWeekOf', () => {
+  it('через неделю после копируемого сбора, тот же день недели и время', () => {
+    const src = new Date(2026, 9, 21, 19, 30).toISOString(); // ср, 21 октября, 19:30 по местному времени
+    assert.equal(nextWeekOf(src, new Date(2026, 9, 21, 12, 0)), '2026-10-28T19:30');
+  });
+
+  it('если и через неделю уже прошло, ближайшая такая же дата в будущем', () => {
+    const src = new Date(2026, 8, 2, 21, 0).toISOString(); // 2 сентября
+    // 9, 16, 23, 30 сентября, 7 и 14 октября уже прошли; 21 октября в 21:00 ещё впереди
+    assert.equal(nextWeekOf(src, new Date(2026, 9, 21, 12, 0)), '2026-10-21T21:00');
   });
 });
 

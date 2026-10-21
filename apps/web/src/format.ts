@@ -53,13 +53,15 @@ export function fromLocalInput(value: string): string {
 }
 
 /**
- * Значение поля «Дата и время начала» с датой из localValue и временем из iso (сбор, который копируют):
- * у нового сбора остаётся своя дата, а время начала берётся как в прошлый раз.
+ * Дата и время нового сбора при копировании: через неделю после копируемого, в тот же день недели и час.
+ * Если и это уже прошло (копируют давний сбор), берётся ближайшая такая же дата в будущем.
  */
-export function withTimeOf(localValue: string, iso: string): string {
-  const date = localValue.slice(0, 10);
-  const time = toLocalInput(iso).slice(11, 16);
-  return /^\d{4}-\d{2}-\d{2}$/.test(date) ? `${date}T${time}` : toLocalInput(iso);
+export function nextWeekOf(iso: string, now: Date): string {
+  const d = new Date(iso);
+  do {
+    d.setDate(d.getDate() + 7);
+  } while (d.getTime() <= now.getTime());
+  return toLocalInput(d.toISOString());
 }
 
 export function fullName(u: { firstName: string; lastName: string }): string {

@@ -1,31 +1,47 @@
-import { useState } from 'react';
-import { Button, CustomSelect, FormItem } from '@vkontakte/vkui';
+import { useEffect, useState } from 'react';
+import { CustomSelect, FormItem, IconButton, Tooltip } from '@vkontakte/vkui';
+import { Icon24CopyOutline } from '@vkontakte/icons';
 import type { GameDetails, GameSummary } from '@football/shared';
 import { api, ApiError } from '../api.ts';
 import { useApp } from '../context.ts';
 import { gameLabel } from '../format.ts';
 
+export const COPY_TOOLTIP = 'Копировать инфу из существующего сбора';
+
+/** Иконка «Копировать сбор» рядом с заголовком «Новый сбор»: открывает и закрывает список сборов. */
+export function CopyGatheringButton({ open, onToggle }: { open: boolean; onToggle: () => void }) {
+  return (
+    <Tooltip description={COPY_TOOLTIP} placement="bottom">
+      <IconButton label="Копировать сбор" aria-expanded={open} onClick={onToggle} className="copy-gathering__button">
+        <Icon24CopyOutline />
+      </IconButton>
+    </Tooltip>
+  );
+}
+
 /**
- * «Копировать сбор» в форме нового сбора: кнопка открывает список моих сборов (включая прошедшие),
- * выбранный сбор загружается целиком и передаётся в onPick; форма берёт из него только настройки.
+ * Список моих сборов (включая прошедшие) для копирования: выбранный сбор загружается целиком
+ * и передаётся в onPick; форма берёт из него только настройки.
  */
-export function CopyGatheringPicker({ onPick }: { onPick: (game: GameDetails) => void }) {
+export function CopyGatheringPicker({ onPick, onClose }: { onPick: (game: GameDetails) => void; onClose: () => void }) {
   const { showToast } = useApp();
   const [games, setGames] = useState<GameSummary[] | null>(null);
-  const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
 
-  const show = () => {
-    setOpen(true);
-    if (games) return;
+  useEffect(() => {
+    let alive = true;
     api
       .myOrganized()
-      .then((r) => setGames(r.items))
+      .then((r) => alive && setGames(r.items))
       .catch((e: unknown) => {
+        if (!alive) return;
         setGames([]);
         showToast(e instanceof ApiError ? e.message : 'Не удалось загрузить сборы');
       });
-  };
+    return () => {
+      alive = false;
+    };
+  }, [showToast]);
 
   const pick = (value: string | null) => {
     if (value === null || value === '') return;
@@ -34,28 +50,18 @@ export function CopyGatheringPicker({ onPick }: { onPick: (game: GameDetails) =>
       .getGame(Number(value))
       .then((g) => {
         onPick(g);
-        setOpen(false);
+        onClose();
         showToast(`Настройки скопированы из сбора ${gameLabel(g)}`);
       })
       .catch((e: unknown) => showToast(e instanceof ApiError ? e.message : 'Не удалось загрузить сбор'))
       .finally(() => setBusy(false));
   };
 
-  if (!open) {
-    return (
-      <FormItem>
-        <Button size="m" mode="secondary" stretched onClick={show}>
-          Копировать сбор
-        </Button>
-      </FormItem>
-    );
-  }
-
   return (
     <FormItem
       htmlFor="copyGathering"
       top="Копировать сбор"
-      bottom="Копируются место, команды, игроки, встречи, взнос, реквизиты, контакт и описание; время начала — без даты. Состав, команды и результаты не копируются"
+      bottom="Копируются место, команды, игроки, встречи, взнос, реквизиты, контакт и описание; дата — через неделю после выбранного сбора. Состав, команды и результаты не копируются"
     >
       <CustomSelect
         id="copyGathering"

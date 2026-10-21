@@ -29,11 +29,11 @@ import {
   type Place,
 } from '@football/shared';
 import { api, ApiError } from '../api.ts';
-import { CopyGatheringPicker } from '../components/CopyGatheringPicker.tsx';
+import { CopyGatheringButton, CopyGatheringPicker } from '../components/CopyGatheringPicker.tsx';
 import { Empty } from '../components/Empty.tsx';
 import { PlaceForm } from '../components/PlaceForm.tsx';
 import { useApp } from '../context.ts';
-import { defaultStartsAt, fromLocalInput, routeToHash, toLocalInput, withTimeOf } from '../format.ts';
+import { defaultStartsAt, fromLocalInput, nextWeekOf, routeToHash, toLocalInput } from '../format.ts';
 import { useGame } from '../hooks.ts';
 
 interface FormState {
@@ -98,11 +98,11 @@ function toForm(g?: GameDetails): FormState {
 }
 
 /**
- * Настройки сбора, который копируют, поверх текущей формы: базовые поля без даты (остаётся своя, берётся
- * только время начала). Состав, команды, результаты и лучший игрок в форму не входят и не копируются.
+ * Настройки сбора, который копируют: базовые поля, дата — через неделю после него. Состав, команды,
+ * результаты и лучший игрок в форму не входят и не копируются.
  */
-function copyForm(current: FormState, g: GameDetails): FormState {
-  return { ...toForm(g), startsAt: withTimeOf(current.startsAt, g.startsAt) };
+function copyForm(g: GameDetails): FormState {
+  return { ...toForm(g), startsAt: nextWeekOf(g.startsAt, new Date()) };
 }
 
 /** Число из текстового поля; пустая строка и мусор дают NaN, чтобы валидатор показал ошибку, а не 0. */
@@ -129,6 +129,7 @@ export function GameForm({ initial }: { initial?: GameDetails }) {
   const [busy, setBusy] = useState(false);
   const [places, setPlaces] = useState<Place[] | null>(null);
   const [addingPlace, setAddingPlace] = useState(false);
+  const [copying, setCopying] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -254,15 +255,23 @@ export function GameForm({ initial }: { initial?: GameDetails }) {
   return (
     <>
       <PanelHeader before={<PanelHeaderBack onClick={back} />}>
-        {initial ? 'Редактирование игры' : 'Новый сбор'}
+        {initial ? (
+          'Редактирование игры'
+        ) : (
+          <span className="copy-gathering__title">
+            Новый сбор
+            <CopyGatheringButton open={copying} onToggle={() => setCopying((v) => !v)} />
+          </span>
+        )}
       </PanelHeader>
       <Group>
-        {!initial && (
+        {!initial && copying && (
           <CopyGatheringPicker
             onPick={(g) => {
-              setForm((f) => copyForm(f, g));
+              setForm(copyForm(g));
               setErrors({});
             }}
+            onClose={() => setCopying(false)}
           />
         )}
         {FIELDS.map((f) =>

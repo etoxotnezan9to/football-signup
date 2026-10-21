@@ -18,6 +18,14 @@ async function choosePlace(page: Page, name: string, address: string): Promise<v
   await expect(page.getByText(name, { exact: true })).toBeVisible();
 }
 
+/** Значение поля datetime-local через неделю: «2026-10-22T21:00» → «2026-10-29T21:00». */
+function plusWeek(local: string): string {
+  const d = new Date(`${local}:00`);
+  d.setDate(d.getDate() + 7);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 /** Отдельный браузерный контекст = отдельный пользователь (mockUser хранится в localStorage). */
 async function openAs(browser: Browser, userId: number, path = '/'): Promise<Page> {
   const ctx = await browser.newContext();
@@ -440,7 +448,7 @@ test('главная: вкладки «Сборы» и «Рейтинг», ре�
 test('новый сбор: заголовок и «Копировать сбор» переносит только настройки', async ({ browser }) => {
   const org = await openAs(browser, DMITRY);
   await org.getByRole('button', { name: 'Создать игру', exact: true }).click();
-  await expect(org.getByText('Новый сбор', { exact: true })).toBeVisible();
+  await expect(org.locator('.copy-gathering__title')).toContainText('Новый сбор');
   await choosePlace(org, 'Зал копирования', 'ул. Шаблонная, 2');
   await org.getByLabel('Количество команд (макс)', { exact: true }).fill('3');
   await org.getByLabel('Игроков в команде', { exact: true }).fill('5');
@@ -449,6 +457,7 @@ test('новый сбор: заголовок и «Копировать сбор
   await org.getByLabel('Реквизиты для предоплаты', { exact: true }).fill('Сбер 900');
   await org.getByLabel('Контакт для чека', { exact: true }).fill('@dima');
   await org.getByLabel('Описание', { exact: true }).fill('Берите манишки');
+  const sourceStartsAt = await org.getByLabel('Дата и время начала', { exact: true }).inputValue();
   await org.getByRole('button', { name: 'Создать игру', exact: true }).last().click();
   await expect(org).toHaveURL(/#\/game\/\d+$/);
   const sourcePath = `/${new URL(org.url()).hash}`;
@@ -459,7 +468,11 @@ test('новый сбор: заголовок и «Копировать сбор
   await expect(maria.getByText(/Вы записаны/)).toBeVisible();
 
   await org.goto('/#/create');
-  await org.getByRole('button', { name: 'Копировать сбор', exact: true }).click();
+  // иконка рядом с заголовком с подсказкой
+  const copyIcon = org.getByRole('button', { name: 'Копировать сбор', exact: true });
+  await copyIcon.hover();
+  await expect(org.getByText('Копировать инфу из существующего сбора')).toBeVisible();
+  await copyIcon.click();
   await org.getByLabel('Копировать сбор', { exact: true }).click();
   await org.getByRole('option', { name: /Зал копирования/ }).click();
   await expect(org.getByLabel('Количество команд (макс)', { exact: true })).toHaveValue('3');
@@ -469,6 +482,8 @@ test('новый сбор: заголовок и «Копировать сбор
   await expect(org.getByLabel('Реквизиты для предоплаты', { exact: true })).toHaveValue('Сбер 900');
   await expect(org.getByLabel('Контакт для чека', { exact: true })).toHaveValue('@dima');
   await expect(org.getByLabel('Описание', { exact: true })).toHaveValue('Берите манишки');
+  // дата — через неделю после копируемого сбора, то же время
+  await expect(org.getByLabel('Дата и время начала', { exact: true })).toHaveValue(plusWeek(sourceStartsAt));
   await expect(org.getByText('Зал копирования', { exact: true })).toBeVisible();
 
   await org.getByRole('button', { name: 'Создать игру', exact: true }).last().click();
