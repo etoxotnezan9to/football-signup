@@ -6,6 +6,17 @@ export interface TextGameInfo {
   venue: string;
   address: string;
   feeRub: number;
+  /** «Игра отменена» или «Игра прошла»; нет — сбор актуален */
+  statusLabel?: string;
+  /** Формат: «до 4 команд по 6 игроков, 2 встречи» */
+  formatLabel?: string;
+  organizerName?: string;
+  organizerContact?: string;
+  paymentInfo?: string;
+  /** Описание как ввели, с переносами строк */
+  description?: string;
+  /** Заполненность: «занято 18/24, в очереди 3» */
+  fillLabel?: string;
 }
 
 export interface TextRosterEntry {
@@ -33,14 +44,24 @@ function paidLabel(paidSeats: number, seats: number): string {
   return '';
 }
 
+/**
+ * Вся информация о сборе для чата: сведения (те же значки, что на экране сбора; пустые поля пропускаются),
+ * затем состав и очередь.
+ */
 export function formatRosterText(game: TextGameInfo, entries: readonly TextRosterEntry[]): string {
-  const lines: string[] = [
-    `📅 ${game.whenLabel}`,
-    `📍 ${game.venue}, ${game.address}`,
-    `💰 Взнос ${game.feeRub}₽`,
-    '',
-    'Список:',
-  ];
+  const lines: string[] = [];
+  if (game.statusLabel) lines.push(`⚠ ${game.statusLabel}`);
+  lines.push(`📅 ${game.whenLabel}`, `📍 ${game.venue}, ${game.address}`);
+  if (game.formatLabel) lines.push(`⚽ ${game.formatLabel}`);
+  lines.push(`💰 Взнос ${game.feeRub}₽`);
+  if (game.organizerName) {
+    const contact = game.organizerContact?.trim() ? `, ${game.organizerContact.trim()}` : '';
+    lines.push(`🕺 Организатор: ${game.organizerName}${contact}`);
+  }
+  if (game.paymentInfo?.trim()) lines.push(`❗ Предоплата: ${game.paymentInfo.trim()}`);
+  if (game.description?.trim()) lines.push(`📝 ${game.description.trim()}`);
+  if (game.fillLabel) lines.push(`👥 ${game.fillLabel[0]!.toUpperCase()}${game.fillLabel.slice(1)}`);
+  lines.push('', 'Список:');
 
   let n = 1;
   for (const e of entries) {

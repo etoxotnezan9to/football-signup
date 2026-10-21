@@ -48,6 +48,41 @@ describe('formatRosterText', () => {
     assert.equal(lines[0], '📅 чт, 22 октября, 21:00');
   });
 
+  it('вся информация о сборе: статус, формат, организатор, предоплата, описание с переносами, места', () => {
+    const text = formatRosterText(
+      {
+        ...game,
+        statusLabel: 'Игра отменена',
+        formatLabel: 'до 4 команд по 6 игроков, 2 встречи',
+        organizerName: 'Иван Петров',
+        organizerContact: 'vk.com/ivan',
+        paymentInfo: 'Сбер 8-900-000-00-00',
+        description: 'Берите манишки\nИ воду',
+        fillLabel: 'занято 1/24',
+      },
+      [{ name: 'Иван', seats: 1, mainSeats: 1, queueSeats: 0, paidSeats: 0 }],
+    );
+    assert.deepEqual(text.split('\n').slice(0, 11), [
+      '⚠ Игра отменена',
+      '📅 чт, 22 октября, 21:00',
+      '📍 Ф.Ц. «Орловский», Суздальское шоссе 62',
+      '⚽ до 4 команд по 6 игроков, 2 встречи',
+      '💰 Взнос 650₽',
+      '🕺 Организатор: Иван Петров, vk.com/ivan',
+      '❗ Предоплата: Сбер 8-900-000-00-00',
+      '📝 Берите манишки',
+      'И воду',
+      '👥 Занято 1/24',
+      '',
+    ]);
+  });
+
+  it('пустые необязательные поля пропускаются', () => {
+    const text = formatRosterText({ ...game, organizerName: 'Иван Петров', paymentInfo: ' ', description: '' }, []);
+    assert.ok(text.includes('🕺 Организатор: Иван Петров\n'));
+    assert.ok(!text.includes('Предоплата') && !text.includes('📝') && !text.includes('⚠'));
+  });
+
   it('без очереди блок «Мест нет» не выводится', () => {
     const text = formatRosterText(game, [
       { name: 'Иван', seats: 1, mainSeats: 1, queueSeats: 0, paidSeats: 0 },

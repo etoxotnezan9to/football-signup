@@ -13,6 +13,7 @@ import {
   routeToHash,
   seatsLabel,
   seatName,
+  meetingsLabel,
   nextWeekOf,
   profileUrl,
   signupResultText,
@@ -74,6 +75,14 @@ describe('profileUrl', () => {
     assert.equal(profileUrl(1002), 'https://vk.com/id1002');
     assert.equal(profileUrl(-5), null);
     assert.equal(profileUrl(0), null);
+  });
+});
+
+describe('meetingsLabel', () => {
+  it('склоняет «встреча»', () => {
+    assert.equal(meetingsLabel(1), '1 встреча');
+    assert.equal(meetingsLabel(2), '2 встречи');
+    assert.equal(meetingsLabel(5), '5 встреч');
   });
 });
 

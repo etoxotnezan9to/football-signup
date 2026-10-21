@@ -84,6 +84,11 @@ export function seatName(u: { firstName: string; lastName: string }, seat: numbe
   return seat <= 1 ? fullName(u) : `${fullName(u)} +${seat - 1}`;
 }
 
+/** «2 встречи»: сколько раз каждая пара команд играет между собой. */
+export function meetingsLabel(n: number): string {
+  return `${n} ${plural(n, ['встреча', 'встречи', 'встреч'])}`;
+}
+
 /** Подпись состояния заполненности: «занято 18/24, в очереди 3». */
 /** Формат игры для экрана игры: «до 4 команд по 6 игроков». */
 export function teamsLabel(teamsMax: number, playersPerTeam: number): string {

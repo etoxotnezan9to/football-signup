@@ -537,3 +537,48 @@ test('игроки кликабельны: ссылка на страницу В
   await expect(org.getByRole('button', { name: 'Страница ВКонтакте', exact: true })).toBeVisible();
   await expect(org.getByRole('button', { name: 'Удалить из списка', exact: true })).toBeVisible();
 });
+
+test('«Скопировать список» копирует всю информацию о сборе и состав', async ({ browser }) => {
+  // отдельный контекст с доступом к буферу обмена, чтобы прочитать скопированный текст
+  const ctx = await browser.newContext({ permissions: ['clipboard-read', 'clipboard-write'] });
+  opened.push(ctx);
+  await ctx.addInitScript((id) => localStorage.setItem('mockUser', String(id)), DMITRY);
+  const org = await ctx.newPage();
+  await org.goto('/');
+  await org.getByRole('button', { name: 'Создать игру', exact: true }).click();
+  await choosePlace(org, 'Зал списка', 'ул. Текстовая, 4');
+  await org.getByLabel('Количество команд (макс)', { exact: true }).fill('2');
+  await org.getByLabel('Игроков в команде', { exact: true }).fill('3');
+  await org.getByLabel('Взнос, ₽', { exact: true }).fill('500');
+  await org.getByLabel('Реквизиты для предоплаты', { exact: true }).fill('Т-Банк 8-900');
+  await org.getByLabel('Контакт для чека', { exact: true }).fill('@dima');
+  await org.getByLabel('Описание', { exact: true }).fill('Берите манишки\nИ воду');
+  await org.getByRole('button', { name: 'Создать игру', exact: true }).last().click();
+  await expect(org).toHaveURL(/#\/game\/\d+$/);
+  const gamePath = `/${new URL(org.url()).hash}`;
+
+  const maria = await openAs(browser, MARIA, gamePath);
+  await maria.getByRole('button', { name: '+ Записаться', exact: true }).click();
+  await maria.getByRole('button', { name: '+2', exact: true }).click();
+  await expect(maria.getByText(/Вы записаны/)).toBeVisible();
+  await expect(org.getByText('занято 2/6')).toBeVisible();
+
+  await org.getByRole('button', { name: 'Скопировать список', exact: true }).click();
+  await expect(org.getByText('Список скопирован')).toBeVisible();
+  const text = await org.evaluate(() => navigator.clipboard.readText());
+  const lines = text.split('\n');
+  expect(lines[0]).toMatch(/^📅 /);
+  expect(lines.slice(1)).toEqual([
+    '📍 Зал списка, ул. Текстовая, 4',
+    '⚽ до 2 команд по 3 игрока, 2 встречи',
+    '💰 Взнос 500₽',
+    '🕺 Организатор: Дмитрий Козлов, @dima',
+    '❗ Предоплата: Т-Банк 8-900',
+    '📝 Берите манишки',
+    'И воду',
+    '👥 Занято 2/6',
+    '',
+    'Список:',
+    '1,2) Мария Сидорова (2)',
+  ]);
+});

@@ -25,6 +25,7 @@ import {
   fullName,
   gameLabel,
   gameLink,
+  meetingsLabel,
   openProfile,
   profileUrl,
   routeToHash,
@@ -131,6 +132,17 @@ function GameView({ id }: { id: number }) {
         venue: game.venue,
         address: game.address,
         feeRub: game.feeRub,
+        ...(game.status === 'cancelled'
+          ? { statusLabel: 'Игра отменена' }
+          : game.isFinished
+            ? { statusLabel: 'Игра прошла' }
+            : {}),
+        formatLabel: `${teamsLabel(game.teamsMax, game.playersPerTeam)}, ${meetingsLabel(game.meetings)}`,
+        organizerName: fullName(game.organizer),
+        organizerContact: game.organizerContact,
+        paymentInfo: game.paymentInfo,
+        description: game.description,
+        fillLabel: fillLabel(game.taken, game.capacity, game.queued),
       },
       game.roster.map((r) => ({
         name: fullName(r.user),
