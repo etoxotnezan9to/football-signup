@@ -56,7 +56,7 @@ test('создание игры, запись нескольких мест, о�
   await org.getByLabel('Взнос, ₽', { exact: true }).fill('650');
   await org.getByLabel('Количество команд (макс)', { exact: true }).fill('2');
   await org.getByLabel('Игроков в команде', { exact: true }).fill('2');
-  await org.getByRole('button', { name: 'Создать игру', exact: true }).last().click();
+  await org.getByRole('button', { name: 'Создать сбор', exact: true }).click();
   await expect(org).toHaveURL(/#\/game\/\d+$/);
   const gamePath = `/${new URL(org.url()).hash}`;
   await expect(org.getByText('занято 0/4')).toBeVisible();
@@ -99,7 +99,7 @@ test('лимит: нельзя записаться больше чем на 5 �
   await org.getByLabel('Взнос, ₽', { exact: true }).fill('0');
   await org.getByLabel('Количество команд (макс)', { exact: true }).fill('4');
   await org.getByLabel('Игроков в команде', { exact: true }).fill('5');
-  await org.getByRole('button', { name: 'Создать игру', exact: true }).last().click();
+  await org.getByRole('button', { name: 'Создать сбор', exact: true }).click();
   await expect(org).toHaveURL(/#\/game\/\d+$/);
   await org.getByRole('button', { name: '+ Записаться', exact: true }).click();
   // в выборе числа мест нет варианта больше 5
@@ -109,7 +109,7 @@ test('лимит: нельзя записаться больше чем на 5 �
 
 test('форма создания показывает ошибки валидации и не создаёт игру', async ({ browser }) => {
   const org = await openAs(browser, ORGANIZER, '/#/create');
-  await org.getByRole('button', { name: 'Создать игру', exact: true }).last().click();
+  await org.getByRole('button', { name: 'Создать сбор', exact: true }).click();
   await expect(org.getByText('выберите арену', { exact: true })).toBeVisible();
   // команды и игроки заполнены по умолчанию, отдельного поля вместимости нет
   await expect(org.getByLabel('Количество команд (макс)', { exact: true })).toHaveValue('4');
@@ -136,7 +136,7 @@ test('место: создаётся кнопкой + в форме игры и 
   await org.getByLabel('Взнос, ₽', { exact: true }).fill('500');
   await org.getByLabel('Количество команд (макс)', { exact: true }).fill('2');
   await org.getByLabel('Игроков в команде', { exact: true }).fill('6');
-  await org.getByRole('button', { name: 'Создать игру', exact: true }).last().click();
+  await org.getByRole('button', { name: 'Создать сбор', exact: true }).click();
   await expect(org).toHaveURL(/#\/game\/\d+$/);
   await expect(org.getByText('Манеж E2E, пр. Спортивный, 3')).toBeVisible();
   // вместо названия у игры дата и место
@@ -150,7 +150,7 @@ test('место: создаётся кнопкой + в форме игры и 
   await org.getByLabel('Взнос, ₽', { exact: true }).fill('500');
   await org.getByLabel('Количество команд (макс)', { exact: true }).fill('2');
   await org.getByLabel('Игроков в команде', { exact: true }).fill('5');
-  await org.getByRole('button', { name: 'Создать игру', exact: true }).last().click();
+  await org.getByRole('button', { name: 'Создать сбор', exact: true }).click();
   await expect(org).toHaveURL(/#\/game\/\d+$/);
   await expect(org.getByText('Манеж E2E, пр. Спортивный, 3')).toBeVisible();
 });
@@ -175,7 +175,7 @@ test('тестовый режим: организатор добавляет м�
   await org.getByLabel('Взнос, ₽', { exact: true }).fill('0');
   await org.getByLabel('Количество команд (макс)', { exact: true }).fill('2');
   await org.getByLabel('Игроков в команде', { exact: true }).fill('5');
-  await org.getByRole('button', { name: 'Создать игру', exact: true }).last().click();
+  await org.getByRole('button', { name: 'Создать сбор', exact: true }).click();
   await expect(org).toHaveURL(/#\/game\/\d+$/);
   const gamePath = `/${new URL(org.url()).hash}`;
 
@@ -201,7 +201,7 @@ test('тестовый режим: в игру можно добавить 30 т
   await org.getByLabel('Взнос, ₽', { exact: true }).fill('0');
   await org.getByLabel('Количество команд (макс)', { exact: true }).fill('2');
   await org.getByLabel('Игроков в команде', { exact: true }).fill('5');
-  await org.getByRole('button', { name: 'Создать игру', exact: true }).last().click();
+  await org.getByRole('button', { name: 'Создать сбор', exact: true }).click();
   await expect(org).toHaveURL(/#\/game\/\d+$/);
   const gamePath = `/${new URL(org.url()).hash}`;
   const maria = await openAs(browser, MARIA, gamePath);
@@ -224,7 +224,7 @@ test('формат игры: команды и игроки в команде з
   await org.getByLabel('Взнос, ₽', { exact: true }).fill('0');
   // пустое поле обязательно
   await org.getByLabel('Количество команд (макс)', { exact: true }).fill('');
-  await org.getByRole('button', { name: 'Создать игру', exact: true }).last().click();
+  await org.getByRole('button', { name: 'Создать сбор', exact: true }).click();
   await expect(org.getByText('целое число от 2 до 10')).toBeVisible();
   // 10 × 7 = 70 больше допустимых 60 мест
   await org.getByLabel('Количество команд (макс)', { exact: true }).fill('10');
@@ -232,7 +232,7 @@ test('формат игры: команды и игроки в команде з
   await expect(org.getByText('Мест в составе: 70, допустимо не больше 60')).toBeVisible();
   await org.getByLabel('Количество команд (макс)', { exact: true }).fill('3');
   await expect(org.getByText('Мест в составе: 3 × 7 = 21')).toBeVisible();
-  await org.getByRole('button', { name: 'Создать игру', exact: true }).last().click();
+  await org.getByRole('button', { name: 'Создать сбор', exact: true }).click();
   await expect(org).toHaveURL(/#\/game\/\d+$/);
   await expect(org.getByText('до 3 команд по 7 игроков')).toBeVisible();
   await expect(org.getByText('занято 0/21')).toBeVisible();
@@ -254,7 +254,7 @@ test('команды: новые игроки распределяются са�
   await org.getByLabel('Взнос, ₽', { exact: true }).fill('0');
   await org.getByLabel('Количество команд (макс)', { exact: true }).fill('2');
   await org.getByLabel('Игроков в команде', { exact: true }).fill('3');
-  await org.getByRole('button', { name: 'Создать игру', exact: true }).last().click();
+  await org.getByRole('button', { name: 'Создать сбор', exact: true }).click();
   await expect(org).toHaveURL(/#\/game\/\d+$/);
   const gamePath = `/${new URL(org.url()).hash}`;
   await org.getByRole('tab', { name: 'Команды' }).click();
@@ -287,7 +287,7 @@ test('команды: организатор перераспределяет и
   await org.getByLabel('Взнос, ₽', { exact: true }).fill('0');
   await org.getByLabel('Количество команд (макс)', { exact: true }).fill('2');
   await org.getByLabel('Игроков в команде', { exact: true }).fill('2');
-  await org.getByRole('button', { name: 'Создать игру', exact: true }).last().click();
+  await org.getByRole('button', { name: 'Создать сбор', exact: true }).click();
   await expect(org).toHaveURL(/#\/game\/\d+$/);
   const gamePath = `/${new URL(org.url()).hash}`;
 
@@ -339,7 +339,7 @@ test('результаты: пары команд со счётом каждой
   // встреч по умолчанию 2, организатор ставит 3
   await expect(org.getByLabel('Количество встреч команд', { exact: true })).toHaveValue('2');
   await org.getByLabel('Количество встреч команд', { exact: true }).fill('3');
-  await org.getByRole('button', { name: 'Создать игру', exact: true }).last().click();
+  await org.getByRole('button', { name: 'Создать сбор', exact: true }).click();
   await expect(org).toHaveURL(/#\/game\/\d+$/);
   const gamePath = `/${new URL(org.url()).hash}`;
 
@@ -393,7 +393,7 @@ test('главная: вкладки «Сборы» и «Рейтинг», ре�
   await org.getByLabel('Количество команд (макс)', { exact: true }).fill('2');
   await org.getByLabel('Игроков в команде', { exact: true }).fill('1');
   await org.getByLabel('Количество встреч команд', { exact: true }).fill('1');
-  await org.getByRole('button', { name: 'Создать игру', exact: true }).last().click();
+  await org.getByRole('button', { name: 'Создать сбор', exact: true }).click();
   await expect(org).toHaveURL(/#\/game\/\d+$/);
   const gamePath = `/${new URL(org.url()).hash}`;
 
@@ -458,7 +458,7 @@ test('новый сбор: заголовок и «Копировать сбор
   await org.getByLabel('Контакт для чека', { exact: true }).fill('@dima');
   await org.getByLabel('Описание', { exact: true }).fill('Берите манишки\nИ воду');
   const sourceStartsAt = await org.getByLabel('Дата и время начала', { exact: true }).inputValue();
-  await org.getByRole('button', { name: 'Создать игру', exact: true }).last().click();
+  await org.getByRole('button', { name: 'Создать сбор', exact: true }).click();
   await expect(org).toHaveURL(/#\/game\/\d+$/);
   const sourcePath = `/${new URL(org.url()).hash}`;
   // в исходном сборе есть состав: он не копируется
@@ -486,7 +486,7 @@ test('новый сбор: заголовок и «Копировать сбор
   await expect(org.getByLabel('Дата и время начала', { exact: true })).toHaveValue(plusWeek(sourceStartsAt));
   await expect(org.getByText('Зал копирования', { exact: true })).toBeVisible();
 
-  await org.getByRole('button', { name: 'Создать игру', exact: true }).last().click();
+  await org.getByRole('button', { name: 'Создать сбор', exact: true }).click();
   await expect(org).toHaveURL(/#\/game\/\d+$/);
   expect(`/${new URL(org.url()).hash}`).not.toBe(sourcePath);
   await expect(org.getByText('Зал копирования, ул. Шаблонная, 2')).toBeVisible();
@@ -519,7 +519,7 @@ test('игроки кликабельны: ссылка на страницу В
   await org.getByLabel('Взнос, ₽', { exact: true }).fill('0');
   await org.getByLabel('Количество команд (макс)', { exact: true }).fill('2');
   await org.getByLabel('Игроков в команде', { exact: true }).fill('2');
-  await org.getByRole('button', { name: 'Создать игру', exact: true }).last().click();
+  await org.getByRole('button', { name: 'Создать сбор', exact: true }).click();
   await expect(org).toHaveURL(/#\/game\/\d+$/);
   const gamePath = `/${new URL(org.url()).hash}`;
 
@@ -563,7 +563,7 @@ test('«Скопировать список» копирует всю инфор
   await org.getByLabel('Реквизиты для предоплаты', { exact: true }).fill('Т-Банк 8-900');
   await org.getByLabel('Контакт для чека', { exact: true }).fill('@dima');
   await org.getByLabel('Описание', { exact: true }).fill('Берите манишки\nИ воду');
-  await org.getByRole('button', { name: 'Создать игру', exact: true }).last().click();
+  await org.getByRole('button', { name: 'Создать сбор', exact: true }).click();
   await expect(org).toHaveURL(/#\/game\/\d+$/);
   const gamePath = `/${new URL(org.url()).hash}`;
 

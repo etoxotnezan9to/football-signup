@@ -221,7 +221,7 @@ export function GameForm({ initial }: { initial?: GameDetails }) {
     try {
       if (!initial) {
         const created = await api.createGame(parsed.value);
-        showToast('Игра создана');
+        showToast('Сбор создан');
         navigate(routeToHash({ name: 'game', id: created.id }));
         return;
       }
@@ -303,7 +303,7 @@ export function GameForm({ initial }: { initial?: GameDetails }) {
         )}
         <FormItem>
           <Button size="l" stretched loading={busy} onClick={() => void submit()}>
-            {initial ? 'Сохранить' : 'Создать игру'}
+            {initial ? 'Сохранить' : 'Создать сбор'}
           </Button>
         </FormItem>
       </Group>
