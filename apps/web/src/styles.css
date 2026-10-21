@@ -381,3 +381,8 @@
   color: var(--vkui--color_text_link);
   text-decoration: underline;
 }
+
+/* Текст, введённый в многострочном поле (описание сбора): переносы строк сохраняются при выводе */
+.multiline-text {
+  white-space: pre-line;
+}

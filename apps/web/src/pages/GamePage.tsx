@@ -254,7 +254,9 @@ function GameView({ id }: { id: number }) {
           )}
           {game.description && (
             <Row icon="📝" label="Описание">
-              {game.description}
+              <span className="multiline-text" data-testid="game-description">
+                {game.description}
+              </span>
             </Row>
           )}
           <Row icon="👥" label="Места">

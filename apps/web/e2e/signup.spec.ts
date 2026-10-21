@@ -456,7 +456,7 @@ test('новый сбор: заголовок и «Копировать сбор
   await org.getByLabel('Взнос, ₽', { exact: true }).fill('450');
   await org.getByLabel('Реквизиты для предоплаты', { exact: true }).fill('Сбер 900');
   await org.getByLabel('Контакт для чека', { exact: true }).fill('@dima');
-  await org.getByLabel('Описание', { exact: true }).fill('Берите манишки');
+  await org.getByLabel('Описание', { exact: true }).fill('Берите манишки\nИ воду');
   const sourceStartsAt = await org.getByLabel('Дата и время начала', { exact: true }).inputValue();
   await org.getByRole('button', { name: 'Создать игру', exact: true }).last().click();
   await expect(org).toHaveURL(/#\/game\/\d+$/);
@@ -481,7 +481,7 @@ test('новый сбор: заголовок и «Копировать сбор
   await expect(org.getByLabel('Взнос, ₽', { exact: true })).toHaveValue('450');
   await expect(org.getByLabel('Реквизиты для предоплаты', { exact: true })).toHaveValue('Сбер 900');
   await expect(org.getByLabel('Контакт для чека', { exact: true })).toHaveValue('@dima');
-  await expect(org.getByLabel('Описание', { exact: true })).toHaveValue('Берите манишки');
+  await expect(org.getByLabel('Описание', { exact: true })).toHaveValue('Берите манишки\nИ воду');
   // дата — через неделю после копируемого сбора, то же время
   await expect(org.getByLabel('Дата и время начала', { exact: true })).toHaveValue(plusWeek(sourceStartsAt));
   await expect(org.getByText('Зал копирования', { exact: true })).toBeVisible();
@@ -490,6 +490,12 @@ test('новый сбор: заголовок и «Копировать сбор
   await expect(org).toHaveURL(/#\/game\/\d+$/);
   expect(`/${new URL(org.url()).hash}`).not.toBe(sourcePath);
   await expect(org.getByText('Зал копирования, ул. Шаблонная, 2')).toBeVisible();
+  // перенос строки в описании виден на экране сбора: две строки текста, а не одна
+  const description = org.getByTestId('game-description');
+  await expect(description).toHaveText('Берите манишки\nИ воду');
+  const lineHeight = await description.evaluate((el) => parseFloat(getComputedStyle(el).lineHeight));
+  const height = await description.evaluate((el) => el.getBoundingClientRect().height);
+  expect(height).toBeGreaterThan(lineHeight * 1.5);
   await expect(org.getByText('занято 0/15')).toBeVisible();
   await expect(org.getByText('Пока никто не записался')).toBeVisible();
 });
