@@ -448,6 +448,23 @@ paths:
                     type: array
                     items: { $ref: '#/components/schemas/RatingRow' }
         '401': { $ref: '#/components/responses/Error' }
+  /me/organized:
+    get:
+      summary: Все мои сборы, включая прошедшие и отменённые (для «Копировать сбор»)
+      description: Новые сверху, не больше 50. Подробности сбора — GET /games/{gameId}.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/GameSummary' }
+        '401': { $ref: '#/components/responses/Error' }
   /me/games:
     get:
       summary: Мои игры (созданные и те, куда я записан)

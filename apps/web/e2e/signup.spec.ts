@@ -436,3 +436,45 @@ test('главная: вкладки «Сборы» и «Рейтинг», ре�
   await viewer.reload();
   await expect(viewer.getByRole('tab', { name: 'Рейтинг' })).toHaveAttribute('aria-selected', 'true');
 });
+
+test('новый сбор: заголовок и «Копировать сбор» переносит только настройки', async ({ browser }) => {
+  const org = await openAs(browser, DMITRY);
+  await org.getByRole('button', { name: 'Создать игру', exact: true }).click();
+  await expect(org.getByText('Новый сбор', { exact: true })).toBeVisible();
+  await choosePlace(org, 'Зал копирования', 'ул. Шаблонная, 2');
+  await org.getByLabel('Количество команд (макс)', { exact: true }).fill('3');
+  await org.getByLabel('Игроков в команде', { exact: true }).fill('5');
+  await org.getByLabel('Количество встреч команд', { exact: true }).fill('1');
+  await org.getByLabel('Взнос, ₽', { exact: true }).fill('450');
+  await org.getByLabel('Реквизиты для предоплаты', { exact: true }).fill('Сбер 900');
+  await org.getByLabel('Контакт для чека', { exact: true }).fill('@dima');
+  await org.getByLabel('Описание', { exact: true }).fill('Берите манишки');
+  await org.getByRole('button', { name: 'Создать игру', exact: true }).last().click();
+  await expect(org).toHaveURL(/#\/game\/\d+$/);
+  const sourcePath = `/${new URL(org.url()).hash}`;
+  // в исходном сборе есть состав: он не копируется
+  const maria = await openAs(browser, MARIA, sourcePath);
+  await maria.getByRole('button', { name: '+ Записаться', exact: true }).click();
+  await maria.getByRole('button', { name: '+2', exact: true }).click();
+  await expect(maria.getByText(/Вы записаны/)).toBeVisible();
+
+  await org.goto('/#/create');
+  await org.getByRole('button', { name: 'Копировать сбор', exact: true }).click();
+  await org.getByLabel('Копировать сбор', { exact: true }).click();
+  await org.getByRole('option', { name: /Зал копирования/ }).click();
+  await expect(org.getByLabel('Количество команд (макс)', { exact: true })).toHaveValue('3');
+  await expect(org.getByLabel('Игроков в команде', { exact: true })).toHaveValue('5');
+  await expect(org.getByLabel('Количество встреч команд', { exact: true })).toHaveValue('1');
+  await expect(org.getByLabel('Взнос, ₽', { exact: true })).toHaveValue('450');
+  await expect(org.getByLabel('Реквизиты для предоплаты', { exact: true })).toHaveValue('Сбер 900');
+  await expect(org.getByLabel('Контакт для чека', { exact: true })).toHaveValue('@dima');
+  await expect(org.getByLabel('Описание', { exact: true })).toHaveValue('Берите манишки');
+  await expect(org.getByText('Зал копирования', { exact: true })).toBeVisible();
+
+  await org.getByRole('button', { name: 'Создать игру', exact: true }).last().click();
+  await expect(org).toHaveURL(/#\/game\/\d+$/);
+  expect(`/${new URL(org.url()).hash}`).not.toBe(sourcePath);
+  await expect(org.getByText('Зал копирования, ул. Шаблонная, 2')).toBeVisible();
+  await expect(org.getByText('занято 0/15')).toBeVisible();
+  await expect(org.getByText('Пока никто не записался')).toBeVisible();
+});

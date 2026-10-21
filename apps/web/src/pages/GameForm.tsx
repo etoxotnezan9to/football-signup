@@ -29,10 +29,11 @@ import {
   type Place,
 } from '@football/shared';
 import { api, ApiError } from '../api.ts';
+import { CopyGatheringPicker } from '../components/CopyGatheringPicker.tsx';
 import { Empty } from '../components/Empty.tsx';
 import { PlaceForm } from '../components/PlaceForm.tsx';
 import { useApp } from '../context.ts';
-import { defaultStartsAt, fromLocalInput, routeToHash, toLocalInput } from '../format.ts';
+import { defaultStartsAt, fromLocalInput, routeToHash, toLocalInput, withTimeOf } from '../format.ts';
 import { useGame } from '../hooks.ts';
 
 interface FormState {
@@ -94,6 +95,14 @@ function toForm(g?: GameDetails): FormState {
     paymentInfo: g?.paymentInfo ?? '',
     organizerContact: g?.organizerContact ?? '',
   };
+}
+
+/**
+ * Настройки сбора, который копируют, поверх текущей формы: базовые поля без даты (остаётся своя, берётся
+ * только время начала). Состав, команды, результаты и лучший игрок в форму не входят и не копируются.
+ */
+function copyForm(current: FormState, g: GameDetails): FormState {
+  return { ...toForm(g), startsAt: withTimeOf(current.startsAt, g.startsAt) };
 }
 
 /** Число из текстового поля; пустая строка и мусор дают NaN, чтобы валидатор показал ошибку, а не 0. */
@@ -245,9 +254,17 @@ export function GameForm({ initial }: { initial?: GameDetails }) {
   return (
     <>
       <PanelHeader before={<PanelHeaderBack onClick={back} />}>
-        {initial ? 'Редактирование игры' : 'Новая игра'}
+        {initial ? 'Редактирование игры' : 'Новый сбор'}
       </PanelHeader>
       <Group>
+        {!initial && (
+          <CopyGatheringPicker
+            onPick={(g) => {
+              setForm((f) => copyForm(f, g));
+              setErrors({});
+            }}
+          />
+        )}
         {FIELDS.map((f) =>
           f.type === 'place' ? (
             <div key={f.key}>{renderPlace(f)}</div>

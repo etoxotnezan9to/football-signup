@@ -13,6 +13,8 @@ import {
   routeToHash,
   seatsLabel,
   seatName,
+  toLocalInput,
+  withTimeOf,
   signupResultText,
   defaultStartsAt,
   type Route,
@@ -51,6 +53,15 @@ describe('seatName', () => {
     const u = { firstName: 'Иван', lastName: 'Петров' };
     assert.equal(seatName(u, 1), 'Иван Петров');
     assert.equal(seatName(u, 3), 'Иван Петров +2');
+  });
+});
+
+describe('withTimeOf', () => {
+  it('оставляет дату поля, а время берёт из копируемого сбора', () => {
+    const iso = new Date(2026, 9, 1, 19, 30).toISOString(); // 1 октября, 19:30 по местному времени
+    assert.equal(toLocalInput(iso).slice(11), '19:30');
+    assert.equal(withTimeOf('2026-10-25T21:00', iso), '2026-10-25T19:30');
+    assert.equal(withTimeOf('', iso), toLocalInput(iso), 'пустое поле — дата и время копируемого');
   });
 });
 

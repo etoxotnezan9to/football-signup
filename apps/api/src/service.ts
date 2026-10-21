@@ -1012,6 +1012,17 @@ export function createService(db: DatabaseSync, options: ServiceOptions = {}) {
       }));
     },
 
+    /**
+     * Все сборы, которые создал пользователь, включая прошедшие и отменённые, новые сверху (не больше 50):
+     * из них выбирают сбор, чтобы скопировать его настройки в новый.
+     */
+    myOrganized(userId: number): GameSummary[] {
+      const rows = db
+        .prepare(`${GAME_SELECT} WHERE g.organizer_id = ? ORDER BY g.starts_at DESC, g.id DESC LIMIT 50`)
+        .all(userId) as unknown as GameRow[];
+      return rows.map((g) => summary(g, userId));
+    },
+
     myGames(userId: number): { organized: GameSummary[]; joined: GameSummary[] } {
       const since = new Date(now().getTime() - FINISH_GRACE_MIN * 60_000).toISOString();
       const organized = db

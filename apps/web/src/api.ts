@@ -78,6 +78,7 @@ export const api = {
   createPlace: (body: { name: string; address: string }) => request<Place>('POST', '/places', body),
   listGames: () => request<GamesPage>('GET', '/games?limit=50'),
   myGames: () => request<{ organized: GameSummary[]; joined: GameSummary[] }>('GET', '/me/games'),
+  myOrganized: () => request<{ items: GameSummary[] }>('GET', '/me/organized'),
   getGame: (id: number) => request<GameDetails>('GET', `/games/${id}`),
   createGame: (body: unknown) => request<GameDetails>('POST', '/games', body),
   updateGame: (id: number, body: unknown) => request<GameDetails>('PATCH', `/games/${id}`, body),

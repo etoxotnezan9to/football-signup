@@ -190,6 +190,14 @@ describe('HTTP API', () => {
     assert.equal((await put(2, 2, 902)).statusCode, 403);
   });
 
+  it('GET /api/me/organized отдаёт мои сборы', async () => {
+    await app.inject({ method: 'POST', url: '/api/games', headers: auth(931), payload: gameBody() });
+    const res = await app.inject({ method: 'GET', url: '/api/me/organized', headers: auth(931) });
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.json().items.length, 1);
+    assert.equal(res.json().items[0].organizer.vkId, 931);
+  });
+
   it('GET /api/rating отдаёт список игроков', async () => {
     const res = await app.inject({ method: 'GET', url: '/api/rating', headers: auth(921) });
     assert.equal(res.statusCode, 200);

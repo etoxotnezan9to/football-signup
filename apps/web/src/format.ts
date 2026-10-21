@@ -52,6 +52,16 @@ export function fromLocalInput(value: string): string {
   return Number.isNaN(d.getTime()) ? '' : d.toISOString();
 }
 
+/**
+ * Значение поля «Дата и время начала» с датой из localValue и временем из iso (сбор, который копируют):
+ * у нового сбора остаётся своя дата, а время начала берётся как в прошлый раз.
+ */
+export function withTimeOf(localValue: string, iso: string): string {
+  const date = localValue.slice(0, 10);
+  const time = toLocalInput(iso).slice(11, 16);
+  return /^\d{4}-\d{2}-\d{2}$/.test(date) ? `${date}T${time}` : toLocalInput(iso);
+}
+
 export function fullName(u: { firstName: string; lastName: string }): string {
   return `${u.firstName} ${u.lastName}`.trim();
 }

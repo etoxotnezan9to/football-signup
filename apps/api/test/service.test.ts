@@ -596,3 +596,23 @@ describe('лучший игрок сбора', () => {
     assert.equal(r.bestPlayerId, null);
   });
 });
+
+describe('мои сборы для копирования', () => {
+  it('все сборы организатора, включая прошедшие и отменённые, новые сверху; чужие не попадают', () => {
+    const old = svc.createGame(ORG, gameBody({ startsAt: '2026-10-21T18:00:00.000Z' }));
+    const later = svc.createGame(ORG, gameBody({ startsAt: '2026-10-25T18:00:00.000Z' }));
+    const cancelled = svc.createGame(ORG, gameBody({ startsAt: '2026-10-23T18:00:00.000Z' }));
+    svc.cancelGame(cancelled.id, ORG);
+    svc.createGame(U1, gameBody());
+    clock = new Date('2026-10-30T10:00:00.000Z'); // все сборы ORG уже прошли
+    assert.deepEqual(
+      svc.myOrganized(ORG).map((g) => [g.id, g.status]),
+      [
+        [later.id, 'active'],
+        [cancelled.id, 'cancelled'],
+        [old.id, 'active'],
+      ],
+    );
+    assert.deepEqual(svc.myGames(ORG).organized, [], 'в «моих играх» прошедших нет');
+  });
+});

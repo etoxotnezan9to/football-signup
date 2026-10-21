@@ -129,6 +129,7 @@ export function buildApp(deps: AppDeps): FastifyInstance {
         secured.get('/me', async (req) => service.ensureUser(req.vkId));
         secured.put('/me', async (req) => service.updateProfile(req.vkId, req.body));
         secured.get('/me/games', async (req) => service.myGames(req.vkId));
+        secured.get('/me/organized', async (req) => ({ items: service.myOrganized(req.vkId) }));
 
         secured.get('/config', async () => ({ testMode: config.testMode }));
 
