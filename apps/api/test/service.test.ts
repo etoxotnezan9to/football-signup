@@ -424,27 +424,34 @@ describe('команды', () => {
     assert.ok(last?.type === 'roster.updated' && last.game.unassigned.length === 0);
   });
 
-  it('уже распределённые и убранные организатором не трогаются, увеличение записи идёт к своим', () => {
+  it('команды заполняются по очереди; распределённые и убранные организатором не трогаются', () => {
     const g = svc.createGame(ORG, gameBody({ teamsMax: 2, playersPerTeam: 3 }));
-    const s1 = svc.putSignup(g.id, U1, 1).signup.signupId; // → команда 1
-    const s2 = svc.putSignup(g.id, U2, 1).signup.signupId; // → команда 2 (самая свободная)
+    const s1 = svc.putSignup(g.id, U1, 1).signup.signupId;
+    const s2 = svc.putSignup(g.id, U2, 1).signup.signupId;
     let r = svc.getGame(g.id, ORG);
-    assert.deepEqual(r.teams[0]!.members, [{ signupId: s1, seat: 1 }]);
-    assert.deepEqual(r.teams[1]!.members, [{ signupId: s2, seat: 1 }]);
+    // второй игрок идёт в уже начатую команду, а не во вторую
+    assert.deepEqual(r.teams[0]!.members, [
+      { signupId: s1, seat: 1 },
+      { signupId: s2, seat: 1 },
+    ]);
+    assert.deepEqual(r.teams[1]!.members, []);
 
-    // организатор переставил U2 к U1 и убрал U1 из команд
-    svc.assignSeat(g.id, ORG, { signupId: s2, seat: 1, teamNo: 1 });
+    // организатор переставил U2 во вторую команду и убрал U1 из команд
+    svc.assignSeat(g.id, ORG, { signupId: s2, seat: 1, teamNo: 2 });
     svc.assignSeat(g.id, ORG, { signupId: s1, seat: 1, teamNo: null });
-    // другие изменения не возвращают убранного и не двигают переставленного
-    svc.putSignup(g.id, U3, 1);
+    // новый игрок идёт в самую заполненную (вторую); убранный не возвращается, переставленный не двигается
+    const s3 = svc.putSignup(g.id, U3, 1).signup.signupId;
     r = svc.getGame(g.id, ORG);
     assert.deepEqual(r.unassigned, [{ signupId: s1, seat: 1 }]);
-    assert.deepEqual(r.teams[0]!.members[0], { signupId: s2, seat: 1 });
+    assert.deepEqual(r.teams[1]!.members, [
+      { signupId: s2, seat: 1 },
+      { signupId: s3, seat: 1 },
+    ]);
 
     // U2 добавил друга: друг идёт в команду U2
     r = svc.putSignup(g.id, U2, 2).game;
     assert.deepEqual(
-      r.teams[0]!.members.filter((m) => m.signupId === s2),
+      r.teams[1]!.members.filter((m) => m.signupId === s2),
       [
         { signupId: s2, seat: 1 },
         { signupId: s2, seat: 2 },

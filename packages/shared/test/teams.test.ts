@@ -111,7 +111,7 @@ describe('autoAssign', () => {
   const sizes = (r: ReturnType<typeof autoAssign>, teams: number) =>
     Array.from({ length: teams }, (_, i) => r.filter((x) => x.teamNo === i + 1).length);
 
-  it('держит игроков одной записи вместе и выравнивает команды', () => {
+  it('заполняет команды по очереди, держа игроков одной записи вместе', () => {
     // 4 команды по 6: записи +3, +1, +2, +1, +3, +2, +1, +1 = 14 игроков
     const v = view(6, 4, [
       [1, 3],
@@ -135,8 +135,8 @@ describe('autoAssign', () => {
       const teams = new Set(Array.from({ length: seats! }, (_, i) => p.get(`${id}:${i + 1}`)));
       assert.equal(teams.size, 1, `запись ${id} в одной команде`);
     }
-    const s = sizes(r, 4);
-    assert.ok(Math.max(...s) - Math.min(...s) <= 1, `равные команды: ${s.join(',')}`);
+    // сначала до конца заполняется первая команда, потом вторая, остальные пока пустые
+    assert.deepEqual(sizes(r, 4), [6, 6, 2, 0]);
   });
 
   it('досаживает к своим, если часть записи уже в команде, и не трогает ручную расстановку', () => {
@@ -164,6 +164,37 @@ describe('autoAssign', () => {
       autoAssign(v2, 4).map((x) => x.teamNo),
       [2, 2],
       'остальные места записи идут к своим',
+    );
+  });
+
+  it('одиночный игрок идёт в самую заполненную команду, а группа — туда, где поместится целиком', () => {
+    const at0 = '2026-10-21T10:00:00.000Z';
+    const seat = (signupId: number, teamNo: number) => ({ signupId, seat: 1, teamNo, createdAt: at0 });
+    // команда 1: 4 из 6, команда 2: 1 из 6
+    const base: [number, number][] = [
+      [1, 1],
+      [2, 1],
+      [3, 1],
+      [4, 1],
+      [5, 1],
+    ];
+    const fixed = [seat(1, 1), seat(2, 1), seat(3, 1), seat(4, 1), seat(5, 2)];
+    const single = view(6, 2, [...base, [6, 1]], fixed);
+    assert.deepEqual(
+      autoAssign(single, 6).map((x) => x.teamNo),
+      [1],
+    );
+    const trio = view(6, 2, [...base, [6, 3]], fixed);
+    assert.deepEqual(
+      autoAssign(trio, 6).map((x) => x.teamNo),
+      [2, 2, 2],
+      'в первой команде 2 места: тройка идёт целиком во вторую',
+    );
+    const pair = view(6, 2, [...base, [6, 2]], fixed);
+    assert.deepEqual(
+      autoAssign(pair, 6).map((x) => x.teamNo),
+      [1, 1],
+      'пара помещается в самую заполненную',
     );
   });
 

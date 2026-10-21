@@ -91,10 +91,11 @@ export function buildTeams(input: {
 
 /**
  * Автоматическое распределение нераспределённых мест (уже распределённые не трогаются).
- * Места одной записи (человек и его друзья) по возможности попадают в одну команду: туда, где уже есть кто-то
- * из этой записи, иначе в самую свободную команду, куда группа помещается целиком. Если целиком не помещается
- * никуда, группа делится между самыми свободными командами. Крупные группы раскладываются первыми,
- * равные по размеру — в порядке состава. Команды заполняются равномерно.
+ * Команды заполняются по очереди, а не поровну: место получает самая заполненная команда, где ещё есть место.
+ * Места одной записи (человек и его друзья) по возможности попадают в одну команду целиком: туда, где уже есть
+ * кто-то из этой записи, иначе в самую заполненную команду, где группа помещается целиком. Если целиком
+ * не помещается никуда, группа делится так, чтобы кусков было меньше: начиная с самой свободной команды.
+ * Крупные группы раскладываются первыми, равные по размеру — в порядке состава.
  * Возвращает новые назначения в порядке, в котором их надо сохранить.
  */
 export function autoAssign(view: TeamsView, playersPerTeam: number): (TeamSeat & { teamNo: number })[] {
@@ -112,11 +113,14 @@ export function autoAssign(view: TeamsView, playersPerTeam: number): (TeamSeat &
   // стабильная сортировка: при равном размере сохраняется порядок состава
   groups.sort((a, b) => b.length - a.length);
 
-  const mostFree = (minFree: number): number | undefined => {
+  /** Команда, где свободно не меньше need: самая заполненная (fullest) или самая свободная; при равенстве — с меньшим номером. */
+  const pick = (need: number, prefer: 'fullest' | 'emptiest'): number | undefined => {
     let best: number | undefined;
     for (const t of view.teams) {
       const f = free.get(t.no)!;
-      if (f >= minFree && f > 0 && (best === undefined || f > free.get(best)!)) best = t.no;
+      if (f < need || f === 0) continue;
+      const b = best === undefined ? undefined : free.get(best)!;
+      if (b === undefined || (prefer === 'fullest' ? f < b : f > b)) best = t.no;
     }
     return best;
   };
@@ -130,14 +134,14 @@ export function autoAssign(view: TeamsView, playersPerTeam: number): (TeamSeat &
   const deferred: TeamSeat[][] = [];
   for (const group of groups) {
     const home = (homeOf.get(group[0]!.signupId) ?? []).find((no) => free.get(no)! >= group.length);
-    const target = home ?? mostFree(group.length);
+    const target = home ?? pick(group.length, 'fullest');
     if (target === undefined) deferred.push(group);
     else put(group, target);
   }
   for (const group of deferred) {
     let rest = group;
     while (rest.length > 0) {
-      const target = mostFree(1);
+      const target = pick(1, 'emptiest');
       if (target === undefined) return out; // мест в командах больше нет
       const take = Math.min(rest.length, free.get(target)!);
       put(rest.slice(0, take), target);
