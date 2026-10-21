@@ -148,6 +148,8 @@ export function buildApp(deps: AppDeps): FastifyInstance {
           service.removeTestPlayers(parseId((req.params as { gameId: string }).gameId), req.vkId),
         );
 
+        secured.get('/rating', async () => ({ items: service.rating() }));
+
         secured.get('/places', async () => ({ items: service.listPlaces() }));
         secured.post('/places', async (req, reply) => {
           const { place, created } = service.createPlace(req.vkId, req.body);

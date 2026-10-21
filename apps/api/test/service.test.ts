@@ -541,3 +541,28 @@ describe('счёт встреч', () => {
     assert.equal(r.results.length, 2);
   });
 });
+
+describe('рейтинг', () => {
+  it('учитывает сборы со счётом, только самих записавшихся, без отменённых сборов', () => {
+    const g = svc.createGame(ORG, gameBody({ teamsMax: 2, playersPerTeam: 2 }));
+    svc.putSignup(g.id, U1, 2); // U1 и его друг — в команде 1
+    svc.putSignup(g.id, U2, 1); // U2 — в команде 2
+    assert.deepEqual(svc.rating(), [], 'без счёта рейтинга нет');
+    svc.setMatchScore(g.id, ORG, 1, 2, 1, { goalsA: 3, goalsB: 0 });
+
+    const other = svc.createGame(ORG, gameBody({ teamsMax: 2, playersPerTeam: 2 }));
+    svc.putSignup(other.id, U3, 1);
+    svc.putSignup(other.id, U2, 1);
+    svc.setMatchScore(other.id, ORG, 1, 2, 1, { goalsA: 0, goalsB: 1 });
+    svc.cancelGame(other.id, ORG); // отменённый сбор не учитывается
+
+    const rows = svc.rating();
+    assert.deepEqual(
+      rows.map((r) => [r.user.vkId, r.user.firstName, r.matches, r.gatherings, r.points]),
+      [
+        [U1, `Имя${U1}`, { played: 1, won: 1, drawn: 0, lost: 0 }, { played: 1, won: 1 }, 1],
+        [U2, `Имя${U2}`, { played: 1, won: 0, drawn: 0, lost: 1 }, { played: 1, won: 0 }, 0],
+      ],
+    );
+  });
+});

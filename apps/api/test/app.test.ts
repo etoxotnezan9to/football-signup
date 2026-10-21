@@ -190,6 +190,13 @@ describe('HTTP API', () => {
     assert.equal((await put(2, 2, 902)).statusCode, 403);
   });
 
+  it('GET /api/rating отдаёт список игроков', async () => {
+    const res = await app.inject({ method: 'GET', url: '/api/rating', headers: auth(921) });
+    assert.equal(res.statusCode, 200);
+    assert.ok(Array.isArray(res.json().items));
+    assert.equal((await app.inject({ method: 'GET', url: '/api/rating' })).statusCode, 401);
+  });
+
   it('счёт матча: PUT записывает, DELETE стирает, чужой — 403', async () => {
     const g = await app.inject({
       method: 'POST',

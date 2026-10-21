@@ -398,6 +398,27 @@ paths:
         '403': { $ref: '#/components/responses/Error' }
         '404': { $ref: '#/components/responses/Error' }
         '409': { $ref: '#/components/responses/Error' }
+  /rating:
+    get:
+      summary: Рейтинг игроков по сборам с сохранённым счётом
+      description: >-
+        Все записавшиеся (без их друзей по записи), кто был в команде хотя бы в одном неотменённом сборе
+        с сохранённым счётом. Каждая встреча — матч его команды. Победа в сборе — первое место команды
+        в турнирной таблице сбора (при полном равенстве с второй командой победителя нет); за неё 1 очко.
+        Порядок: очки, доля побед в матчах, победы, сыграно матчей. Логика — computeRating в packages/shared.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/RatingRow' }
+        '401': { $ref: '#/components/responses/Error' }
   /me/games:
     get:
       summary: Мои игры (созданные и те, куда я записан)
@@ -528,6 +549,27 @@ components:
         queued: { type: integer, description: Мест в очереди }
         organizer: { $ref: '#/components/schemas/User' }
         mySeats: { type: integer, description: Мои места суммарно, 0 если нет записи }
+    RatingRow:
+      type: object
+      required: [user, matches, gatherings, points]
+      properties:
+        user: { $ref: '#/components/schemas/User' }
+        matches:
+          type: object
+          required: [played, won, drawn, lost]
+          properties:
+            played: { type: integer }
+            won: { type: integer }
+            drawn: { type: integer }
+            lost: { type: integer }
+        gatherings:
+          type: object
+          description: Сборы с сохранённым счётом, где игрок был в команде, и победы в них
+          required: [played, won]
+          properties:
+            played: { type: integer }
+            won: { type: integer }
+        points: { type: integer, description: Персональные очки, 1 за каждую победу в сборе }
     TeamSeat:
       type: object
       description: Одно место записи; запись «+3» даёт места 1, 2, 3

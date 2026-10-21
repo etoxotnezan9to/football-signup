@@ -1,4 +1,4 @@
-import type { GameDetails, GameSummary, Place, RosterEntry, User } from '@football/shared';
+import type { RatingRow, GameDetails, GameSummary, Place, RosterEntry, User } from '@football/shared';
 
 export class ApiError extends Error {
   code: string;
@@ -71,6 +71,7 @@ export const api = {
     request<GameDetails>('DELETE', `/games/${id}/matches/${teamA}/${teamB}/${leg}`),
   assignSeat: (id: number, signupId: number, seat: number, teamNo: number | null) =>
     request<GameDetails>('PUT', `/games/${id}/team-assignment`, { signupId, seat, teamNo }),
+  rating: () => request<{ items: RatingRow[] }>('GET', '/rating'),
   listPlaces: () => request<{ items: Place[] }>('GET', '/places'),
   createPlace: (body: { name: string; address: string }) => request<Place>('POST', '/places', body),
   listGames: () => request<GamesPage>('GET', '/games?limit=50'),

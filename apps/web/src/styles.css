@@ -315,3 +315,27 @@
 .standings__points {
   font-weight: 700;
 }
+
+/* Вкладка «Рейтинг» на главном экране */
+.rating {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 16px 16px;
+}
+.rating__table td,
+.rating__table th {
+  white-space: nowrap;
+}
+.rating__player {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+/* на узком экране таблица прокручивается вбок, а имя игрока остаётся на месте */
+.rating__table .standings__team {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: var(--vkui--color_background_content);
+}

@@ -69,6 +69,14 @@ export interface GameDetails extends GameSummary {
   results: MatchResult[];
 }
 
+/** Строка рейтинга игроков (GET /rating) */
+export interface RatingRow {
+  user: User;
+  matches: { played: number; won: number; drawn: number; lost: number };
+  gatherings: { played: number; won: number };
+  points: number;
+}
+
 export interface ErrorBody {
   error: { code: ErrorCode; message: string };
 }

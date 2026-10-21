@@ -3,6 +3,7 @@
 import type { DatabaseSync } from 'node:sqlite';
 import {
   autoAssign,
+  computeRating,
   isGoals,
   buildTeams,
   capacityError,
@@ -33,6 +34,8 @@ import type {
   Place,
   RosterEntry,
   MatchResult,
+  RatingGame,
+  RatingRow,
   ServerEvent,
   TeamsView,
   User,
@@ -912,6 +915,42 @@ export function createService(db: DatabaseSync, options: ServiceOptions = {}) {
         }
       }
       return sent;
+    },
+
+    /**
+     * Рейтинг игроков по всем неотменённым сборам с сохранённым счётом (computeRating в packages/shared).
+     * Учитываются записавшиеся люди (первое место записи), которые были в команде; их друзья — нет.
+     */
+    rating(): RatingRow[] {
+      const gameIds = db
+        .prepare(
+          `SELECT DISTINCT m.game_id AS id FROM match_results m JOIN games g ON g.id = m.game_id
+            WHERE g.status = 'active' ORDER BY m.game_id`,
+        )
+        .all() as unknown as { id: number }[];
+      const users = new Map<number, User>();
+      const games: RatingGame[] = gameIds.map(({ id }) => {
+        const game = getGameRow(id);
+        const { entries } = buildRoster(game);
+        const bySignup = new Map(entries.map((e) => [e.signupId, e.user]));
+        const { teams } = teamsOf(game, entries);
+        const players: { userId: number; teamNo: number }[] = [];
+        for (const t of teams) {
+          for (const m of t.members) {
+            const user = bySignup.get(m.signupId);
+            if (m.seat !== 1 || !user) continue;
+            users.set(user.vkId, user);
+            players.push({ userId: user.vkId, teamNo: t.no });
+          }
+        }
+        return { teamNos: teams.map((t) => t.no), players, results: resultsOf(game) };
+      });
+      return computeRating(games).map((s) => ({
+        user: users.get(s.userId)!,
+        matches: s.matches,
+        gatherings: s.gatherings,
+        points: s.points,
+      }));
     },
 
     myGames(userId: number): { organized: GameSummary[]; joined: GameSummary[] } {

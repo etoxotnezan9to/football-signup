@@ -373,3 +373,44 @@ test('результаты: пары команд со счётом каждой
   await first.getByRole('button', { name: 'Стереть', exact: true }).click();
   await expect(seen.getByRole('group', { name: 'Встреча 1' }).getByText('– : –')).toBeVisible();
 });
+
+test('главная: вкладки «Сборы» и «Рейтинг», рейтинг считается по сохранённому счёту', async ({ browser }) => {
+  const org = await openAs(browser, ORGANIZER);
+  await expect(org.getByRole('tab', { name: 'Сборы' })).toHaveAttribute('aria-selected', 'true');
+  await org.getByRole('button', { name: 'Создать игру', exact: true }).click();
+  await choosePlace(org, 'Арена рейтинга', 'ул. Рейтинговая, 1');
+  await org.getByLabel('Взнос, ₽', { exact: true }).fill('0');
+  await org.getByLabel('Количество команд (макс)', { exact: true }).fill('2');
+  await org.getByLabel('Игроков в команде', { exact: true }).fill('1');
+  await org.getByLabel('Количество встреч команд', { exact: true }).fill('1');
+  await org.getByRole('button', { name: 'Создать игру', exact: true }).last().click();
+  await expect(org).toHaveURL(/#\/game\/\d+$/);
+  const gamePath = `/${new URL(org.url()).hash}`;
+
+  // Мария попадает в «Синие», Алексей — в «Розовые»
+  for (const user of [MARIA, ALEXEY]) {
+    const page = await openAs(browser, user, gamePath);
+    await page.getByRole('button', { name: '+ Записаться', exact: true }).click();
+    await page.getByRole('button', { name: '+1', exact: true }).click();
+    await expect(page.getByText(/Вы записаны/)).toBeVisible();
+  }
+  await org.getByRole('tab', { name: 'Результаты' }).click();
+  const leg = org.getByRole('region', { name: 'Синие — Розовые' }).getByRole('group', { name: 'Встреча 1' });
+  await leg.getByLabel('Голы Синие', { exact: true }).fill('2');
+  await leg.getByLabel('Голы Розовые', { exact: true }).fill('0');
+  await leg.getByRole('button', { name: 'Сохранить', exact: true }).click();
+  await expect(leg.getByRole('button', { name: 'Стереть', exact: true })).toBeVisible();
+
+  const viewer = await openAs(browser, ALEXEY);
+  await viewer.getByRole('tab', { name: 'Рейтинг' }).click();
+  const table = viewer.getByRole('table', { name: 'Рейтинг игроков' });
+  const maria = table.getByRole('row').filter({ hasText: 'Мария Сидорова' });
+  const alexey = table.getByRole('row').filter({ hasText: 'Алексей Смирнов' });
+  // Мария: 1 матч, победа, 1 сбор, победа в сборе, 1 очко
+  await expect(maria.getByRole('cell')).toHaveText(['1', '1', '1 (100%)', '0 (0%)', '0 (0%)', '1', '1 (100%)', '1']);
+  await expect(alexey.getByRole('cell').nth(4)).toHaveText('1 (100%)');
+  await expect(alexey.getByRole('cell').last()).toHaveText('0');
+  // вкладка запоминается после перезагрузки
+  await viewer.reload();
+  await expect(viewer.getByRole('tab', { name: 'Рейтинг' })).toHaveAttribute('aria-selected', 'true');
+});
