@@ -40,6 +40,36 @@ pnpm --filter @football/web dev
 
 В тестовом режиме у организатора на странице игры есть блок «🧪 Тестовый режим»: можно сразу добавить до 50 тестовых игроков (по 1–5 мест каждому) и одной кнопкой убрать всех. Тестовые игроки — обычные записи в составе и очереди с фамилией «(тест)» и отрицательным id; уведомления VK им не отправляются. Режим включается сам при `AUTH_DEV_BYPASS=1`, а на сервере — строкой `TEST_MODE=1` в `.env` (см. `docs/runbook.md`). VK Tunnel не используется (отключён платформой), проверка внутри VK идёт на HTTPS-стенде, см. `docs/runbook.md`.
 
+### Запуск под Windows
+
+Команды выше написаны для bash: в PowerShell и cmd строка `AUTH_DEV_BYPASS=1 … node …` не работает. Порядок для PowerShell:
+
+1. Установите Node.js 22.18 или новее (`winget install OpenJS.NodeJS.LTS`) и pnpm той версии, что указана в `packageManager` корневого `package.json`:
+   ```powershell
+   corepack enable   # если нет прав, запустите PowerShell от администратора
+   pnpm --version
+   ```
+   Если `corepack` недоступен: `npm install -g pnpm@10.28.0`. **Не** выполняйте в каталоге проекта `npm install` или `npm install pnpm`: появятся `package-lock.json` и локальный pnpm в зависимостях, после чего `pnpm -r …` и e2e перестают запускаться. Если это уже случилось, верните `package.json` и `pnpm-lock.yaml` (`git checkout -- package.json pnpm-lock.yaml`), удалите `package-lock.json` и `node_modules` и снова выполните `pnpm install`.
+2. Окончания строк: `.gitattributes` хранит `*.sh`, `deploy/` и `ci/` с LF при любом `core.autocrlf`. Если файлы получены до его появления, перевыгрузите их: `Remove-Item deploy/*.sh, ci/run.sh ; git checkout -- deploy ci`.
+3. Установите зависимости из корня: `pnpm install`.
+4. API. Удобнее всего через файл `apps/api/.env` (он в `.gitignore`), тогда переменные не зависят от оболочки:
+   ```
+   AUTH_DEV_BYPASS=1
+   VK_APP_ID=54809461
+   DATABASE_FILE=./data/dev.db
+   ```
+   и запуск с перезапуском при изменениях: `pnpm --filter @football/api dev`.
+   Без файла, переменными текущей сессии PowerShell:
+   ```powershell
+   cd apps/api
+   $env:AUTH_DEV_BYPASS = '1'; $env:VK_APP_ID = '54809461'; $env:DATABASE_FILE = './data/dev.db'
+   node src/server.ts
+   ```
+   В cmd то же самое через `set AUTH_DEV_BYPASS=1` и так далее, по одной переменной на команду.
+5. Во втором окне терминала: `pnpm --filter @football/web dev`, затем откройте http://localhost:5173. Если Windows спросит про доступ Node.js к сети, достаточно частных сетей.
+
+Проверки из следующего раздела работают и под Windows. В Windows PowerShell 5.1 нет `&&`: запускайте команды по одной или через `;`. Скрипты из `deploy/` (bash) выполняются только на сервере. Копируйте их из рабочей копии с LF, иначе bash упадёт с `set: pipefail: invalid option name`.
+
 ## Проверки
 
 ```bash
