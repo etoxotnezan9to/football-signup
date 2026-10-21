@@ -62,6 +62,10 @@ Settings → Secrets and variables → Actions → вкладка Variables → 
 | Откат вручную | `echo <прежний-тег> > .tag; TAG=<прежний-тег> docker compose up -d` (прежний тег в `.tag.prev`) |
 | Бэкап сейчас | `./backup.sh /opt/football/<env>`; копии в `data/backups`, ежедневно в 03:17, хранится 14 |
 | Продление сертификата | автоматически (`certbot.timer`); проверка: `certbot renew --dry-run` |
+| Обновить конфиг nginx после правки `deploy/nginx.conf.template` | под root, в каталоге со свежим `deploy/` (пример для staging): `sed -e 's/__ENV__/staging/g' -e 's/__DOMAIN__/football-test.etoxotnezan9to.ru/g' -e 's#__WEB_ROOT__#/var/www/football/staging#g' -e 's/__API_PORT__/3101/g' nginx.conf.template > /tmp/football.conf && cp /etc/nginx/conf.d/football-staging.conf /root/football-staging.conf.bak && cp /tmp/football.conf /etc/nginx/conf.d/football-staging.conf && nginx -t && systemctl reload nginx` (если `nginx -t` не прошёл, верните копию из `/root/football-staging.conf.bak`) |
+| Чистка старых файлов сборки | `find /var/www/football/<env>/assets -type f -mtime +30 -delete` (выкладка их не удаляет, чтобы закэшированная страница не ломалась) |
+
+**После выкладки в VK пустой экран.** Откройте консоль браузера, выберите в ней фрейм приложения (выпадающий список контекста вверху консоли) и найдите 404 на `/assets/index-….js`: значит, клиент взял закэшированный `index.html` со ссылкой на удалённый файл сборки. С конфигом nginx, где `index.html` отдаётся с `Cache-Control: no-cache`, и выкладкой без удаления старых `assets` это не повторяется; на старом конфиге помогает перезапуск приложения VK или очистка кэша.
 
 **Восстановление из копии** (останавливает API): `docker compose stop api && cp data/backups/football-<дата>.db data/football.db && chown 1000:1000 data/football.db && docker compose start api`. Бэкапы лежат на том же сервере: периодически забирайте их в другое место (`scp`, облачное хранилище).
 

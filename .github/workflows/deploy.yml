@@ -89,7 +89,10 @@ jobs:
           ENVN: ${{ inputs.environment }}
         run: |
           SSH="ssh -i ~/.ssh/id_deploy -p $PORT -o StrictHostKeyChecking=yes"
-          rsync -az --delete -e "$SSH" web-dist/ "$USER_@$HOST:/var/www/football/$ENVN/"
+          # сначала новые файлы сборки, потом index.html со ссылками на них. Старые assets не удаляются:
+          # страница, закэшированная до выкладки (WebView VK), ссылается на них и без них не запустится
+          rsync -az -e "$SSH" web-dist/assets/ "$USER_@$HOST:/var/www/football/$ENVN/assets/"
+          rsync -az --delete --exclude=/assets/ -e "$SSH" web-dist/ "$USER_@$HOST:/var/www/football/$ENVN/"
           rsync -az -e "$SSH" deploy/docker-compose.yml deploy/backup.sh deploy/release.sh "$USER_@$HOST:/opt/football/$ENVN/"
       - name: Release (health check and rollback on the server)
         env:

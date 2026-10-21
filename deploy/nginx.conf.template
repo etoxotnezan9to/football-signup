@@ -55,6 +55,14 @@ server {
         add_header Content-Security-Policy "frame-ancestors 'self' https://vk.com https://*.vk.com https://vk.ru https://*.vk.ru https://*.vk-apps.com" always;
     }
 
+    # index.html не кэшируется: после выкладки клиент (в том числе WebView VK) сразу берёт новую страницу
+    # со ссылками на новые файлы сборки. add_header в location отменяет заголовки сервера, поэтому они повторены.
+    location = /index.html {
+        add_header Cache-Control "no-cache" always;
+        add_header Content-Security-Policy "frame-ancestors 'self' https://vk.com https://*.vk.com https://vk.ru https://*.vk.ru https://*.vk-apps.com" always;
+        add_header X-Content-Type-Options nosniff always;
+    }
+
     location / {
         try_files $uri /index.html;
     }
