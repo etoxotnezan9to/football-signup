@@ -4,6 +4,7 @@ import { expect, test, type Browser, type BrowserContext, type Page } from '@pla
 const ORGANIZER = 1001; // Иван Петров
 const MARIA = 1002; // Мария Сидорова
 const ALEXEY = 1003; // Алексей Смирнов
+const DMITRY = 1004; // Дмитрий Козлов
 
 const opened: BrowserContext[] = [];
 
@@ -375,7 +376,8 @@ test('результаты: пары команд со счётом каждой
 });
 
 test('главная: вкладки «Сборы» и «Рейтинг», рейтинг считается по сохранённому счёту', async ({ browser }) => {
-  const org = await openAs(browser, ORGANIZER);
+  // у ORGANIZER к этому моменту уже лимит активных игр (10), поэтому организатор другой
+  const org = await openAs(browser, DMITRY);
   await expect(org.getByRole('tab', { name: 'Сборы' })).toHaveAttribute('aria-selected', 'true');
   await org.getByRole('button', { name: 'Создать игру', exact: true }).click();
   await choosePlace(org, 'Арена рейтинга', 'ул. Рейтинговая, 1');
