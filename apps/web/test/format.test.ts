@@ -37,12 +37,11 @@ describe('fillLabel', () => {
 });
 
 describe('teamsLabel', () => {
-  it('склоняет команды и игроков и опускает неуказанное', () => {
-    assert.equal(teamsLabel(3, 6), 'до 3 команд по 6 игроков');
+  it('склоняет команды и игроков', () => {
+    assert.equal(teamsLabel(4, 6), 'до 4 команд по 6 игроков');
     assert.equal(teamsLabel(2, 2), 'до 2 команд по 2 игрока');
-    assert.equal(teamsLabel(4, null), 'до 4 команд');
-    assert.equal(teamsLabel(null, 5), '5 игроков в команде');
-    assert.equal(teamsLabel(null, null), '');
+    assert.equal(teamsLabel(3, 1), 'до 3 команд по 1 игроку');
+    assert.equal(teamsLabel(10, 11), 'до 10 команд по 11 игроков');
   });
 });
 

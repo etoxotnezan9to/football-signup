@@ -29,10 +29,10 @@ CREATE TABLE games (
   organizer_id      INTEGER NOT NULL REFERENCES users(vk_id),
   starts_at         TEXT NOT NULL,
   place_id          INTEGER REFERENCES places(id),  -- миграция 0003, заменила venue и address
-  teams_max         INTEGER,          -- миграция 0005, вместе с players_per_team заменила format; NULL — не указано
+  teams_max         INTEGER,          -- миграция 0005, вместе с players_per_team заменила format; с миграции 0006 всегда задано
   players_per_team  INTEGER,
   fee_rub           INTEGER NOT NULL CHECK (fee_rub >= 0),
-  capacity          INTEGER NOT NULL CHECK (capacity BETWEEN 2 AND 60),
+  capacity          INTEGER NOT NULL CHECK (capacity BETWEEN 2 AND 60),  -- = teams_max * players_per_team (с миграции 0006)
   description       TEXT NOT NULL DEFAULT '',
   payment_info      TEXT NOT NULL DEFAULT '',
   organizer_contact TEXT NOT NULL DEFAULT '',

@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
+  capacityError,
   checkSeats,
+  gameCapacity,
   formatRosterText,
   numberLabel,
   parseGameInput,
@@ -73,23 +75,25 @@ describe('parseGameInput / parseGameUpdate', () => {
   const valid = {
     startsAt: '2026-10-22T18:00:00.000Z',
     placeId: 1,
+    teamsMax: 4,
+    playersPerTeam: 6,
     feeRub: 650,
-    capacity: 24,
   };
 
   it('нормализует и подставляет значения по умолчанию', () => {
     const r = parseGameInput(valid);
     assert.ok(r.ok);
     assert.equal(r.value.placeId, 1);
-    assert.equal(r.value.teamsMax, null);
-    assert.equal(r.value.playersPerTeam, null);
-    assert.equal(r.value.capacity, 24);
+    assert.equal(r.value.teamsMax, 4);
+    assert.equal(r.value.playersPerTeam, 6);
+    assert.equal(r.value.description, '');
+    assert.ok(!('capacity' in r.value), 'вместимость не задаётся во входных данных');
   });
 
   it('сообщает обо всех ошибках полей', () => {
-    const r = parseGameInput({ capacity: 1, feeRub: -5 });
+    const r = parseGameInput({ teamsMax: 1, feeRub: -5 });
     assert.ok(!r.ok);
-    for (const k of ['startsAt', 'placeId', 'feeRub', 'capacity']) {
+    for (const k of ['startsAt', 'placeId', 'teamsMax', 'playersPerTeam', 'feeRub']) {
       assert.ok(k in r.errors, k);
     }
   });
@@ -111,39 +115,44 @@ describe('parseGameInput / parseGameUpdate', () => {
 
   it('обновление: пустое тело отвергается, подмножество принимается', () => {
     assert.ok(!parseGameUpdate({}).ok);
-    const r = parseGameUpdate({ capacity: 10 });
+    assert.ok(!parseGameUpdate({ capacity: 10 }).ok, 'capacity больше не принимается');
+    const r = parseGameUpdate({ teamsMax: 5 });
     assert.ok(r.ok);
-    assert.deepEqual(r.value, { capacity: 10 });
+    assert.deepEqual(r.value, { teamsMax: 5 });
   });
 });
 
 describe('teamsMax / playersPerTeam', () => {
-  const valid = { startsAt: '2026-10-22T18:00:00.000Z', placeId: 1, feeRub: 0, capacity: 18 };
+  const valid = { startsAt: '2026-10-22T18:00:00.000Z', placeId: 1, feeRub: 0 };
 
-  it('необязательны и принимают границы диапазона', () => {
+  it('обязательны и принимают границы диапазона', () => {
     const r = parseGameInput({ ...valid, teamsMax: 3, playersPerTeam: 6 });
     assert.ok(r.ok);
-    assert.equal(r.value.teamsMax, 3);
-    assert.equal(r.value.playersPerTeam, 6);
-    assert.ok(parseGameInput({ ...valid, teamsMax: 2, playersPerTeam: 11 }).ok);
-    assert.ok(parseGameInput({ ...valid, teamsMax: 10, playersPerTeam: 2 }).ok);
+    assert.equal(gameCapacity(r.value.teamsMax, r.value.playersPerTeam), 18);
+    assert.ok(parseGameInput({ ...valid, teamsMax: 2, playersPerTeam: 1 }).ok);
+    assert.ok(parseGameInput({ ...valid, teamsMax: 5, playersPerTeam: 11 }).ok);
+    const missing = parseGameInput(valid);
+    assert.ok(!missing.ok && missing.errors.teamsMax === 'обязательное поле');
+    assert.ok(!missing.ok && missing.errors.playersPerTeam === 'обязательное поле');
   });
 
-  it('вне диапазона и не целые отвергаются', () => {
-    for (const v of [1, 11, 2.5, '3']) {
-      const r = parseGameInput({ ...valid, teamsMax: v });
+  it('вне диапазона, не целые и null отвергаются', () => {
+    for (const v of [1, 11, 2.5, '3', null]) {
+      const r = parseGameInput({ ...valid, teamsMax: v, playersPerTeam: 6 });
       assert.ok(!r.ok && r.errors.teamsMax === 'целое число от 2 до 10', String(v));
     }
-    for (const v of [1, 12, NaN]) {
-      const r = parseGameInput({ ...valid, playersPerTeam: v });
-      assert.ok(!r.ok && r.errors.playersPerTeam === 'целое число от 2 до 11', String(v));
+    for (const v of [0, 12, NaN, null]) {
+      const r = parseGameInput({ ...valid, teamsMax: 4, playersPerTeam: v });
+      assert.ok(!r.ok && r.errors.playersPerTeam === 'целое число от 1 до 11', String(v));
     }
   });
 
-  it('null в обновлении очищает значение', () => {
-    const r = parseGameUpdate({ teamsMax: null, playersPerTeam: 5 });
-    assert.ok(r.ok);
-    assert.deepEqual(r.value, { teamsMax: null, playersPerTeam: 5 });
+  it('произведение не больше MAX_CAPACITY', () => {
+    assert.ok(parseGameInput({ ...valid, teamsMax: 10, playersPerTeam: 6 }).ok);
+    const r = parseGameInput({ ...valid, teamsMax: 10, playersPerTeam: 7 });
+    assert.ok(!r.ok && r.errors.playersPerTeam === 'команд × игроков — не больше 60 мест');
+    assert.equal(capacityError(6, 10), null);
+    assert.ok(!parseGameUpdate({ teamsMax: 10, playersPerTeam: 11 }).ok);
   });
 });
 

@@ -5,7 +5,6 @@ import {
   MAX_PLAYERS_PER_TEAM,
   MAX_SEATS_PER_USER,
   MAX_TEAMS,
-  MIN_CAPACITY,
   MIN_PLAYERS_PER_TEAM,
   MIN_TEAMS,
 } from './constants.ts';
@@ -13,12 +12,11 @@ import {
 export interface GameInput {
   startsAt: string;
   placeId: number;
-  /** Максимальное число команд; null — не указано */
-  teamsMax: number | null;
-  /** Игроков в команде; null — не указано */
-  playersPerTeam: number | null;
+  /** Максимальное число команд */
+  teamsMax: number;
+  /** Игроков в команде */
+  playersPerTeam: number;
   feeRub: number;
-  capacity: number;
   description: string;
   paymentInfo: string;
   organizerContact: string;
@@ -79,13 +77,25 @@ function checkInt(
   out[key] = v;
 }
 
-/** Необязательное целое: null очищает значение (для обновления), undefined — поле не передано. */
-function checkOptionalInt(raw: Raw, key: string, min: number, max: number, errors: FieldErrors, out: Raw): void {
-  if (raw[key] === null) {
-    out[key] = null;
-    return;
+/** Мест в составе: команд × игроков в команде. Отдельно не задаётся. */
+export function gameCapacity(teamsMax: number, playersPerTeam: number): number {
+  return teamsMax * playersPerTeam;
+}
+
+/** Ошибка для поля playersPerTeam, если произведение не помещается в MAX_CAPACITY; иначе null. */
+export function capacityError(teamsMax: number, playersPerTeam: number): string | null {
+  return gameCapacity(teamsMax, playersPerTeam) > MAX_CAPACITY
+    ? `команд × игроков — не больше ${MAX_CAPACITY} мест`
+    : null;
+}
+
+function checkTeams(raw: Raw, errors: FieldErrors, out: Raw, required: boolean): void {
+  checkInt(raw, 'teamsMax', MIN_TEAMS, MAX_TEAMS, errors, out, required);
+  checkInt(raw, 'playersPerTeam', MIN_PLAYERS_PER_TEAM, MAX_PLAYERS_PER_TEAM, errors, out, required);
+  if (typeof out.teamsMax === 'number' && typeof out.playersPerTeam === 'number') {
+    const err = capacityError(out.teamsMax, out.playersPerTeam);
+    if (err) errors.playersPerTeam = err;
   }
-  checkInt(raw, key, min, max, errors, out, false);
 }
 
 function checkPlaceId(raw: Raw, errors: FieldErrors, out: Raw, required: boolean): void {
@@ -123,10 +133,8 @@ export function parseGameInput(body: unknown): ParseResult<GameInput> {
   const out: Raw = {};
   checkDate(body, 'startsAt', errors, out, true);
   checkPlaceId(body, errors, out, true);
-  checkOptionalInt(body, 'teamsMax', MIN_TEAMS, MAX_TEAMS, errors, out);
-  checkOptionalInt(body, 'playersPerTeam', MIN_PLAYERS_PER_TEAM, MAX_PLAYERS_PER_TEAM, errors, out);
+  checkTeams(body, errors, out, true);
   checkInt(body, 'feeRub', 0, MAX_FEE_RUB, errors, out, true);
-  checkInt(body, 'capacity', MIN_CAPACITY, MAX_CAPACITY, errors, out, true);
   checkString(body, 'description', 0, 1000, errors, out, false);
   checkString(body, 'paymentInfo', 0, 300, errors, out, false);
   checkString(body, 'organizerContact', 0, 120, errors, out, false);
@@ -136,10 +144,9 @@ export function parseGameInput(body: unknown): ParseResult<GameInput> {
     value: {
       startsAt: out.startsAt as string,
       placeId: out.placeId as number,
-      teamsMax: (out.teamsMax as number | null | undefined) ?? null,
-      playersPerTeam: (out.playersPerTeam as number | null | undefined) ?? null,
+      teamsMax: out.teamsMax as number,
+      playersPerTeam: out.playersPerTeam as number,
       feeRub: out.feeRub as number,
-      capacity: out.capacity as number,
       description: (out.description as string | undefined) ?? '',
       paymentInfo: (out.paymentInfo as string | undefined) ?? '',
       organizerContact: (out.organizerContact as string | undefined) ?? '',
@@ -147,17 +154,18 @@ export function parseGameInput(body: unknown): ParseResult<GameInput> {
   };
 }
 
-/** Разбор частичного обновления игры: любое подмножество полей, но не пустое. */
+/**
+ * Разбор частичного обновления игры: любое подмножество полей, но не пустое.
+ * Если передано только одно из teamsMax и playersPerTeam, предел произведения проверяет вызывающий по итоговым значениям.
+ */
 export function parseGameUpdate(body: unknown): ParseResult<Partial<GameInput>> {
   if (!isRecord(body)) return { ok: false, errors: { body: 'ожидается объект' } };
   const errors: FieldErrors = {};
   const out: Raw = {};
   checkDate(body, 'startsAt', errors, out, false);
   checkPlaceId(body, errors, out, false);
-  checkOptionalInt(body, 'teamsMax', MIN_TEAMS, MAX_TEAMS, errors, out);
-  checkOptionalInt(body, 'playersPerTeam', MIN_PLAYERS_PER_TEAM, MAX_PLAYERS_PER_TEAM, errors, out);
+  checkTeams(body, errors, out, false);
   checkInt(body, 'feeRub', 0, MAX_FEE_RUB, errors, out, false);
-  checkInt(body, 'capacity', MIN_CAPACITY, MAX_CAPACITY, errors, out, false);
   checkString(body, 'description', 0, 1000, errors, out, false);
   checkString(body, 'paymentInfo', 0, 300, errors, out, false);
   checkString(body, 'organizerContact', 0, 120, errors, out, false);

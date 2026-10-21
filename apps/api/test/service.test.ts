@@ -23,7 +23,7 @@ function gameBody(over: Record<string, unknown> = {}) {
     startsAt: '2026-10-22T18:00:00.000Z',
     placeId: PLACE,
     feeRub: 650,
-    capacity: 4,
+    teamsMax: 2, playersPerTeam: 2,
     ...over,
   };
 }
@@ -57,15 +57,21 @@ describe('создание и список игр', () => {
     assert.equal(events[0]?.type, 'game.created');
   });
 
-  it('хранит число команд и игроков в команде, обновление null очищает', () => {
-    const g = svc.createGame(ORG, gameBody({ teamsMax: 3, playersPerTeam: 6 }));
+  it('вместимость = команды × игроки в команде, пересчитывается при изменении любого из них', () => {
+    const g = svc.createGame(ORG, gameBody({ teamsMax: 3, playersPerTeam: 6, capacity: 99 }));
     assert.equal(g.teamsMax, 3);
     assert.equal(g.playersPerTeam, 6);
-    assert.equal(svc.createGame(ORG, gameBody()).teamsMax, null);
-    const u = svc.updateGame(g.id, ORG, { teamsMax: null, playersPerTeam: 7 });
-    assert.equal(u.teamsMax, null);
-    assert.equal(u.playersPerTeam, 7);
+    assert.equal(g.capacity, 18, 'переданная capacity игнорируется');
+    assert.equal(svc.updateGame(g.id, ORG, { playersPerTeam: 7 }).capacity, 21);
+    assert.equal(svc.updateGame(g.id, ORG, { teamsMax: 2 }).capacity, 14);
+    expectCode(() => svc.createGame(ORG, gameBody({ teamsMax: undefined })), 'VALIDATION_ERROR');
     expectCode(() => svc.updateGame(g.id, ORG, { teamsMax: 11 }), 'VALIDATION_ERROR');
+    // по отдельности допустимо, но 10 × 7 = 70 больше 60 мест
+    assert.throws(
+      () => svc.updateGame(g.id, ORG, { teamsMax: 10 }),
+      (e: unknown) => e instanceof AppError && e.code === 'VALIDATION_ERROR' && 'playersPerTeam' in (e.details ?? {}),
+    );
+    assert.equal(svc.getGame(g.id, ORG).capacity, 14);
   });
 
   it('отвергает прошедшее время и неверные поля', () => {
@@ -73,7 +79,7 @@ describe('создание и список игр', () => {
       () => svc.createGame(ORG, gameBody({ startsAt: '2026-10-19T18:00:00.000Z' })),
       'STARTS_AT_IN_PAST',
     );
-    expectCode(() => svc.createGame(ORG, gameBody({ capacity: 1 })), 'VALIDATION_ERROR');
+    expectCode(() => svc.createGame(ORG, gameBody({ teamsMax: 1 })), 'VALIDATION_ERROR');
     expectCode(() => svc.createGame(ORG, null), 'VALIDATION_ERROR');
   });
 
@@ -148,7 +154,7 @@ describe('запись на игру', () => {
   });
 
   it('пример 10: лимит 5 мест, состояние не меняется', () => {
-    const g = svc.createGame(ORG, gameBody({ capacity: 10 }));
+    const g = svc.createGame(ORG, gameBody({ teamsMax: 5, playersPerTeam: 2 }));
     svc.putSignup(g.id, U1, 1);
     expectCode(() => svc.putSignup(g.id, U1, 6), 'SEATS_LIMIT_EXCEEDED');
     assert.equal(svc.getGame(g.id, U1).roster[0]?.seats, 1);
@@ -179,7 +185,7 @@ describe('запись на игру', () => {
   });
 
   it('последовательные записи никогда не превышают вместимость состава', () => {
-    const g = svc.createGame(ORG, gameBody({ capacity: 7 }));
+    const g = svc.createGame(ORG, gameBody({ teamsMax: 7, playersPerTeam: 1 }));
     const users = [U1, U2, U3, ORG];
     for (let i = 0; i < 40; i++) {
       const u = users[i % users.length]!;
@@ -212,14 +218,14 @@ describe('функции организатора', () => {
   it('только организатор редактирует, отменяет, отмечает оплату и удаляет', () => {
     const g = svc.createGame(ORG, gameBody());
     const s = svc.putSignup(g.id, U1, 2).signup;
-    expectCode(() => svc.updateGame(g.id, U1, { capacity: 10 }), 'FORBIDDEN');
+    expectCode(() => svc.updateGame(g.id, U1, { teamsMax: 5, playersPerTeam: 2 }), 'FORBIDDEN');
     expectCode(() => svc.cancelGame(g.id, U1), 'FORBIDDEN');
     expectCode(() => svc.setPaid(g.id, U1, s.signupId, 1), 'FORBIDDEN');
     expectCode(() => svc.removeSignup(g.id, U1, s.signupId), 'FORBIDDEN');
   });
 
   it('оплата: проверка границ и пример 14 (обрезка при уменьшении мест)', () => {
-    const g = svc.createGame(ORG, gameBody({ capacity: 10 }));
+    const g = svc.createGame(ORG, gameBody({ teamsMax: 5, playersPerTeam: 2 }));
     const s = svc.putSignup(g.id, U1, 3).signup;
     expectCode(() => svc.setPaid(g.id, ORG, s.signupId, 4), 'VALIDATION_ERROR');
     expectCode(() => svc.setPaid(g.id, ORG, s.signupId, -1), 'VALIDATION_ERROR');
@@ -231,7 +237,7 @@ describe('функции организатора', () => {
   });
 
   it('пример 11: удаление участника продвигает очередь', () => {
-    const g = svc.createGame(ORG, gameBody({ capacity: 2 }));
+    const g = svc.createGame(ORG, gameBody({ teamsMax: 2, playersPerTeam: 1 }));
     const a = svc.putSignup(g.id, U1, 2).signup;
     svc.putSignup(g.id, U2, 1);
     const after = svc.removeSignup(g.id, ORG, a.signupId);
@@ -241,10 +247,10 @@ describe('функции организатора', () => {
   });
 
   it('пример 8 и 9: изменение вместимости пересчитывает состав', () => {
-    const g = svc.createGame(ORG, gameBody({ capacity: 4 }));
+    const g = svc.createGame(ORG, gameBody({ teamsMax: 2, playersPerTeam: 2 }));
     svc.putSignup(g.id, U1, 3);
     svc.putSignup(g.id, U2, 2);
-    const smaller = svc.updateGame(g.id, ORG, { capacity: 2 });
+    const smaller = svc.updateGame(g.id, ORG, { teamsMax: 2, playersPerTeam: 1 });
     assert.deepEqual(
       smaller.roster.map((e) => [e.mainSeats, e.queueSeats]),
       [
@@ -252,7 +258,7 @@ describe('функции организатора', () => {
         [0, 2],
       ],
     );
-    const bigger = svc.updateGame(g.id, ORG, { capacity: 8 });
+    const bigger = svc.updateGame(g.id, ORG, { teamsMax: 4, playersPerTeam: 2 });
     assert.equal(bigger.queued, 0);
     assert.equal(bigger.taken, 5);
   });
@@ -265,7 +271,7 @@ describe('функции организатора', () => {
     );
     expectCode(() => svc.updateGame(g.id, ORG, {}), 'VALIDATION_ERROR');
     svc.cancelGame(g.id, ORG);
-    expectCode(() => svc.updateGame(g.id, ORG, { capacity: 10 }), 'GAME_NOT_ACTIVE');
+    expectCode(() => svc.updateGame(g.id, ORG, { teamsMax: 5, playersPerTeam: 2 }), 'GAME_NOT_ACTIVE');
   });
 
   it('организатор может записаться на свою игру', () => {
@@ -353,7 +359,7 @@ describe('тестовые игроки', () => {
     t.upsertUser({ vkId: ORG, firstName: 'Орг', lastName: '' });
     t.upsertUser({ vkId: U1, firstName: 'Игрок', lastName: '' });
     const place = t.createPlace(ORG, { name: 'Зал', address: 'ул. 1' }).place.id;
-    const g = t.createGame(ORG, gameBody({ placeId: place, capacity: 10 }));
+    const g = t.createGame(ORG, gameBody({ placeId: place, teamsMax: 5, playersPerTeam: 2 }));
     t.putSignup(g.id, U1, 1);
 
     expectCode(() => t.addTestPlayers(g.id, U1, 3), 'FORBIDDEN');

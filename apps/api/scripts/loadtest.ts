@@ -24,7 +24,10 @@ function arg(name: string, fallback: string): string {
 const BASE = arg('base', 'http://127.0.0.1:3000').replace(/\/$/, '');
 const USERS = Number(arg('users', '200'));
 const OBSERVERS = Number(arg('observers', '20'));
-const CAPACITY = 24;
+// 4 команды по 6 игроков: вместимость сервер считает как их произведение
+const TEAMS = 4;
+const PLAYERS_PER_TEAM = 6;
+const CAPACITY = TEAMS * PLAYERS_PER_TEAM;
 const ORGANIZER = 900_000;
 
 const failures: string[] = [];
@@ -105,7 +108,8 @@ async function main(): Promise<void> {
     startsAt,
     placeId,
     feeRub: 0,
-    capacity: CAPACITY,
+    teamsMax: TEAMS,
+    playersPerTeam: PLAYERS_PER_TEAM,
   });
   check(created.status === 201, `создание игры вернуло ${created.status}`);
   const gameId = (created.json as { id: number }).id;

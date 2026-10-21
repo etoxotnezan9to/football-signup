@@ -49,10 +49,10 @@ export interface RosterEntry {
 export interface GameDetails extends GameSummary {
   /** Адрес места (из сущности «Место») */
   address: string;
-  /** Максимальное число команд; null — не указано */
-  teamsMax: number | null;
-  /** Игроков в команде; null — не указано */
-  playersPerTeam: number | null;
+  /** Максимальное число команд */
+  teamsMax: number;
+  /** Игроков в команде */
+  playersPerTeam: number;
   description: string;
   paymentInfo: string;
   organizerContact: string;

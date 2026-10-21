@@ -12,10 +12,14 @@ import {
 } from '@vkontakte/vkui';
 import { Icon28AddOutline } from '@vkontakte/icons';
 import {
+  DEFAULT_PLAYERS_PER_TEAM,
+  DEFAULT_TEAMS,
+  MAX_CAPACITY,
   MAX_PLAYERS_PER_TEAM,
   MAX_TEAMS,
   MIN_PLAYERS_PER_TEAM,
   MIN_TEAMS,
+  gameCapacity,
   parseGameInput,
   type GameDetails,
   type GameInput,
@@ -35,7 +39,6 @@ interface FormState {
   teamsMax: string;
   playersPerTeam: string;
   feeRub: string;
-  capacity: string;
   description: string;
   paymentInfo: string;
   organizerContact: string;
@@ -52,15 +55,14 @@ interface Field {
 const FIELDS: Field[] = [
   { key: 'startsAt', label: 'Дата и время начала', type: 'datetime-local' },
   { key: 'placeId', label: 'Место', type: 'place', hint: 'Выберите из списка или добавьте новое кнопкой +' },
-  { key: 'teamsMax', label: 'Количество команд (макс)', type: 'number', hint: `От ${MIN_TEAMS} до ${MAX_TEAMS}, можно не указывать` },
+  { key: 'teamsMax', label: 'Количество команд (макс)', type: 'number', hint: `От ${MIN_TEAMS} до ${MAX_TEAMS}` },
   {
     key: 'playersPerTeam',
     label: 'Игроков в команде',
     type: 'number',
-    hint: `От ${MIN_PLAYERS_PER_TEAM} до ${MAX_PLAYERS_PER_TEAM}, можно не указывать`,
+    hint: `От ${MIN_PLAYERS_PER_TEAM} до ${MAX_PLAYERS_PER_TEAM}`,
   },
   { key: 'feeRub', label: 'Взнос, ₽', type: 'number' },
-  { key: 'capacity', label: 'Число мест в составе', type: 'number', hint: 'От 2 до 60' },
   {
     key: 'paymentInfo',
     label: 'Реквизиты для предоплаты',
@@ -74,10 +76,9 @@ function toForm(g?: GameDetails): FormState {
   return {
     startsAt: g ? toLocalInput(g.startsAt) : defaultStartsAt(new Date()),
     placeId: g ? String(g.placeId) : '',
-    teamsMax: g?.teamsMax != null ? String(g.teamsMax) : '',
-    playersPerTeam: g?.playersPerTeam != null ? String(g.playersPerTeam) : '',
+    teamsMax: String(g?.teamsMax ?? DEFAULT_TEAMS),
+    playersPerTeam: String(g?.playersPerTeam ?? DEFAULT_PLAYERS_PER_TEAM),
     feeRub: g ? String(g.feeRub) : '',
-    capacity: g ? String(g.capacity) : '',
     description: g?.description ?? '',
     paymentInfo: g?.paymentInfo ?? '',
     organizerContact: g?.organizerContact ?? '',
@@ -89,9 +90,15 @@ function toNumber(s: string): number {
   return s.trim() === '' ? NaN : Number(s);
 }
 
-/** Необязательное число: пустое поле означает «не указано» (null). */
-function toOptionalNumber(s: string): number | null {
-  return s.trim() === '' ? null : Number(s);
+/** Подсказка под полем «Игроков в команде»: сколько мест в составе получится. */
+function capacityHint(form: FormState): string | undefined {
+  const teams = toNumber(form.teamsMax);
+  const players = toNumber(form.playersPerTeam);
+  if (!Number.isInteger(teams) || !Number.isInteger(players) || teams < 1 || players < 1) return undefined;
+  const total = gameCapacity(teams, players);
+  return total > MAX_CAPACITY
+    ? `Мест в составе: ${total}, допустимо не больше ${MAX_CAPACITY}`
+    : `Мест в составе: ${teams} × ${players} = ${total}`;
 }
 
 /** Форма создания (без `initial`) и редактирования игры. */
@@ -174,10 +181,9 @@ export function GameForm({ initial }: { initial?: GameDetails }) {
     const parsed = parseGameInput({
       startsAt: fromLocalInput(form.startsAt),
       placeId: toNumber(form.placeId),
-      teamsMax: toOptionalNumber(form.teamsMax),
-      playersPerTeam: toOptionalNumber(form.playersPerTeam),
+      teamsMax: toNumber(form.teamsMax),
+      playersPerTeam: toNumber(form.playersPerTeam),
       feeRub: toNumber(form.feeRub),
-      capacity: toNumber(form.capacity),
       description: form.description,
       paymentInfo: form.paymentInfo,
       organizerContact: form.organizerContact,
@@ -197,7 +203,7 @@ export function GameForm({ initial }: { initial?: GameDetails }) {
         return;
       }
       // при редактировании отправляем только изменённые поля (неизменённое прошедшее время не должно давать ошибку)
-      const patch: Record<string, string | number | null> = {};
+      const patch: Record<string, string | number> = {};
       for (const key of Object.keys(parsed.value) as (keyof GameInput)[]) {
         const next = parsed.value[key];
         const before = initial[key];
@@ -239,7 +245,7 @@ export function GameForm({ initial }: { initial?: GameDetails }) {
               htmlFor={f.key}
               top={f.label}
               status={errors[f.key] ? 'error' : 'default'}
-              bottom={errors[f.key] ?? f.hint}
+              bottom={errors[f.key] ?? (f.key === 'playersPerTeam' ? (capacityHint(form) ?? f.hint) : f.hint)}
             >
               {f.multiline ? (
                 <Textarea

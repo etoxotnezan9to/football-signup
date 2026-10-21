@@ -44,7 +44,7 @@ const gameBody = (over: Record<string, unknown> = {}) => ({
   startsAt: new Date(Date.now() + 2 * 86_400_000).toISOString(),
   placeId: placeId,
   feeRub: 650,
-  capacity: 4,
+  teamsMax: 2, playersPerTeam: 2,
   ...over,
 });
 

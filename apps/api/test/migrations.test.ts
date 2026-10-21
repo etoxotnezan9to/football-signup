@@ -70,6 +70,20 @@ describe('миграция 0003_places', () => {
       assert.ok(!cols5.includes('format') && cols5.includes('teams_max') && cols5.includes('players_per_team'));
       const nulls = db.prepare('SELECT COUNT(*) AS n FROM games WHERE teams_max IS NULL AND players_per_team IS NULL').get();
       assert.equal(nulls!.n, 3);
+
+      // у одной игры значения уже были, причём произведение больше 60
+      db.prepare('UPDATE games SET teams_max = 10, players_per_team = 7 WHERE id = 1').run();
+      copyFileSync(join(MIGRATIONS, '0006_capacity_from_teams.sql'), join(dir, '0006_capacity_from_teams.sql'));
+      assert.deepEqual(migrate(db, dir), ['0006_capacity_from_teams.sql']);
+      const rows = db.prepare('SELECT id, teams_max, players_per_team, capacity FROM games ORDER BY id').all();
+      assert.deepEqual(
+        rows.map((g) => [g.teams_max, g.players_per_team, g.capacity]),
+        [
+          [8, 7, 56],
+          [4, 6, 24],
+          [4, 6, 24],
+        ],
+      );
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

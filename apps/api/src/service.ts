@@ -2,6 +2,8 @@
 // поэтому полностью тестируется без HTTP-слоя.
 import type { DatabaseSync } from 'node:sqlite';
 import {
+  capacityError,
+  gameCapacity,
   FINISH_GRACE_MIN,
   MAX_ACTIVE_GAMES_PER_ORGANIZER,
   REMINDER_LEAD_MIN,
@@ -47,8 +49,8 @@ interface GameRow {
   venue: string;
   /** Адрес места (из JOIN с places) */
   address: string;
-  teams_max: number | null;
-  players_per_team: number | null;
+  teams_max: number;
+  players_per_team: number;
   fee_rub: number;
   capacity: number;
   description: string;
@@ -424,7 +426,7 @@ export function createService(db: DatabaseSync, options: ServiceOptions = {}) {
             input.teamsMax,
             input.playersPerTeam,
             input.feeRub,
-            input.capacity,
+            gameCapacity(input.teamsMax, input.playersPerTeam),
             input.description,
             input.paymentInfo,
             input.organizerContact,
@@ -471,22 +473,30 @@ export function createService(db: DatabaseSync, options: ServiceOptions = {}) {
           throw new AppError('STARTS_AT_IN_PAST', 'Время начала должно быть в будущем');
         }
         if (patch.placeId !== undefined) requirePlace(patch.placeId);
+        // вместимость не задаётся напрямую: пересчитывается из итоговых команд и игроков в команде
+        const teams = patch.teamsMax ?? game.teams_max;
+        const players = patch.playersPerTeam ?? game.players_per_team;
+        const tooBig = capacityError(teams, players);
+        if (tooBig) throw new AppError('VALIDATION_ERROR', 'Неверные данные игры', { playersPerTeam: tooBig });
         const columns: Record<keyof GameInput, string> = {
           startsAt: 'starts_at',
           placeId: 'place_id',
           teamsMax: 'teams_max',
           playersPerTeam: 'players_per_team',
           feeRub: 'fee_rub',
-          capacity: 'capacity',
           description: 'description',
           paymentInfo: 'payment_info',
           organizerContact: 'organizer_contact',
         };
         const sets: string[] = [];
-        const values: (string | number | null)[] = [];
+        const values: (string | number)[] = [];
         for (const key of Object.keys(patch) as (keyof GameInput)[]) {
           sets.push(`${columns[key]} = ?`);
-          values.push(patch[key] as string | number | null);
+          values.push(patch[key] as string | number);
+        }
+        if (patch.teamsMax !== undefined || patch.playersPerTeam !== undefined) {
+          sets.push('capacity = ?');
+          values.push(gameCapacity(teams, players));
         }
         sets.push('updated_at = ?');
         values.push(now().toISOString(), gameId);

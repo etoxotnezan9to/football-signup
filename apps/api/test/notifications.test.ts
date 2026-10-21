@@ -26,7 +26,7 @@ function gameBody(over: Record<string, unknown> = {}) {
     startsAt: '2026-10-22T18:00:00.000Z', // 21:00 по Москве
     placeId: PLACE,
     feeRub: 650,
-    capacity: 2,
+    teamsMax: 2, playersPerTeam: 1,
     ...over,
   };
 }
@@ -70,7 +70,7 @@ describe('уведомление о попадании в состав', () => {
   });
 
   it('инициатор действия не получает уведомление о собственном повышении', () => {
-    const g = svc.createGame(ORG, gameBody({ capacity: 3 }));
+    const g = svc.createGame(ORG, gameBody({ teamsMax: 3, playersPerTeam: 1 }));
     signup(g.id, A, 2);
     signup(g.id, B, 2); // 1 в составе + 1 в очереди
     sent = [];
@@ -99,7 +99,7 @@ describe('уведомление о попадании в состав', () => {
     signup(g.id, A, 2);
     signup(g.id, B, 2); // в очереди
     tick();
-    svc.updateGame(g.id, ORG, { capacity: 4 });
+    svc.updateGame(g.id, ORG, { teamsMax: 2, playersPerTeam: 2 });
     assert.deepEqual(
       sent.map((n) => n.userIds),
       [[B]],
@@ -130,7 +130,7 @@ describe('уведомление о попадании в состав', () => {
 
 describe('уведомления об изменении и отмене игры', () => {
   it('перенос времени или места уведомляет записавшихся, кроме организатора', () => {
-    const g = svc.createGame(ORG, gameBody({ capacity: 4 }));
+    const g = svc.createGame(ORG, gameBody({ teamsMax: 2, playersPerTeam: 2 }));
     signup(g.id, A, 1);
     signup(g.id, B, 1);
     tick();
@@ -142,7 +142,7 @@ describe('уведомления об изменении и отмене игр�
   });
 
   it('правка описания или взноса никого не беспокоит', () => {
-    const g = svc.createGame(ORG, gameBody({ capacity: 4 }));
+    const g = svc.createGame(ORG, gameBody({ teamsMax: 2, playersPerTeam: 2 }));
     signup(g.id, A, 1);
     tick();
     svc.updateGame(g.id, ORG, { description: 'Берите сменку', feeRub: 700 });
@@ -155,7 +155,7 @@ describe('уведомления об изменении и отмене игр�
     signup(g.id, B, 1); // очередь
     tick();
     const other = svc.createPlace(ORG, { name: 'Другой зал', address: 'ул. Другая, 1' }).place.id;
-    svc.updateGame(g.id, ORG, { capacity: 3, placeId: other });
+    svc.updateGame(g.id, ORG, { teamsMax: 3, playersPerTeam: 1, placeId: other });
     const toB = sent.filter((n) => n.userIds.includes(B));
     assert.equal(toB.length, 1);
     assert.match(toB[0]!.message, /Вы в составе/);
@@ -216,7 +216,7 @@ describe('напоминания за сутки', () => {
   });
 
   it('участники с разным числом мест получают отдельные сообщения', () => {
-    const g = svc.createGame(ORG, gameBody({ capacity: 6 }));
+    const g = svc.createGame(ORG, gameBody({ teamsMax: 3, playersPerTeam: 2 }));
     signup(g.id, A, 2);
     signup(g.id, B, 1);
     signup(g.id, C, 2);

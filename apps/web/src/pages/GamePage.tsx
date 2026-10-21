@@ -212,11 +212,9 @@ function GameView({ id }: { id: number }) {
           <Row icon="📍" label="Где">
             {game.venue}, {game.address}
           </Row>
-          {teamsLabel(game.teamsMax, game.playersPerTeam) && (
-            <Row icon="⚽" label="Формат">
-              {teamsLabel(game.teamsMax, game.playersPerTeam)}
-            </Row>
-          )}
+          <Row icon="⚽" label="Формат">
+            {teamsLabel(game.teamsMax, game.playersPerTeam)}
+          </Row>
           <Row icon="💰" label="Взнос">
             {game.feeRub} ₽
           </Row>
