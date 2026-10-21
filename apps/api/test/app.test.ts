@@ -190,6 +190,34 @@ describe('HTTP API', () => {
     assert.equal((await put(2, 2, 902)).statusCode, 403);
   });
 
+  it('счёт матча: PUT записывает, DELETE стирает, чужой — 403', async () => {
+    const g = await app.inject({
+      method: 'POST',
+      url: '/api/games',
+      headers: auth(911),
+      payload: gameBody({ teamsMax: 2, playersPerTeam: 2 }),
+    });
+    const id = g.json().id;
+    const put = await app.inject({
+      method: 'PUT',
+      url: `/api/games/${id}/matches/2/1`,
+      headers: auth(911),
+      payload: { goalsA: 4, goalsB: 2 },
+    });
+    assert.equal(put.statusCode, 200);
+    assert.deepEqual(put.json().results, [{ teamA: 1, teamB: 2, goalsA: 2, goalsB: 4 }]);
+    const other = await app.inject({
+      method: 'PUT',
+      url: `/api/games/${id}/matches/1/2`,
+      headers: auth(912),
+      payload: { goalsA: 0, goalsB: 0 },
+    });
+    assert.equal(other.statusCode, 403);
+    const del = await app.inject({ method: 'DELETE', url: `/api/games/${id}/matches/1/2`, headers: auth(911) });
+    assert.equal(del.statusCode, 200);
+    assert.deepEqual(del.json().results, []);
+  });
+
   it('конфигурация и тестовые игроки выключены без тестового режима', async () => {
     const cfg = await app.inject({ method: 'GET', url: '/api/config', headers: auth(801) });
     assert.equal(cfg.statusCode, 200);

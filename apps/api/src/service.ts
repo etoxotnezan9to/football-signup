@@ -3,6 +3,7 @@
 import type { DatabaseSync } from 'node:sqlite';
 import {
   autoAssign,
+  isGoals,
   buildTeams,
   capacityError,
   gameCapacity,
@@ -31,6 +32,7 @@ import type {
   MainSeats,
   Place,
   RosterEntry,
+  MatchResult,
   ServerEvent,
   TeamsView,
   User,
@@ -267,6 +269,17 @@ export function createService(db: DatabaseSync, options: ServiceOptions = {}) {
     }
   }
 
+  /** Счёт матчей между командами, которые ещё есть в игре (номер не больше teamsMax). */
+  function resultsOf(game: GameRow): MatchResult[] {
+    const rows = db
+      .prepare(
+        `SELECT team_a, team_b, goals_a, goals_b FROM match_results
+          WHERE game_id = ? AND team_b <= ? ORDER BY team_a, team_b`,
+      )
+      .all(game.id, game.teams_max) as unknown as { team_a: number; team_b: number; goals_a: number; goals_b: number }[];
+    return rows.map((r) => ({ teamA: r.team_a, teamB: r.team_b, goalsA: r.goals_a, goalsB: r.goals_b }));
+  }
+
   function details(game: GameRow, viewerId?: number): GameDetails {
     const { entries } = buildRoster(game);
     return {
@@ -279,6 +292,7 @@ export function createService(db: DatabaseSync, options: ServiceOptions = {}) {
       organizerContact: game.organizer_contact,
       roster: entries,
       ...teamsOf(game, entries),
+      results: resultsOf(game),
     };
   }
 
@@ -774,6 +788,42 @@ export function createService(db: DatabaseSync, options: ServiceOptions = {}) {
           `INSERT INTO team_assignments (signup_id, seat_no, game_id, team_no, created_at) VALUES (?, ?, ?, ?, ?)
              ON CONFLICT (signup_id, seat_no) DO UPDATE SET team_no = excluded.team_no, created_at = excluded.created_at`,
         ).run(signupId, seat, gameId, teamNo, now().toISOString());
+      });
+      emitGameChanged(gameId, 'roster');
+      return details(getGameRow(gameId), organizerId);
+    },
+
+    /**
+     * Организатор записывает счёт матча команд teamA и teamB (порядок любой, голы в том же порядке)
+     * или стирает его (body null). Можно и после окончания игры, но не в отменённой игре.
+     */
+    setMatchScore(gameId: number, organizerId: number, teamA: number, teamB: number, body: unknown): GameDetails {
+      let goals: [number, number] | null = null;
+      if (body !== null) {
+        const b = (typeof body === 'object' ? body : {}) as { goalsA?: unknown; goalsB?: unknown };
+        if (!isGoals(b.goalsA) || !isGoals(b.goalsB)) {
+          throw new AppError('VALIDATION_ERROR', 'Счёт — целые числа от 0 до 99');
+        }
+        goals = [b.goalsA, b.goalsB];
+      }
+      inTransaction(db, () => {
+        const game = getGameRow(gameId);
+        requireOrganizer(game, organizerId);
+        if (game.status !== 'active') throw new AppError('GAME_NOT_ACTIVE', 'Игра отменена');
+        if (teamA === teamB || teamA > game.teams_max || teamB > game.teams_max) {
+          throw new AppError('NOT_FOUND', 'Такого матча нет');
+        }
+        const [a, b] = teamA < teamB ? [teamA, teamB] : [teamB, teamA];
+        if (goals === null) {
+          db.prepare('DELETE FROM match_results WHERE game_id = ? AND team_a = ? AND team_b = ?').run(gameId, a, b);
+          return;
+        }
+        const [ga, gb] = teamA < teamB ? goals : [goals[1], goals[0]];
+        db.prepare(
+          `INSERT INTO match_results (game_id, team_a, team_b, goals_a, goals_b, updated_at) VALUES (?, ?, ?, ?, ?, ?)
+             ON CONFLICT (game_id, team_a, team_b)
+             DO UPDATE SET goals_a = excluded.goals_a, goals_b = excluded.goals_b, updated_at = excluded.updated_at`,
+        ).run(gameId, a, b, ga, gb, now().toISOString());
       });
       emitGameChanged(gameId, 'roster');
       return details(getGameRow(gameId), organizerId);

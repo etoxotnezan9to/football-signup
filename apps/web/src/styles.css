@@ -199,3 +199,106 @@
 .team-seat--editable:active {
   cursor: grabbing;
 }
+
+/* Вкладка «Результаты» */
+.results {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 8px 16px 16px;
+}
+.results__round-title {
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+.results__rest {
+  font-size: 13px;
+  color: var(--vkui--color_text_secondary);
+  padding-top: 2px;
+}
+.match {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--vkui--color_separator_primary);
+}
+.match__team {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.match__team--right {
+  justify-content: flex-end;
+}
+.match__team-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.match__score {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.match__score--text {
+  min-width: 48px;
+  justify-content: center;
+}
+.match__goals {
+  width: 36px;
+  height: 32px;
+  text-align: center;
+  font: inherit;
+  border: 1px solid var(--vkui--color_field_border_alpha);
+  border-radius: 8px;
+  background: var(--vkui--color_field_background);
+  color: inherit;
+}
+.match__actions {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: center;
+}
+.results__table-wrap {
+  overflow-x: auto;
+}
+.standings {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+.standings caption {
+  text-align: left;
+  font-weight: 600;
+  font-size: 15px;
+  padding: 4px 0 8px;
+}
+.standings th,
+.standings td {
+  padding: 6px 4px;
+  text-align: center;
+  border-bottom: 1px solid var(--vkui--color_separator_primary);
+}
+.standings thead th {
+  color: var(--vkui--color_text_secondary);
+  font-weight: 500;
+}
+.standings .standings__team {
+  text-align: left;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.standings__team .team-dot {
+  display: inline-block;
+  vertical-align: middle;
+  margin-right: 4px;
+}
+.standings__points {
+  font-weight: 700;
+}

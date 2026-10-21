@@ -325,6 +325,47 @@ paths:
         '403': { $ref: '#/components/responses/Error' }
         '404': { $ref: '#/components/responses/Error' }
         '409': { $ref: '#/components/responses/Error' }
+  /games/{gameId}/matches/{teamA}/{teamB}:
+    parameters:
+      - { $ref: '#/components/parameters/GameId' }
+      - { name: teamA, in: path, required: true, schema: { type: integer, minimum: 1 }, description: Номер команды }
+      - { name: teamB, in: path, required: true, schema: { type: integer, minimum: 1 }, description: Номер соперника }
+    put:
+      summary: Записать счёт матча команд (только организатор; можно и после окончания игры)
+      description: Порядок команд любой, голы в том же порядке. В ответе results хранятся с teamA < teamB.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [goalsA, goalsB]
+              properties:
+                goalsA: { type: integer, minimum: 0, maximum: 99 }
+                goalsB: { type: integer, minimum: 0, maximum: 99 }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GameDetails' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+    delete:
+      summary: Стереть счёт матча (только организатор)
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GameDetails' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
   /games/{gameId}/team-assignment:
     parameters:
       - { $ref: '#/components/parameters/GameId' }
@@ -491,6 +532,15 @@ components:
       properties:
         signupId: { type: integer }
         seat: { type: integer, minimum: 1 }
+    MatchResult:
+      type: object
+      description: Счёт матча команд teamA < teamB
+      required: [teamA, teamB, goalsA, goalsB]
+      properties:
+        teamA: { type: integer, minimum: 1 }
+        teamB: { type: integer, minimum: 2 }
+        goalsA: { type: integer, minimum: 0, maximum: 99 }
+        goalsB: { type: integer, minimum: 0, maximum: 99 }
     Team:
       type: object
       required: [no, name, color, members]
@@ -516,7 +566,7 @@ components:
       allOf:
         - $ref: '#/components/schemas/GameSummary'
         - type: object
-          required: [address, teamsMax, playersPerTeam, description, paymentInfo, organizerContact, roster, teams, unassigned]
+          required: [address, teamsMax, playersPerTeam, description, paymentInfo, organizerContact, roster, teams, unassigned, results]
           properties:
             address: { type: string, description: Адрес места }
             teamsMax: { type: integer }
@@ -536,3 +586,9 @@ components:
               type: array
               description: Места состава, не распределённые по командам, в порядке состава
               items: { $ref: '#/components/schemas/TeamSeat' }
+            results:
+              type: array
+              description: >-
+                Счёт сыгранных матчей между командами 1..teamsMax (каждая с каждой). Расписание по турам
+                и турнирную таблицу клиент считает функциями roundRobin и standings из packages/shared
+              items: { $ref: '#/components/schemas/MatchResult' }

@@ -497,3 +497,36 @@ describe('команды', () => {
     assert.equal(r.teams.flatMap((t) => t.members).length, 3);
   });
 });
+
+describe('счёт матчей', () => {
+  it('организатор записывает, меняет и стирает счёт; порядок команд любой', () => {
+    const g = svc.createGame(ORG, gameBody({ teamsMax: 3, playersPerTeam: 2 }));
+    assert.deepEqual(g.results, []);
+    let r = svc.setMatchScore(g.id, ORG, 2, 1, { goalsA: 3, goalsB: 1 }); // «Розовые» 3 : 1 «Синие»
+    assert.deepEqual(r.results, [{ teamA: 1, teamB: 2, goalsA: 1, goalsB: 3 }]);
+    assert.equal(events.at(-1)?.type, 'roster.updated');
+    r = svc.setMatchScore(g.id, ORG, 1, 2, { goalsA: 2, goalsB: 2 });
+    assert.deepEqual(r.results, [{ teamA: 1, teamB: 2, goalsA: 2, goalsB: 2 }]);
+    r = svc.setMatchScore(g.id, ORG, 1, 2, null);
+    assert.deepEqual(r.results, []);
+  });
+
+  it('права и проверки: только организатор, голы 0..99, команды из игры, не в отменённой игре', () => {
+    const g = svc.createGame(ORG, gameBody({ teamsMax: 2, playersPerTeam: 2 }));
+    expectCode(() => svc.setMatchScore(g.id, U1, 1, 2, { goalsA: 1, goalsB: 0 }), 'FORBIDDEN');
+    expectCode(() => svc.setMatchScore(g.id, ORG, 1, 2, { goalsA: 100, goalsB: 0 }), 'VALIDATION_ERROR');
+    expectCode(() => svc.setMatchScore(g.id, ORG, 1, 2, { goalsA: 1 }), 'VALIDATION_ERROR');
+    expectCode(() => svc.setMatchScore(g.id, ORG, 1, 1, { goalsA: 1, goalsB: 0 }), 'NOT_FOUND');
+    expectCode(() => svc.setMatchScore(g.id, ORG, 1, 3, { goalsA: 1, goalsB: 0 }), 'NOT_FOUND');
+    svc.cancelGame(g.id, ORG);
+    expectCode(() => svc.setMatchScore(g.id, ORG, 1, 2, { goalsA: 1, goalsB: 0 }), 'GAME_NOT_ACTIVE');
+  });
+
+  it('после уменьшения числа команд счёт матчей с исчезнувшими командами не показывается', () => {
+    const g = svc.createGame(ORG, gameBody({ teamsMax: 3, playersPerTeam: 2 }));
+    svc.setMatchScore(g.id, ORG, 1, 2, { goalsA: 1, goalsB: 0 });
+    svc.setMatchScore(g.id, ORG, 2, 3, { goalsA: 0, goalsB: 2 });
+    const r = svc.updateGame(g.id, ORG, { teamsMax: 2 });
+    assert.deepEqual(r.results, [{ teamA: 1, teamB: 2, goalsA: 1, goalsB: 0 }]);
+  });
+});
