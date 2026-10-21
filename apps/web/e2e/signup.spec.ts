@@ -448,7 +448,7 @@ test('главная: вкладки «Сборы» и «Рейтинг», ре�
 test('новый сбор: заголовок и «Копировать сбор» переносит только настройки', async ({ browser }) => {
   const org = await openAs(browser, DMITRY);
   await org.getByRole('button', { name: 'Создать игру', exact: true }).click();
-  await expect(org.locator('.copy-gathering__title')).toContainText('Новый сбор');
+  await expect(org.getByText('Новый сбор', { exact: true })).toBeVisible();
   await choosePlace(org, 'Зал копирования', 'ул. Шаблонная, 2');
   await org.getByLabel('Количество команд (макс)', { exact: true }).fill('3');
   await org.getByLabel('Игроков в команде', { exact: true }).fill('5');
@@ -468,7 +468,7 @@ test('новый сбор: заголовок и «Копировать сбор
   await expect(maria.getByText(/Вы записаны/)).toBeVisible();
 
   await org.goto('/#/create');
-  // иконка рядом с заголовком с подсказкой
+  // иконка — первая в форме, с подсказкой
   const copyIcon = org.getByRole('button', { name: 'Копировать сбор', exact: true });
   await copyIcon.hover();
   await expect(org.getByText('Копировать инфу из существующего сбора')).toBeVisible();
@@ -500,6 +500,16 @@ test('новый сбор: заголовок и «Копировать сбор
   expect(lines).toBeGreaterThan(2);
   await expect(org.getByText('занято 0/15')).toBeVisible();
   await expect(org.getByText('Пока никто не записался')).toBeVisible();
+
+  // та же иконка в форме редактирования: сам сбор в списке не показывается, дата не меняется
+  await org.getByRole('button', { name: 'Редактировать сбор', exact: true }).click();
+  const dateBefore = await org.getByLabel('Дата и время начала', { exact: true }).inputValue();
+  await org.getByRole('button', { name: 'Копировать сбор', exact: true }).click();
+  await org.getByLabel('Копировать сбор', { exact: true }).click();
+  await expect(org.getByRole('option', { name: /Зал копирования/ })).toHaveCount(1);
+  await org.getByRole('option', { name: /Зал копирования/ }).click();
+  await expect(org.getByLabel('Дата и время начала', { exact: true })).toHaveValue(dateBefore);
+  await expect(org.getByLabel('Взнос, ₽', { exact: true })).toHaveValue('450');
 });
 
 test('игроки кликабельны: ссылка на страницу ВКонтакте, у организатора — пункт в меню', async ({ browser }) => {

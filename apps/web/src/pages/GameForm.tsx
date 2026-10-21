@@ -98,11 +98,12 @@ function toForm(g?: GameDetails): FormState {
 }
 
 /**
- * Настройки сбора, который копируют: базовые поля, дата — через неделю после него. Состав, команды,
+ * Настройки сбора, который копируют: базовые поля. Дата нового сбора — через неделю после копируемого;
+ * при редактировании дата остаётся прежней, чтобы назначенный сбор не сдвинулся. Состав, команды,
  * результаты и лучший игрок в форму не входят и не копируются.
  */
-function copyForm(g: GameDetails): FormState {
-  return { ...toForm(g), startsAt: nextWeekOf(g.startsAt, new Date()) };
+function copyForm(current: FormState, g: GameDetails, editing: boolean): FormState {
+  return { ...toForm(g), startsAt: editing ? current.startsAt : nextWeekOf(g.startsAt, new Date()) };
 }
 
 /** Число из текстового поля; пустая строка и мусор дают NaN, чтобы валидатор показал ошибку, а не 0. */
@@ -255,20 +256,18 @@ export function GameForm({ initial }: { initial?: GameDetails }) {
   return (
     <>
       <PanelHeader before={<PanelHeaderBack onClick={back} />}>
-        {initial ? (
-          'Редактирование сбора'
-        ) : (
-          <span className="copy-gathering__title">
-            Новый сбор
-            <CopyGatheringButton open={copying} onToggle={() => setCopying((v) => !v)} />
-          </span>
-        )}
+        {initial ? 'Редактирование сбора' : 'Новый сбор'}
       </PanelHeader>
       <Group>
-        {!initial && copying && (
+        {/* первое в форме: иконка «Копировать сбор» и, если открыт, список сборов */}
+        <div className="copy-gathering">
+          <CopyGatheringButton open={copying} onToggle={() => setCopying((v) => !v)} />
+        </div>
+        {copying && (
           <CopyGatheringPicker
+            {...(initial ? { excludeId: initial.id } : {})}
             onPick={(g) => {
-              setForm(copyForm(g));
+              setForm((f) => copyForm(f, g, initial !== undefined));
               setErrors({});
             }}
             onClose={() => setCopying(false)}

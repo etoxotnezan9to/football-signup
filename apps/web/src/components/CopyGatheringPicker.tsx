@@ -23,7 +23,16 @@ export function CopyGatheringButton({ open, onToggle }: { open: boolean; onToggl
  * Список моих сборов (включая прошедшие) для копирования: выбранный сбор загружается целиком
  * и передаётся в onPick; форма берёт из него только настройки.
  */
-export function CopyGatheringPicker({ onPick, onClose }: { onPick: (game: GameDetails) => void; onClose: () => void }) {
+export function CopyGatheringPicker({
+  onPick,
+  onClose,
+  excludeId,
+}: {
+  onPick: (game: GameDetails) => void;
+  onClose: () => void;
+  /** Редактируемый сбор: копировать его в самого себя незачем */
+  excludeId?: number;
+}) {
   const { showToast } = useApp();
   const [games, setGames] = useState<GameSummary[] | null>(null);
   const [busy, setBusy] = useState(false);
@@ -61,7 +70,11 @@ export function CopyGatheringPicker({ onPick, onClose }: { onPick: (game: GameDe
     <FormItem
       htmlFor="copyGathering"
       top="Копировать сбор"
-      bottom="Копируются арена, команды, игроки, встречи, взнос, реквизиты, контакт и описание; дата — через неделю после выбранного сбора. Состав, команды и результаты не копируются"
+      bottom={
+        excludeId === undefined
+          ? 'Копируются арена, команды, игроки, встречи, взнос, реквизиты, контакт и описание; дата — через неделю после выбранного сбора. Состав, команды и результаты не копируются'
+          : 'Копируются арена, команды, игроки, встречи, взнос, реквизиты, контакт и описание; дата сбора не меняется. Состав, команды и результаты не копируются'
+      }
     >
       <CustomSelect
         id="copyGathering"
@@ -70,7 +83,9 @@ export function CopyGatheringPicker({ onPick, onClose }: { onPick: (game: GameDe
         emptyText="У вас пока нет сборов"
         fetching={games === null}
         disabled={busy}
-        options={(games ?? []).map((g) => ({
+        options={(games ?? [])
+          .filter((g) => g.id !== excludeId)
+          .map((g) => ({
           value: String(g.id),
           label: gameLabel(g),
           ...(g.status === 'cancelled' ? { description: 'отменён' } : {}),

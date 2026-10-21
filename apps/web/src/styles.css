@@ -364,11 +364,10 @@
   height: 16px;
 }
 
-/* Иконка «Копировать сбор» рядом с заголовком формы */
-.copy-gathering__title {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
+/* Иконка «Копировать сбор» первой строкой формы сбора */
+.copy-gathering {
+  display: flex;
+  padding: 4px 8px 0;
 }
 
 /* Имя игрока — ссылка на страницу ВКонтакте */
