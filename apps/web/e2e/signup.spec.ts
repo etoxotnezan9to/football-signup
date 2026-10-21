@@ -493,9 +493,8 @@ test('новый сбор: заголовок и «Копировать сбор
   // перенос строки в описании виден на экране сбора: две строки текста, а не одна
   const description = org.getByTestId('game-description');
   await expect(description).toHaveText('Берите манишки\nИ воду');
-  const lineHeight = await description.evaluate((el) => parseFloat(getComputedStyle(el).lineHeight));
-  const height = await description.evaluate((el) => el.getBoundingClientRect().height);
-  expect(height).toBeGreaterThan(lineHeight * 1.5);
+  // у строчного элемента по прямоугольнику на каждую строку
+  expect(await description.evaluate((el) => el.getClientRects().length)).toBe(2);
   await expect(org.getByText('занято 0/15')).toBeVisible();
   await expect(org.getByText('Пока никто не записался')).toBeVisible();
 });
