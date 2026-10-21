@@ -11,6 +11,8 @@
 | `MAX_SEATS_PER_USER` | 5 | Максимум мест одного пользователя в одной игре суммарно (состав + очередь) |
 | `MIN_CAPACITY` | 2 | Минимальная вместимость игры |
 | `MAX_CAPACITY` | 60 | Максимальная вместимость игры |
+| `MIN_TEAMS`, `MAX_TEAMS` | 2, 10 | Допустимое «Количество команд (макс)» |
+| `MIN_PLAYERS_PER_TEAM`, `MAX_PLAYERS_PER_TEAM` | 2, 11 | Допустимое «Игроков в команде» |
 | `MAX_FEE_RUB` | 100000 | Максимальный взнос, ₽ |
 | `MAX_ACTIVE_GAMES_PER_ORGANIZER` | 10 | Активных (будущих) игр у одного организатора |
 | `LIST_PAGE_SIZE` | 20 | Размер страницы списка игр |
@@ -31,7 +33,7 @@
 
 **Game**:
 - `id`, `organizerId` (User), `startsAt` (UTC, будущее на момент создания),
-- `placeId` (Place; в ответах также `venue` = название места и `address` = адрес места), `format` (0–120, текст, например «6х6, 3 или 4 команды»),
+- `placeId` (Place; в ответах также `venue` = название места и `address` = адрес места), `teamsMax` (`MIN_TEAMS`..`MAX_TEAMS` или null) и `playersPerTeam` (`MIN_PLAYERS_PER_TEAM`..`MAX_PLAYERS_PER_TEAM` или null): необязательные «Количество команд (макс)» и «Игроков в команде», заменили текстовый `format` (миграция 0005); с `capacity` не связаны,
 - `feeRub` (0..`MAX_FEE_RUB`), `capacity` (`MIN_CAPACITY`..`MAX_CAPACITY`),
 - `description` (0–1000), `paymentInfo` (0–300: реквизиты предоплаты текстом), `organizerContact` (0–120: ссылка VK или телефон для чека),
 - `status`: `active` | `cancelled`, `createdAt`, `updatedAt`.

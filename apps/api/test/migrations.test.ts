@@ -63,6 +63,13 @@ describe('миграция 0003_places', () => {
       const after = db.prepare('PRAGMA table_info(games)').all().map((c) => c.name);
       assert.ok(!after.includes('title'));
       assert.equal(db.prepare('SELECT COUNT(*) AS n FROM games').get()!.n, 3);
+
+      copyFileSync(join(MIGRATIONS, '0005_teams.sql'), join(dir, '0005_teams.sql'));
+      assert.deepEqual(migrate(db, dir), ['0005_teams.sql']);
+      const cols5 = db.prepare('PRAGMA table_info(games)').all().map((c) => c.name);
+      assert.ok(!cols5.includes('format') && cols5.includes('teams_max') && cols5.includes('players_per_team'));
+      const nulls = db.prepare('SELECT COUNT(*) AS n FROM games WHERE teams_max IS NULL AND players_per_team IS NULL').get();
+      assert.equal(nulls!.n, 3);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

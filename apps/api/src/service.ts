@@ -47,7 +47,8 @@ interface GameRow {
   venue: string;
   /** Адрес места (из JOIN с places) */
   address: string;
-  format: string;
+  teams_max: number | null;
+  players_per_team: number | null;
   fee_rub: number;
   capacity: number;
   description: string;
@@ -224,7 +225,8 @@ export function createService(db: DatabaseSync, options: ServiceOptions = {}) {
     return {
       ...summary(game, viewerId),
       address: game.address,
-      format: game.format,
+      teamsMax: game.teams_max,
+      playersPerTeam: game.players_per_team,
       description: game.description,
       paymentInfo: game.payment_info,
       organizerContact: game.organizer_contact,
@@ -411,15 +413,16 @@ export function createService(db: DatabaseSync, options: ServiceOptions = {}) {
         const ts = now().toISOString();
         const res = db
           .prepare(
-            `INSERT INTO games (organizer_id, starts_at, place_id, format, fee_rub, capacity,
+            `INSERT INTO games (organizer_id, starts_at, place_id, teams_max, players_per_team, fee_rub, capacity,
                                 description, payment_info, organizer_contact, status, created_at, updated_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?)`,
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?)`,
           )
           .run(
             organizerId,
             input.startsAt,
             input.placeId,
-            input.format,
+            input.teamsMax,
+            input.playersPerTeam,
             input.feeRub,
             input.capacity,
             input.description,
@@ -471,7 +474,8 @@ export function createService(db: DatabaseSync, options: ServiceOptions = {}) {
         const columns: Record<keyof GameInput, string> = {
           startsAt: 'starts_at',
           placeId: 'place_id',
-          format: 'format',
+          teamsMax: 'teams_max',
+          playersPerTeam: 'players_per_team',
           feeRub: 'fee_rub',
           capacity: 'capacity',
           description: 'description',
@@ -479,10 +483,10 @@ export function createService(db: DatabaseSync, options: ServiceOptions = {}) {
           organizerContact: 'organizer_contact',
         };
         const sets: string[] = [];
-        const values: (string | number)[] = [];
+        const values: (string | number | null)[] = [];
         for (const key of Object.keys(patch) as (keyof GameInput)[]) {
           sets.push(`${columns[key]} = ?`);
-          values.push(patch[key] as string | number);
+          values.push(patch[key] as string | number | null);
         }
         sets.push('updated_at = ?');
         values.push(now().toISOString(), gameId);

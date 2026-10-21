@@ -57,6 +57,16 @@ export function fullName(u: { firstName: string; lastName: string }): string {
 }
 
 /** Подпись состояния заполненности: «занято 18/24, в очереди 3». */
+/** Формат игры для экрана игры: «до 3 команд по 6 игроков»; пустая строка, если ничего не указано. */
+export function teamsLabel(teamsMax: number | null, playersPerTeam: number | null): string {
+  const players = (n: number) => `${n} ${plural(n, ['игрок', 'игрока', 'игроков'])}`;
+  if (teamsMax !== null) {
+    const teams = `до ${teamsMax} ${plural(teamsMax, ['команды', 'команд', 'команд'])}`;
+    return playersPerTeam !== null ? `${teams} по ${players(playersPerTeam)}` : teams;
+  }
+  return playersPerTeam !== null ? `${players(playersPerTeam)} в команде` : '';
+}
+
 export function fillLabel(taken: number, capacity: number, queued: number): string {
   const base = `занято ${taken}/${capacity}`;
   return queued > 0 ? `${base}, в очереди ${queued}` : base;

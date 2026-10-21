@@ -391,7 +391,8 @@ components:
       properties:
         startsAt: { type: string, format: date-time }
         placeId: { type: integer, minimum: 1, description: 'Место; неизвестное — VALIDATION_ERROR с details.placeId' }
-        format: { type: string, maxLength: 120, default: '' }
+        teamsMax: { type: integer, nullable: true, minimum: 2, maximum: 10, default: null, description: 'Максимум команд; null — не указано' }
+        playersPerTeam: { type: integer, nullable: true, minimum: 2, maximum: 11, default: null, description: 'Игроков в команде; null — не указано' }
         feeRub: { type: integer, minimum: 0, maximum: 100000 }
         capacity: { type: integer, minimum: 2, maximum: 60 }
         description: { type: string, maxLength: 1000, default: '' }
@@ -403,7 +404,8 @@ components:
       properties:
         startsAt: { type: string, format: date-time }
         placeId: { type: integer, minimum: 1 }
-        format: { type: string, maxLength: 120 }
+        teamsMax: { type: integer, nullable: true, minimum: 2, maximum: 10, description: 'null очищает значение' }
+        playersPerTeam: { type: integer, nullable: true, minimum: 2, maximum: 11, description: 'null очищает значение' }
         feeRub: { type: integer, minimum: 0, maximum: 100000 }
         capacity: { type: integer, minimum: 2, maximum: 60 }
         description: { type: string, maxLength: 1000 }
@@ -440,10 +442,11 @@ components:
       allOf:
         - $ref: '#/components/schemas/GameSummary'
         - type: object
-          required: [address, format, description, paymentInfo, organizerContact, roster]
+          required: [address, teamsMax, playersPerTeam, description, paymentInfo, organizerContact, roster]
           properties:
             address: { type: string, description: Адрес места }
-            format: { type: string }
+            teamsMax: { type: integer, nullable: true }
+            playersPerTeam: { type: integer, nullable: true }
             description: { type: string }
             paymentInfo: { type: string }
             organizerContact: { type: string }

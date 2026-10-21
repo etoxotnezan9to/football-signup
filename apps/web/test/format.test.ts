@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
   fillLabel,
+  teamsLabel,
   formatWhen,
   fromLocalInput,
   gameLink,
@@ -32,6 +33,16 @@ describe('fillLabel', () => {
   it('показывает очередь только если она есть', () => {
     assert.equal(fillLabel(18, 24, 0), 'занято 18/24');
     assert.equal(fillLabel(24, 24, 3), 'занято 24/24, в очереди 3');
+  });
+});
+
+describe('teamsLabel', () => {
+  it('склоняет команды и игроков и опускает неуказанное', () => {
+    assert.equal(teamsLabel(3, 6), 'до 3 команд по 6 игроков');
+    assert.equal(teamsLabel(2, 2), 'до 2 команд по 2 игрока');
+    assert.equal(teamsLabel(4, null), 'до 4 команд');
+    assert.equal(teamsLabel(null, 5), '5 игроков в команде');
+    assert.equal(teamsLabel(null, null), '');
   });
 });
 

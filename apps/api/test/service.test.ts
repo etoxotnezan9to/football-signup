@@ -57,6 +57,17 @@ describe('создание и список игр', () => {
     assert.equal(events[0]?.type, 'game.created');
   });
 
+  it('хранит число команд и игроков в команде, обновление null очищает', () => {
+    const g = svc.createGame(ORG, gameBody({ teamsMax: 3, playersPerTeam: 6 }));
+    assert.equal(g.teamsMax, 3);
+    assert.equal(g.playersPerTeam, 6);
+    assert.equal(svc.createGame(ORG, gameBody()).teamsMax, null);
+    const u = svc.updateGame(g.id, ORG, { teamsMax: null, playersPerTeam: 7 });
+    assert.equal(u.teamsMax, null);
+    assert.equal(u.playersPerTeam, 7);
+    expectCode(() => svc.updateGame(g.id, ORG, { teamsMax: 11 }), 'VALIDATION_ERROR');
+  });
+
   it('отвергает прошедшее время и неверные поля', () => {
     expectCode(
       () => svc.createGame(ORG, gameBody({ startsAt: '2026-10-19T18:00:00.000Z' })),

@@ -81,7 +81,8 @@ describe('parseGameInput / parseGameUpdate', () => {
     const r = parseGameInput(valid);
     assert.ok(r.ok);
     assert.equal(r.value.placeId, 1);
-    assert.equal(r.value.format, '');
+    assert.equal(r.value.teamsMax, null);
+    assert.equal(r.value.playersPerTeam, null);
     assert.equal(r.value.capacity, 24);
   });
 
@@ -113,6 +114,36 @@ describe('parseGameInput / parseGameUpdate', () => {
     const r = parseGameUpdate({ capacity: 10 });
     assert.ok(r.ok);
     assert.deepEqual(r.value, { capacity: 10 });
+  });
+});
+
+describe('teamsMax / playersPerTeam', () => {
+  const valid = { startsAt: '2026-10-22T18:00:00.000Z', placeId: 1, feeRub: 0, capacity: 18 };
+
+  it('необязательны и принимают границы диапазона', () => {
+    const r = parseGameInput({ ...valid, teamsMax: 3, playersPerTeam: 6 });
+    assert.ok(r.ok);
+    assert.equal(r.value.teamsMax, 3);
+    assert.equal(r.value.playersPerTeam, 6);
+    assert.ok(parseGameInput({ ...valid, teamsMax: 2, playersPerTeam: 11 }).ok);
+    assert.ok(parseGameInput({ ...valid, teamsMax: 10, playersPerTeam: 2 }).ok);
+  });
+
+  it('вне диапазона и не целые отвергаются', () => {
+    for (const v of [1, 11, 2.5, '3']) {
+      const r = parseGameInput({ ...valid, teamsMax: v });
+      assert.ok(!r.ok && r.errors.teamsMax === 'целое число от 2 до 10', String(v));
+    }
+    for (const v of [1, 12, NaN]) {
+      const r = parseGameInput({ ...valid, playersPerTeam: v });
+      assert.ok(!r.ok && r.errors.playersPerTeam === 'целое число от 2 до 11', String(v));
+    }
+  });
+
+  it('null в обновлении очищает значение', () => {
+    const r = parseGameUpdate({ teamsMax: null, playersPerTeam: 5 });
+    assert.ok(r.ok);
+    assert.deepEqual(r.value, { teamsMax: null, playersPerTeam: 5 });
   });
 });
 

@@ -196,3 +196,28 @@ test('тестовый режим: в игру можно добавить 30 т
   // у другого пользователя состав обновился без перезагрузки
   await expect(maria.getByText('занято 10/10, в очереди 20')).toBeVisible();
 });
+
+test('формат игры: количество команд и игроков в команде', async ({ browser }) => {
+  const org = await openAs(browser, ORGANIZER);
+  await org.getByRole('button', { name: 'Создать игру', exact: true }).click();
+  await expect(org.getByLabel('Формат', { exact: true })).toHaveCount(0);
+  await choosePlace(org, 'Зал команд', 'ул. Командная, 3');
+  await org.getByLabel('Количество команд (макс)', { exact: true }).fill('11');
+  await org.getByLabel('Игроков в команде', { exact: true }).fill('6');
+  await org.getByLabel('Взнос, ₽', { exact: true }).fill('0');
+  await org.getByLabel('Число мест в составе', { exact: true }).fill('18');
+  await org.getByRole('button', { name: 'Создать игру', exact: true }).last().click();
+  await expect(org.getByText('целое число от 2 до 10')).toBeVisible();
+  await org.getByLabel('Количество команд (макс)', { exact: true }).fill('3');
+  await org.getByRole('button', { name: 'Создать игру', exact: true }).last().click();
+  await expect(org).toHaveURL(/#\/game\/\d+$/);
+  await expect(org.getByText('до 3 команд по 6 игроков')).toBeVisible();
+
+  // пустое поле при редактировании очищает значение
+  await org.getByRole('button', { name: 'Редактировать', exact: true }).click();
+  await expect(org.getByLabel('Количество команд (макс)', { exact: true })).toHaveValue('3');
+  await org.getByLabel('Количество команд (макс)', { exact: true }).fill('');
+  await org.getByRole('button', { name: 'Сохранить', exact: true }).click();
+  await expect(org).toHaveURL(/#\/game\/\d+$/);
+  await expect(org.getByText('6 игроков в команде')).toBeVisible();
+});

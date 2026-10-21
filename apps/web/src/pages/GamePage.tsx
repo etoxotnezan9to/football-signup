@@ -14,7 +14,7 @@ import { api, type ApiError } from '../api.ts';
 import { Empty } from '../components/Empty.tsx';
 import { MockFill } from '../components/MockFill.tsx';
 import { useApp } from '../context.ts';
-import { fillLabel, formatWhen, fullName, gameLabel, gameLink, routeToHash, seatsLabel } from '../format.ts';
+import { fillLabel, formatWhen, fullName, gameLabel, gameLink, routeToHash, seatsLabel, teamsLabel } from '../format.ts';
 import { useGame } from '../hooks.ts';
 import { TestPlayersPanel } from '../components/TestPlayersPanel.tsx';
 import { confirmPopout, entryMenuPopout } from '../seats.tsx';
@@ -212,9 +212,9 @@ function GameView({ id }: { id: number }) {
           <Row icon="📍" label="Где">
             {game.venue}, {game.address}
           </Row>
-          {game.format && (
+          {teamsLabel(game.teamsMax, game.playersPerTeam) && (
             <Row icon="⚽" label="Формат">
-              {game.format}
+              {teamsLabel(game.teamsMax, game.playersPerTeam)}
             </Row>
           )}
           <Row icon="💰" label="Взнос">

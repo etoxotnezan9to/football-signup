@@ -1,10 +1,22 @@
 // Валидация входных данных без внешних библиотек (используется и сервером, и клиентом).
-import { MAX_CAPACITY, MAX_FEE_RUB, MAX_SEATS_PER_USER, MIN_CAPACITY } from './constants.ts';
+import {
+  MAX_CAPACITY,
+  MAX_FEE_RUB,
+  MAX_PLAYERS_PER_TEAM,
+  MAX_SEATS_PER_USER,
+  MAX_TEAMS,
+  MIN_CAPACITY,
+  MIN_PLAYERS_PER_TEAM,
+  MIN_TEAMS,
+} from './constants.ts';
 
 export interface GameInput {
   startsAt: string;
   placeId: number;
-  format: string;
+  /** Максимальное число команд; null — не указано */
+  teamsMax: number | null;
+  /** Игроков в команде; null — не указано */
+  playersPerTeam: number | null;
   feeRub: number;
   capacity: number;
   description: string;
@@ -67,6 +79,15 @@ function checkInt(
   out[key] = v;
 }
 
+/** Необязательное целое: null очищает значение (для обновления), undefined — поле не передано. */
+function checkOptionalInt(raw: Raw, key: string, min: number, max: number, errors: FieldErrors, out: Raw): void {
+  if (raw[key] === null) {
+    out[key] = null;
+    return;
+  }
+  checkInt(raw, key, min, max, errors, out, false);
+}
+
 function checkPlaceId(raw: Raw, errors: FieldErrors, out: Raw, required: boolean): void {
   const v = raw.placeId;
   if (v === undefined) {
@@ -102,7 +123,8 @@ export function parseGameInput(body: unknown): ParseResult<GameInput> {
   const out: Raw = {};
   checkDate(body, 'startsAt', errors, out, true);
   checkPlaceId(body, errors, out, true);
-  checkString(body, 'format', 0, 120, errors, out, false);
+  checkOptionalInt(body, 'teamsMax', MIN_TEAMS, MAX_TEAMS, errors, out);
+  checkOptionalInt(body, 'playersPerTeam', MIN_PLAYERS_PER_TEAM, MAX_PLAYERS_PER_TEAM, errors, out);
   checkInt(body, 'feeRub', 0, MAX_FEE_RUB, errors, out, true);
   checkInt(body, 'capacity', MIN_CAPACITY, MAX_CAPACITY, errors, out, true);
   checkString(body, 'description', 0, 1000, errors, out, false);
@@ -114,7 +136,8 @@ export function parseGameInput(body: unknown): ParseResult<GameInput> {
     value: {
       startsAt: out.startsAt as string,
       placeId: out.placeId as number,
-      format: (out.format as string | undefined) ?? '',
+      teamsMax: (out.teamsMax as number | null | undefined) ?? null,
+      playersPerTeam: (out.playersPerTeam as number | null | undefined) ?? null,
       feeRub: out.feeRub as number,
       capacity: out.capacity as number,
       description: (out.description as string | undefined) ?? '',
@@ -131,7 +154,8 @@ export function parseGameUpdate(body: unknown): ParseResult<Partial<GameInput>> 
   const out: Raw = {};
   checkDate(body, 'startsAt', errors, out, false);
   checkPlaceId(body, errors, out, false);
-  checkString(body, 'format', 0, 120, errors, out, false);
+  checkOptionalInt(body, 'teamsMax', MIN_TEAMS, MAX_TEAMS, errors, out);
+  checkOptionalInt(body, 'playersPerTeam', MIN_PLAYERS_PER_TEAM, MAX_PLAYERS_PER_TEAM, errors, out);
   checkInt(body, 'feeRub', 0, MAX_FEE_RUB, errors, out, false);
   checkInt(body, 'capacity', MIN_CAPACITY, MAX_CAPACITY, errors, out, false);
   checkString(body, 'description', 0, 1000, errors, out, false);

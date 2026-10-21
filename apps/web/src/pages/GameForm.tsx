@@ -11,7 +11,16 @@ import {
   Textarea,
 } from '@vkontakte/vkui';
 import { Icon28AddOutline } from '@vkontakte/icons';
-import { parseGameInput, type GameDetails, type GameInput, type Place } from '@football/shared';
+import {
+  MAX_PLAYERS_PER_TEAM,
+  MAX_TEAMS,
+  MIN_PLAYERS_PER_TEAM,
+  MIN_TEAMS,
+  parseGameInput,
+  type GameDetails,
+  type GameInput,
+  type Place,
+} from '@football/shared';
 import { api, ApiError } from '../api.ts';
 import { Empty } from '../components/Empty.tsx';
 import { PlaceForm } from '../components/PlaceForm.tsx';
@@ -23,7 +32,8 @@ interface FormState {
   startsAt: string;
   /** id выбранного места строкой ('' — не выбрано) */
   placeId: string;
-  format: string;
+  teamsMax: string;
+  playersPerTeam: string;
   feeRub: string;
   capacity: string;
   description: string;
@@ -42,7 +52,13 @@ interface Field {
 const FIELDS: Field[] = [
   { key: 'startsAt', label: 'Дата и время начала', type: 'datetime-local' },
   { key: 'placeId', label: 'Место', type: 'place', hint: 'Выберите из списка или добавьте новое кнопкой +' },
-  { key: 'format', label: 'Формат', hint: 'Например: 6х6, 3 команды, 6 игр по 9 минут' },
+  { key: 'teamsMax', label: 'Количество команд (макс)', type: 'number', hint: `От ${MIN_TEAMS} до ${MAX_TEAMS}, можно не указывать` },
+  {
+    key: 'playersPerTeam',
+    label: 'Игроков в команде',
+    type: 'number',
+    hint: `От ${MIN_PLAYERS_PER_TEAM} до ${MAX_PLAYERS_PER_TEAM}, можно не указывать`,
+  },
   { key: 'feeRub', label: 'Взнос, ₽', type: 'number' },
   { key: 'capacity', label: 'Число мест в составе', type: 'number', hint: 'От 2 до 60' },
   {
@@ -58,7 +74,8 @@ function toForm(g?: GameDetails): FormState {
   return {
     startsAt: g ? toLocalInput(g.startsAt) : defaultStartsAt(new Date()),
     placeId: g ? String(g.placeId) : '',
-    format: g?.format ?? '',
+    teamsMax: g?.teamsMax != null ? String(g.teamsMax) : '',
+    playersPerTeam: g?.playersPerTeam != null ? String(g.playersPerTeam) : '',
     feeRub: g ? String(g.feeRub) : '',
     capacity: g ? String(g.capacity) : '',
     description: g?.description ?? '',
@@ -70,6 +87,11 @@ function toForm(g?: GameDetails): FormState {
 /** Число из текстового поля; пустая строка и мусор дают NaN, чтобы валидатор показал ошибку, а не 0. */
 function toNumber(s: string): number {
   return s.trim() === '' ? NaN : Number(s);
+}
+
+/** Необязательное число: пустое поле означает «не указано» (null). */
+function toOptionalNumber(s: string): number | null {
+  return s.trim() === '' ? null : Number(s);
 }
 
 /** Форма создания (без `initial`) и редактирования игры. */
@@ -152,7 +174,8 @@ export function GameForm({ initial }: { initial?: GameDetails }) {
     const parsed = parseGameInput({
       startsAt: fromLocalInput(form.startsAt),
       placeId: toNumber(form.placeId),
-      format: form.format,
+      teamsMax: toOptionalNumber(form.teamsMax),
+      playersPerTeam: toOptionalNumber(form.playersPerTeam),
       feeRub: toNumber(form.feeRub),
       capacity: toNumber(form.capacity),
       description: form.description,
@@ -174,7 +197,7 @@ export function GameForm({ initial }: { initial?: GameDetails }) {
         return;
       }
       // при редактировании отправляем только изменённые поля (неизменённое прошедшее время не должно давать ошибку)
-      const patch: Record<string, string | number> = {};
+      const patch: Record<string, string | number | null> = {};
       for (const key of Object.keys(parsed.value) as (keyof GameInput)[]) {
         const next = parsed.value[key];
         const before = initial[key];
