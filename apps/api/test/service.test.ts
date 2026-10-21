@@ -454,3 +454,31 @@ describe('команды', () => {
     assert.deepEqual(r.teams[1]!.members, [], 'распределение не воскресает после возврата в состав');
   });
 });
+
+describe('автоматическое распределение по командам', () => {
+  it('раскладывает только нераспределённых, держа записи вместе; только организатор', () => {
+    const g = svc.createGame(ORG, gameBody({ teamsMax: 2, playersPerTeam: 3 }));
+    const s1 = svc.putSignup(g.id, U1, 3).signup.signupId;
+    const s2 = svc.putSignup(g.id, U2, 2).signup.signupId;
+    const s3 = svc.putSignup(g.id, U3, 1).signup.signupId;
+    svc.assignSeat(g.id, ORG, { signupId: s3, seat: 1, teamNo: 2 }); // вручную
+
+    expectCode(() => svc.autoAssignTeams(g.id, U1), 'FORBIDDEN');
+    const r = svc.autoAssignTeams(g.id, ORG);
+    assert.equal(events.at(-1)?.type, 'roster.updated');
+    assert.deepEqual(r.unassigned, []);
+    // +3 целиком в свободную команду 1, +2 к уже стоящему вручную в команде 2
+    assert.deepEqual(r.teams[0]!.members, [
+      { signupId: s1, seat: 1 },
+      { signupId: s1, seat: 2 },
+      { signupId: s1, seat: 3 },
+    ]);
+    assert.deepEqual(r.teams[1]!.members, [
+      { signupId: s3, seat: 1 },
+      { signupId: s2, seat: 1 },
+      { signupId: s2, seat: 2 },
+    ]);
+    // повторный вызов ничего не меняет
+    assert.deepEqual(svc.autoAssignTeams(g.id, ORG).teams, r.teams);
+  });
+});

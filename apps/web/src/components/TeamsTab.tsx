@@ -1,5 +1,5 @@
 import { useState, type DragEvent, type KeyboardEvent } from 'react';
-import { Alert, Avatar, Input } from '@vkontakte/vkui';
+import { Alert, Avatar, Button, Input } from '@vkontakte/vkui';
 import { TEAM_NAME_MAX, type GameDetails, type Team, type TeamSeat } from '@football/shared';
 import { api, type ApiError } from '../api.ts';
 import { Empty } from './Empty.tsx';
@@ -26,12 +26,30 @@ export function TeamsTab({
   const [dragging, setDragging] = useState<TeamSeat | null>(null);
   const [over, setOver] = useState<Target | undefined>(undefined);
   const [renaming, setRenaming] = useState<{ no: number; value: string } | null>(null);
+  const [autoBusy, setAutoBusy] = useState(false);
   const bySignup = new Map(game.roster.map((r) => [r.signupId, r]));
   const isFull = (t: Team) => t.members.length >= game.playersPerTeam;
   const fail = (e: ApiError) => showToast(e.message);
 
   const move = (s: TeamSeat, teamNo: Target) =>
     api.assignSeat(game.id, s.signupId, s.seat, teamNo).then(onUpdate).catch(fail);
+
+  const autoAssign = () => {
+    setAutoBusy(true);
+    api
+      .autoAssignTeams(game.id)
+      .then((g) => {
+        onUpdate(g);
+        showToast(
+          g.unassigned.length > 0
+            ? `Игроки распределены, в командах не хватило мест для ${g.unassigned.length}`
+            : 'Игроки распределены',
+        );
+      })
+      .catch(fail)
+      .finally(() => setAutoBusy(false));
+  };
+  const hasRoom = game.teams.some((t) => !isFull(t));
 
   const saveName = () => {
     if (!renaming) return;
@@ -130,6 +148,11 @@ export function TeamsTab({
     <div className="teams">
       {editable && (
         <div className="teams__hint">Перетащите игрока в команду или нажмите на него, чтобы выбрать команду</div>
+      )}
+      {editable && game.unassigned.length > 0 && hasRoom && (
+        <Button size="m" mode="secondary" stretched loading={autoBusy} onClick={autoAssign}>
+          Распределить автоматически
+        </Button>
       )}
       <section
         className={`team-box team-box--none${over === null ? ' team-box--over' : ''}`}

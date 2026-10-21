@@ -325,6 +325,25 @@ paths:
         '403': { $ref: '#/components/responses/Error' }
         '404': { $ref: '#/components/responses/Error' }
         '409': { $ref: '#/components/responses/Error' }
+  /games/{gameId}/teams/auto:
+    parameters:
+      - { $ref: '#/components/parameters/GameId' }
+    post:
+      summary: Автоматически распределить нераспределённых игроков по командам (только организатор)
+      description: >-
+        Уже распределённые места не трогаются. Места одной записи по возможности попадают в одну команду
+        (туда, где уже есть кто-то из этой записи, иначе в самую свободную, где группа помещается целиком);
+        команды заполняются равномерно. Логика — autoAssign в packages/shared.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GameDetails' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
   /games/{gameId}/team-assignment:
     parameters:
       - { $ref: '#/components/parameters/GameId' }

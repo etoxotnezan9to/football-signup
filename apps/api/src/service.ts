@@ -2,6 +2,7 @@
 // поэтому полностью тестируется без HTTP-слоя.
 import type { DatabaseSync } from 'node:sqlite';
 import {
+  autoAssign,
   buildTeams,
   capacityError,
   gameCapacity,
@@ -734,6 +735,26 @@ export function createService(db: DatabaseSync, options: ServiceOptions = {}) {
           `INSERT INTO team_assignments (signup_id, seat_no, game_id, team_no, created_at) VALUES (?, ?, ?, ?, ?)
              ON CONFLICT (signup_id, seat_no) DO UPDATE SET team_no = excluded.team_no, created_at = excluded.created_at`,
         ).run(signupId, seat, gameId, teamNo, now().toISOString());
+      });
+      emitGameChanged(gameId, 'roster');
+      return details(getGameRow(gameId), organizerId);
+    },
+
+    /** Организатор раскладывает нераспределённых игроков по командам автоматически (autoAssign в packages/shared). */
+    autoAssignTeams(gameId: number, organizerId: number): GameDetails {
+      inTransaction(db, () => {
+        const game = getGameRow(gameId);
+        requireOrganizer(game, organizerId);
+        if (game.status !== 'active') throw new AppError('GAME_NOT_ACTIVE', 'Игра отменена');
+        const view = teamsOf(game, buildRoster(game).entries);
+        const ts = now().getTime();
+        const insert = db.prepare(
+          'INSERT INTO team_assignments (signup_id, seat_no, game_id, team_no, created_at) VALUES (?, ?, ?, ?, ?)',
+        );
+        // по миллисекунде на место: порядок внутри команды совпадает с порядком распределения
+        autoAssign(view, game.players_per_team).forEach((a, i) =>
+          insert.run(a.signupId, a.seat, gameId, a.teamNo, new Date(ts + i).toISOString()),
+        );
       });
       emitGameChanged(gameId, 'roster');
       return details(getGameRow(gameId), organizerId);

@@ -65,6 +65,7 @@ export const api = {
   removeTestPlayers: (id: number) => request<GameDetails>('DELETE', `/games/${id}/test-players`),
   setTeamName: (id: number, teamNo: number, name: string) =>
     request<GameDetails>('PUT', `/games/${id}/teams/${teamNo}`, { name }),
+  autoAssignTeams: (id: number) => request<GameDetails>('POST', `/games/${id}/teams/auto`),
   assignSeat: (id: number, signupId: number, seat: number, teamNo: number | null) =>
     request<GameDetails>('PUT', `/games/${id}/team-assignment`, { signupId, seat, teamNo }),
   listPlaces: () => request<{ items: Place[] }>('GET', '/places'),

@@ -290,3 +290,36 @@ test('команды: организатор распределяет игрок
   await expect(maria.getByRole('button', { name: 'Мария Сидорова', exact: true })).toHaveCount(0);
   await expect(maria.getByText('Перетащите игрока в команду', { exact: false })).toHaveCount(0);
 });
+
+test('команды: автоматическое распределение держит игроков одной записи вместе', async ({ browser }) => {
+  const org = await openAs(browser, ORGANIZER);
+  await org.getByRole('button', { name: 'Создать игру', exact: true }).click();
+  await choosePlace(org, 'Зал автораспределения', 'ул. Командная, 7');
+  await org.getByLabel('Взнос, ₽', { exact: true }).fill('0');
+  await org.getByLabel('Количество команд (макс)', { exact: true }).fill('2');
+  await org.getByLabel('Игроков в команде', { exact: true }).fill('3');
+  await org.getByRole('button', { name: 'Создать игру', exact: true }).last().click();
+  await expect(org).toHaveURL(/#\/game\/\d+$/);
+  const gamePath = `/${new URL(org.url()).hash}`;
+
+  for (const [user, seats] of [
+    [ALEXEY, '+2'],
+    [MARIA, '+3'],
+  ] as const) {
+    const page = await openAs(browser, user, gamePath);
+    await page.getByRole('button', { name: '+ Записаться', exact: true }).click();
+    await page.getByRole('button', { name: seats, exact: true }).click();
+    await expect(page.getByText(/Вы записаны/)).toBeVisible();
+  }
+
+  await org.getByRole('tab', { name: 'Команды' }).click();
+  await expect(org.getByRole('region', { name: 'Не распределены' }).getByTestId('team-seat')).toHaveCount(5);
+  await org.getByRole('button', { name: 'Распределить автоматически', exact: true }).click();
+  await expect(org.getByText('Игроки распределены', { exact: true })).toBeVisible();
+  const blue = org.getByRole('region', { name: 'Команда Синие' });
+  const pink = org.getByRole('region', { name: 'Команда Розовые' });
+  // запись «+3» целиком в одной команде, «+2» — в другой
+  await expect(blue.getByTestId('team-seat')).toHaveText(['Мария Сидорова', 'Мария Сидорова +1', 'Мария Сидорова +2']);
+  await expect(pink.getByTestId('team-seat')).toHaveText(['Алексей Смирнов', 'Алексей Смирнов +1']);
+  await expect(org.getByRole('button', { name: 'Распределить автоматически', exact: true })).toHaveCount(0);
+});

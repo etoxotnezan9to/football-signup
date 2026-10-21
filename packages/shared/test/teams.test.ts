@@ -1,6 +1,13 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { MAX_TEAMS, TEAM_PRESETS, buildTeams, parseTeamName, type TeamAssignment } from '../src/index.ts';
+import {
+  MAX_TEAMS,
+  TEAM_PRESETS,
+  autoAssign,
+  buildTeams,
+  parseTeamName,
+  type TeamAssignment,
+} from '../src/index.ts';
 
 const at = (n: number) => `2026-10-21T10:00:${String(n).padStart(2, '0')}.000Z`;
 const a = (signupId: number, seat: number, teamNo: number, t: number): TeamAssignment => ({
@@ -87,5 +94,87 @@ describe('parseTeamName', () => {
     assert.equal(parseTeamName('   '), null);
     assert.equal(parseTeamName('x'.repeat(31)), null);
     assert.equal(parseTeamName(5), null);
+  });
+});
+
+describe('autoAssign', () => {
+  const view = (playersPerTeam: number, teamsMax: number, roster: [number, number][], assignments: TeamAssignment[] = []) =>
+    buildTeams({
+      teamsMax,
+      playersPerTeam,
+      names: new Map(),
+      roster: roster.map(([signupId, mainSeats]) => ({ signupId, mainSeats })),
+      assignments,
+    });
+  /** Команда каждого места: «запись:место» → номер команды */
+  const placement = (r: ReturnType<typeof autoAssign>) => new Map(r.map((x) => [`${x.signupId}:${x.seat}`, x.teamNo]));
+  const sizes = (r: ReturnType<typeof autoAssign>, teams: number) =>
+    Array.from({ length: teams }, (_, i) => r.filter((x) => x.teamNo === i + 1).length);
+
+  it('держит игроков одной записи вместе и выравнивает команды', () => {
+    // 4 команды по 6: записи +3, +1, +2, +1, +3, +2, +1, +1 = 14 игроков
+    const v = view(6, 4, [
+      [1, 3],
+      [2, 1],
+      [3, 2],
+      [4, 1],
+      [5, 3],
+      [6, 2],
+      [7, 1],
+      [8, 1],
+    ]);
+    const r = autoAssign(v, 6);
+    assert.equal(r.length, 14);
+    const p = placement(r);
+    for (const [id, seats] of [
+      [1, 3],
+      [3, 2],
+      [5, 3],
+      [6, 2],
+    ]) {
+      const teams = new Set(Array.from({ length: seats! }, (_, i) => p.get(`${id}:${i + 1}`)));
+      assert.equal(teams.size, 1, `запись ${id} в одной команде`);
+    }
+    const s = sizes(r, 4);
+    assert.ok(Math.max(...s) - Math.min(...s) <= 1, `равные команды: ${s.join(',')}`);
+  });
+
+  it('досаживает к своим, если часть записи уже в команде, и не трогает ручную расстановку', () => {
+    const at0 = '2026-10-21T10:00:00.000Z';
+    const v = view(
+      3,
+      2,
+      [
+        [1, 3],
+        [2, 1],
+      ],
+      [
+        { signupId: 1, seat: 1, teamNo: 2, createdAt: at0 },
+        { signupId: 2, seat: 1, teamNo: 2, createdAt: at0 },
+      ],
+    );
+    const r = autoAssign(v, 3);
+    // в команде 2 осталось одно место: группа из двух мест туда целиком не входит → в команду 1
+    assert.deepEqual(r, [
+      { signupId: 1, seat: 2, teamNo: 1 },
+      { signupId: 1, seat: 3, teamNo: 1 },
+    ]);
+    const v2 = view(4, 2, [[1, 3]], [{ signupId: 1, seat: 1, teamNo: 2, createdAt: at0 }]);
+    assert.deepEqual(
+      autoAssign(v2, 4).map((x) => x.teamNo),
+      [2, 2],
+      'остальные места записи идут к своим',
+    );
+  });
+
+  it('делит группу, только если целиком она не помещается никуда, и останавливается, когда мест нет', () => {
+    const v = view(2, 2, [
+      [1, 3],
+      [2, 2],
+    ]);
+    const r = autoAssign(v, 2);
+    assert.equal(r.length, 4, 'в командах всего 4 места из 5');
+    const p = placement(r);
+    assert.equal(p.get('2:1'), p.get('2:2'), 'пара не делится');
   });
 });

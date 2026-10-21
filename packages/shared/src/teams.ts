@@ -89,6 +89,64 @@ export function buildTeams(input: {
   return { teams, unassigned };
 }
 
+/**
+ * Автоматическое распределение нераспределённых мест (уже распределённые не трогаются).
+ * Места одной записи (человек и его друзья) по возможности попадают в одну команду: туда, где уже есть кто-то
+ * из этой записи, иначе в самую свободную команду, куда группа помещается целиком. Если целиком не помещается
+ * никуда, группа делится между самыми свободными командами. Крупные группы раскладываются первыми,
+ * равные по размеру — в порядке состава. Команды заполняются равномерно.
+ * Возвращает новые назначения в порядке, в котором их надо сохранить.
+ */
+export function autoAssign(view: TeamsView, playersPerTeam: number): (TeamSeat & { teamNo: number })[] {
+  const free = new Map(view.teams.map((t) => [t.no, playersPerTeam - t.members.length]));
+  const homeOf = new Map<number, number[]>(); // запись → команды, где уже есть её места
+  for (const t of view.teams) {
+    for (const m of t.members) homeOf.set(m.signupId, [...(homeOf.get(m.signupId) ?? []), t.no]);
+  }
+  const groups: TeamSeat[][] = [];
+  for (const s of view.unassigned) {
+    const last = groups.at(-1);
+    if (last && last[0]!.signupId === s.signupId) last.push(s);
+    else groups.push([s]);
+  }
+  // стабильная сортировка: при равном размере сохраняется порядок состава
+  groups.sort((a, b) => b.length - a.length);
+
+  const mostFree = (minFree: number): number | undefined => {
+    let best: number | undefined;
+    for (const t of view.teams) {
+      const f = free.get(t.no)!;
+      if (f >= minFree && f > 0 && (best === undefined || f > free.get(best)!)) best = t.no;
+    }
+    return best;
+  };
+
+  const out: (TeamSeat & { teamNo: number })[] = [];
+  const put = (seats: TeamSeat[], teamNo: number) => {
+    for (const s of seats) out.push({ ...s, teamNo });
+    free.set(teamNo, free.get(teamNo)! - seats.length);
+  };
+  // сначала группы, которые помещаются целиком; остальные делятся в конце, чтобы не разрывать другие группы
+  const deferred: TeamSeat[][] = [];
+  for (const group of groups) {
+    const home = (homeOf.get(group[0]!.signupId) ?? []).find((no) => free.get(no)! >= group.length);
+    const target = home ?? mostFree(group.length);
+    if (target === undefined) deferred.push(group);
+    else put(group, target);
+  }
+  for (const group of deferred) {
+    let rest = group;
+    while (rest.length > 0) {
+      const target = mostFree(1);
+      if (target === undefined) return out; // мест в командах больше нет
+      const take = Math.min(rest.length, free.get(target)!);
+      put(rest.slice(0, take), target);
+      rest = rest.slice(take);
+    }
+  }
+  return out;
+}
+
 /** Название команды: 1..TEAM_NAME_MAX символов после обрезки пробелов; null — неверное. */
 export function parseTeamName(value: unknown): string | null {
   if (typeof value !== 'string') return null;
