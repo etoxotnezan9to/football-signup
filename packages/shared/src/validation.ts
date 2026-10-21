@@ -106,11 +106,11 @@ function checkTeams(raw: Raw, errors: FieldErrors, out: Raw, required: boolean):
 function checkPlaceId(raw: Raw, errors: FieldErrors, out: Raw, required: boolean): void {
   const v = raw.placeId;
   if (v === undefined) {
-    if (required) errors.placeId = 'выберите место';
+    if (required) errors.placeId = 'выберите арену';
     return;
   }
   if (typeof v !== 'number' || !Number.isInteger(v) || v < 1) {
-    errors.placeId = 'выберите место';
+    errors.placeId = 'выберите арену';
     return;
   }
   out.placeId = v;

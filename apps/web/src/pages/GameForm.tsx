@@ -59,7 +59,7 @@ interface Field {
 
 const FIELDS: Field[] = [
   { key: 'startsAt', label: 'Дата и время начала', type: 'datetime-local' },
-  { key: 'placeId', label: 'Место', type: 'place', hint: 'Выберите из списка или добавьте новое кнопкой +' },
+  { key: 'placeId', label: 'Арена', type: 'place', hint: 'Выберите из списка или добавьте новую кнопкой +' },
   { key: 'teamsMax', label: 'Количество команд (макс)', type: 'number', hint: `От ${MIN_TEAMS} до ${MAX_TEAMS}` },
   {
     key: 'playersPerTeam',
@@ -121,7 +121,7 @@ function capacityHint(form: FormState): string | undefined {
     : `Мест в составе: ${teams} × ${players} = ${total}`;
 }
 
-/** Форма создания (без `initial`) и редактирования игры. */
+/** Форма создания (без `initial`) и редактирования сбора. */
 export function GameForm({ initial }: { initial?: GameDetails }) {
   const { navigate, showToast } = useApp();
   const [form, setForm] = useState<FormState>(() => toForm(initial));
@@ -171,8 +171,8 @@ export function GameForm({ initial }: { initial?: GameDetails }) {
             className="place-picker__select"
             id={f.key}
             searchable
-            placeholder={places === null ? 'Загрузка…' : 'Выберите место'}
-            emptyText="Мест пока нет, добавьте новое"
+            placeholder={places === null ? 'Загрузка…' : 'Выберите арену'}
+            emptyText="Арен пока нет, добавьте новую"
             fetching={places === null}
             options={(places ?? []).map((p) => ({
               value: String(p.id),
@@ -184,7 +184,7 @@ export function GameForm({ initial }: { initial?: GameDetails }) {
           />
           <IconButton
             className="place-picker__add"
-            label="Добавить место"
+            label="Добавить арену"
             aria-expanded={addingPlace}
             onClick={() => setAddingPlace((v) => !v)}
           >
@@ -245,7 +245,7 @@ export function GameForm({ initial }: { initial?: GameDetails }) {
         if (e.details) setErrors(e.details);
         showToast(e.message);
       } else {
-        showToast('Не удалось сохранить игру');
+        showToast('Не удалось сохранить сбор');
       }
     } finally {
       setBusy(false);
@@ -256,7 +256,7 @@ export function GameForm({ initial }: { initial?: GameDetails }) {
     <>
       <PanelHeader before={<PanelHeaderBack onClick={back} />}>
         {initial ? (
-          'Редактирование игры'
+          'Редактирование сбора'
         ) : (
           <span className="copy-gathering__title">
             Новый сбор
@@ -327,8 +327,8 @@ function EditGameView({ id }: { id: number }) {
   if (game.organizer.vkId !== session.user.id || game.status !== 'active') {
     return (
       <>
-        <PanelHeader before={<PanelHeaderBack onClick={back} />}>Редактирование игры</PanelHeader>
-        <Empty>Редактировать может только организатор, и только активную игру</Empty>
+        <PanelHeader before={<PanelHeaderBack onClick={back} />}>Редактирование сбора</PanelHeader>
+        <Empty>Редактировать может только организатор, и только активный сбор</Empty>
       </>
     );
   }

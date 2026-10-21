@@ -298,7 +298,7 @@ describe('HTTP API', () => {
       payload: gameBody({ placeId: 999_999 }),
     });
     assert.equal(missing.statusCode, 400);
-    assert.equal(missing.json().error.details.placeId, 'место не найдено');
+    assert.equal(missing.json().error.details.placeId, 'арена не найдена');
   });
 
   it('права: чужой не может отменить игру; организатор может', async () => {

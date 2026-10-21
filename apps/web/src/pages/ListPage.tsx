@@ -78,11 +78,11 @@ function GamesTab() {
       <MockBar />
       <NotificationsPrompt />
       {places.length > 1 && (
-        <FormItem htmlFor="placeFilter" top="Место">
+        <FormItem htmlFor="placeFilter" top="Арена">
           <CustomSelect
             id="placeFilter"
             searchable
-            placeholder="Все места"
+            placeholder="Все арены"
             allowClearButton
             options={places.map((p) => ({ value: String(p.id), label: p.name }))}
             value={activeFilter === null ? null : String(activeFilter)}

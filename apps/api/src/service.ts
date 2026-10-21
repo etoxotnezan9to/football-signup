@@ -165,7 +165,7 @@ export function createService(db: DatabaseSync, options: ServiceOptions = {}) {
   /** Проверяет, что место существует (иначе ошибка поля placeId). */
   function requirePlace(placeId: number): void {
     if (!db.prepare('SELECT 1 FROM places WHERE id = ?').get(placeId)) {
-      throw new AppError('VALIDATION_ERROR', 'Место не найдено', { placeId: 'место не найдено' });
+      throw new AppError('VALIDATION_ERROR', 'Арена не найдена', { placeId: 'арена не найдена' });
     }
   }
 
@@ -471,7 +471,7 @@ export function createService(db: DatabaseSync, options: ServiceOptions = {}) {
     /** Создаёт место. Если такое же (название и адрес) уже есть, возвращает существующее. */
     createPlace(userId: number, body: unknown): { place: Place; created: boolean } {
       const parsed = parsePlaceInput(body);
-      if (!parsed.ok) throw new AppError('VALIDATION_ERROR', 'Неверные данные места', parsed.errors);
+      if (!parsed.ok) throw new AppError('VALIDATION_ERROR', 'Неверные данные арены', parsed.errors);
       const { name, address } = parsed.value;
       return inTransaction(db, () => {
         const existing = db
@@ -605,7 +605,7 @@ export function createService(db: DatabaseSync, options: ServiceOptions = {}) {
       const old = inTransaction(db, () => {
         const game = getGameRow(gameId);
         requireOrganizer(game, userId);
-        if (game.status !== 'active') throw new AppError('GAME_NOT_ACTIVE', 'Игра отменена');
+        if (game.status !== 'active') throw new AppError('GAME_NOT_ACTIVE', 'Сбор отменён');
         if (patch.startsAt !== undefined && Date.parse(patch.startsAt) <= now().getTime()) {
           throw new AppError('STARTS_AT_IN_PAST', 'Время начала должно быть в будущем');
         }
@@ -779,7 +779,7 @@ export function createService(db: DatabaseSync, options: ServiceOptions = {}) {
       inTransaction(db, () => {
         const game = getGameRow(gameId);
         requireOrganizer(game, organizerId);
-        if (game.status !== 'active') throw new AppError('GAME_NOT_ACTIVE', 'Игра отменена');
+        if (game.status !== 'active') throw new AppError('GAME_NOT_ACTIVE', 'Сбор отменён');
         if (teamNo > game.teams_max) throw new AppError('NOT_FOUND', 'Команда не найдена');
         db.prepare(
           `INSERT INTO game_teams (game_id, team_no, name) VALUES (?, ?, ?)
@@ -806,7 +806,7 @@ export function createService(db: DatabaseSync, options: ServiceOptions = {}) {
       inTransaction(db, () => {
         const game = getGameRow(gameId);
         requireOrganizer(game, organizerId);
-        if (game.status !== 'active') throw new AppError('GAME_NOT_ACTIVE', 'Игра отменена');
+        if (game.status !== 'active') throw new AppError('GAME_NOT_ACTIVE', 'Сбор отменён');
         const { entries } = buildRoster(game);
         const entry = entries.find((e) => e.signupId === signupId);
         if (!entry) throw new AppError('NOT_FOUND', 'Запись не найдена');
@@ -856,7 +856,7 @@ export function createService(db: DatabaseSync, options: ServiceOptions = {}) {
       inTransaction(db, () => {
         const game = getGameRow(gameId);
         requireOrganizer(game, organizerId);
-        if (game.status !== 'active') throw new AppError('GAME_NOT_ACTIVE', 'Игра отменена');
+        if (game.status !== 'active') throw new AppError('GAME_NOT_ACTIVE', 'Сбор отменён');
         if (teamA === teamB || teamA > game.teams_max || teamB > game.teams_max || leg > game.meetings) {
           throw new AppError('NOT_FOUND', 'Такого матча нет');
         }
@@ -895,7 +895,7 @@ export function createService(db: DatabaseSync, options: ServiceOptions = {}) {
       inTransaction(db, () => {
         const game = getGameRow(gameId);
         requireOrganizer(game, organizerId);
-        if (game.status !== 'active') throw new AppError('GAME_NOT_ACTIVE', 'Игра отменена');
+        if (game.status !== 'active') throw new AppError('GAME_NOT_ACTIVE', 'Сбор отменён');
         if (value !== null) {
           const { entries } = buildRoster(game);
           if (!teamPlayerIds(entries, teamsOf(game, entries).teams).has(value)) {

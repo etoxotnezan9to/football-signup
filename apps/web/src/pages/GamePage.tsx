@@ -133,7 +133,7 @@ function GameView({ id }: { id: number }) {
         address: game.address,
         feeRub: game.feeRub,
         ...(game.status === 'cancelled'
-          ? { statusLabel: 'Игра отменена' }
+          ? { statusLabel: 'Сбор отменён' }
           : game.isFinished
             ? { statusLabel: 'Игра прошла' }
             : {}),
@@ -158,9 +158,9 @@ function GameView({ id }: { id: number }) {
   const cancelGame = () =>
     setPopout(
       confirmPopout({
-        title: 'Отменить игру?',
-        description: 'Игра останется в списке со статусом «отменена», записаться на неё будет нельзя.',
-        confirmTitle: 'Отменить игру',
+        title: 'Отменить сбор?',
+        description: 'Сбор останется в списке со статусом «отменён», записаться на него будет нельзя.',
+        confirmTitle: 'Отменить сбор',
         destructive: true,
         onClose: close,
         onConfirm: () => {
@@ -169,7 +169,7 @@ function GameView({ id }: { id: number }) {
             .cancelGame(game.id)
             .then((g: GameDetails) => {
               setData(g);
-              showToast('Игра отменена');
+              showToast('Сбор отменён');
             })
             .catch(fail);
         },
@@ -235,7 +235,7 @@ function GameView({ id }: { id: number }) {
         <Div>
           {game.status === 'cancelled' && (
             <Row icon="⚠" label="Статус">
-              Игра отменена
+              Сбор отменён
             </Row>
           )}
           {game.isFinished && game.status === 'active' && (
@@ -297,10 +297,10 @@ function GameView({ id }: { id: number }) {
               mode="outline"
               onClick={() => navigate(routeToHash({ name: 'edit', id: game.id }))}
             >
-              Редактировать
+              Редактировать сбор
             </Button>
             <Button size="m" mode="outline" appearance="negative" onClick={cancelGame}>
-              Отменить игру
+              Отменить сбор
             </Button>
           </div>
         )}

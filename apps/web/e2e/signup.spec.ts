@@ -10,10 +10,10 @@ const opened: BrowserContext[] = [];
 
 /** Выбор места в комбобоксе формы игры; если места ещё нет, создаём его прямо из формы. */
 async function choosePlace(page: Page, name: string, address: string): Promise<void> {
-  await page.getByRole('button', { name: 'Добавить место', exact: true }).click();
-  await page.getByLabel('Название места', { exact: true }).fill(name);
-  await page.getByLabel('Адрес места', { exact: true }).fill(address);
-  await page.getByRole('button', { name: 'Сохранить место', exact: true }).click();
+  await page.getByRole('button', { name: 'Добавить арену', exact: true }).click();
+  await page.getByLabel('Название арены', { exact: true }).fill(name);
+  await page.getByLabel('Адрес арены', { exact: true }).fill(address);
+  await page.getByRole('button', { name: 'Сохранить арену', exact: true }).click();
   // новое место сразу выбрано в комбобоксе
   await expect(page.getByText(name, { exact: true })).toBeVisible();
 }
@@ -110,7 +110,7 @@ test('лимит: нельзя записаться больше чем на 5 �
 test('форма создания показывает ошибки валидации и не создаёт игру', async ({ browser }) => {
   const org = await openAs(browser, ORGANIZER, '/#/create');
   await org.getByRole('button', { name: 'Создать игру', exact: true }).last().click();
-  await expect(org.getByText('выберите место', { exact: true })).toBeVisible();
+  await expect(org.getByText('выберите арену', { exact: true })).toBeVisible();
   // команды и игроки заполнены по умолчанию, отдельного поля вместимости нет
   await expect(org.getByLabel('Количество команд (макс)', { exact: true })).toHaveValue('4');
   await expect(org.getByLabel('Игроков в команде', { exact: true })).toHaveValue('6');
@@ -123,15 +123,15 @@ test('форма создания показывает ошибки валида
 test('место: создаётся кнопкой + в форме игры и потом выбирается из списка', async ({ browser }) => {
   const org = await openAs(browser, ORGANIZER);
   // отдельной кнопки на главной больше нет
-  await expect(org.getByRole('button', { name: 'Добавить место', exact: true })).toHaveCount(0);
+  await expect(org.getByRole('button', { name: 'Добавить арену', exact: true })).toHaveCount(0);
 
   await org.getByRole('button', { name: 'Создать игру', exact: true }).click();
-  await org.getByRole('button', { name: 'Добавить место', exact: true }).click();
-  await org.getByRole('button', { name: 'Сохранить место', exact: true }).click();
+  await org.getByRole('button', { name: 'Добавить арену', exact: true }).click();
+  await org.getByRole('button', { name: 'Сохранить арену', exact: true }).click();
   await expect(org.getByText('длина от 1 до 80').first()).toBeVisible();
-  await org.getByLabel('Название места', { exact: true }).fill('Манеж E2E');
-  await org.getByLabel('Адрес места', { exact: true }).fill('пр. Спортивный, 3');
-  await org.getByRole('button', { name: 'Сохранить место', exact: true }).click();
+  await org.getByLabel('Название арены', { exact: true }).fill('Манеж E2E');
+  await org.getByLabel('Адрес арены', { exact: true }).fill('пр. Спортивный, 3');
+  await org.getByRole('button', { name: 'Сохранить арену', exact: true }).click();
   await expect(org.getByText('Манеж E2E', { exact: true })).toBeVisible();
   await org.getByLabel('Взнос, ₽', { exact: true }).fill('500');
   await org.getByLabel('Количество команд (макс)', { exact: true }).fill('2');
@@ -145,7 +145,7 @@ test('место: создаётся кнопкой + в форме игры и 
 
   // второй раз место выбирается из списка
   await org.getByRole('button', { name: 'Создать игру', exact: true }).click();
-  await org.getByLabel('Место', { exact: true }).click();
+  await org.getByLabel('Арена', { exact: true }).click();
   await org.getByRole('option', { name: /Манеж E2E/ }).click();
   await org.getByLabel('Взнос, ₽', { exact: true }).fill('500');
   await org.getByLabel('Количество команд (макс)', { exact: true }).fill('2');
@@ -159,7 +159,7 @@ test('фильтр игр по месту на главной', async ({ browser
   // к этому моменту есть игры в «Тест-арене», «Арене» и «Манеже E2E» (предыдущие тесты)
   const page = await openAs(browser, MARIA);
   await expect(page.getByText(/· Тест-арена$/).first()).toBeVisible();
-  await page.getByLabel('Место', { exact: true }).click();
+  await page.getByLabel('Арена', { exact: true }).click();
   await page.getByRole('option', { name: 'Манеж E2E' }).click();
   await expect(page.getByText(/· Манеж E2E$/).first()).toBeVisible();
   await expect(page.getByText(/· Тест-арена$/)).toHaveCount(0);
@@ -238,7 +238,7 @@ test('формат игры: команды и игроки в команде з
   await expect(org.getByText('занято 0/21')).toBeVisible();
 
   // при редактировании вместимость пересчитывается
-  await org.getByRole('button', { name: 'Редактировать', exact: true }).click();
+  await org.getByRole('button', { name: 'Редактировать сбор', exact: true }).click();
   await expect(org.getByLabel('Количество команд (макс)', { exact: true })).toHaveValue('3');
   await org.getByLabel('Игроков в команде', { exact: true }).fill('5');
   await org.getByRole('button', { name: 'Сохранить', exact: true }).click();

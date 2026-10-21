@@ -28,7 +28,7 @@ export function PlaceForm({
     setBusy(true);
     try {
       const place = await api.createPlace(parsed.value);
-      showToast('Место сохранено');
+      showToast('Арена сохранена');
       setName('');
       setAddress('');
       onCreated(place);
@@ -37,7 +37,7 @@ export function PlaceForm({
         if (e.details) setErrors(e.details);
         showToast(e.message);
       } else {
-        showToast('Не удалось сохранить место');
+        showToast('Не удалось сохранить арену');
       }
     } finally {
       setBusy(false);
@@ -48,7 +48,7 @@ export function PlaceForm({
     <>
       <FormItem
         htmlFor="placeName"
-        top="Название места"
+        top="Название арены"
         status={errors.name ? 'error' : 'default'}
         bottom={errors.name ?? 'Например: Ф.Ц. «Орловский»'}
       >
@@ -56,7 +56,7 @@ export function PlaceForm({
       </FormItem>
       <FormItem
         htmlFor="placeAddress"
-        top="Адрес места"
+        top="Адрес арены"
         status={errors.address ? 'error' : 'default'}
         bottom={errors.address ?? 'Например: Суздальское шоссе 62'}
       >
@@ -65,7 +65,7 @@ export function PlaceForm({
       <FormItem>
         <div className="actions" style={{ padding: 0 }}>
           <Button size="m" loading={busy} onClick={() => void submit()}>
-            Сохранить место
+            Сохранить арену
           </Button>
           {onCancel && (
             <Button size="m" mode="secondary" onClick={onCancel}>

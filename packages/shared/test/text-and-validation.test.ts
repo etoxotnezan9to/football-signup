@@ -52,7 +52,7 @@ describe('formatRosterText', () => {
     const text = formatRosterText(
       {
         ...game,
-        statusLabel: 'Игра отменена',
+        statusLabel: 'Сбор отменён',
         formatLabel: 'до 4 команд по 6 игроков, 2 встречи',
         organizerName: 'Иван Петров',
         organizerContact: 'vk.com/ivan',
@@ -63,7 +63,7 @@ describe('formatRosterText', () => {
       [{ name: 'Иван', seats: 1, mainSeats: 1, queueSeats: 0, paidSeats: 0 }],
     );
     assert.deepEqual(text.split('\n').slice(0, 11), [
-      '⚠ Игра отменена',
+      '⚠ Сбор отменён',
       '📅 чт, 22 октября, 21:00',
       '📍 Ф.Ц. «Орловский», Суздальское шоссе 62',
       '⚽ до 4 команд по 6 игроков, 2 встречи',
@@ -142,7 +142,7 @@ describe('parseGameInput / parseGameUpdate', () => {
   it('placeId: только положительное целое', () => {
     for (const v of [0, -1, 1.5, '1', null]) {
       const r = parseGameInput({ ...valid, placeId: v });
-      assert.ok(!r.ok && r.errors.placeId === 'выберите место', String(v));
+      assert.ok(!r.ok && r.errors.placeId === 'выберите арену', String(v));
     }
     const r = parseGameUpdate({ placeId: 3 });
     assert.ok(r.ok);
