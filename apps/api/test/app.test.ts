@@ -151,6 +151,45 @@ describe('HTTP API', () => {
     assert.equal(del.json().taken, 0);
   });
 
+  it('команды: переименование и распределение, полная команда даёт 409 TEAM_FULL', async () => {
+    const g = await app.inject({
+      method: 'POST',
+      url: '/api/games',
+      headers: auth(901),
+      payload: gameBody({ teamsMax: 2, playersPerTeam: 1 }),
+    });
+    const id = g.json().id;
+    const join = await app.inject({
+      method: 'PUT',
+      url: `/api/games/${id}/signup`,
+      headers: auth(902),
+      payload: { seats: 2 },
+    });
+    const s1 = join.json().signup.signupId;
+    const rename = await app.inject({
+      method: 'PUT',
+      url: `/api/games/${id}/teams/1`,
+      headers: auth(901),
+      payload: { name: 'Ветераны' },
+    });
+    assert.equal(rename.statusCode, 200);
+    assert.equal(rename.json().teams[0].name, 'Ветераны');
+    const put = (seat: number, teamNo: number | null, user = 901) =>
+      app.inject({
+        method: 'PUT',
+        url: `/api/games/${id}/team-assignment`,
+        headers: auth(user),
+        payload: { signupId: s1, seat, teamNo },
+      });
+    const first = await put(1, 1);
+    assert.equal(first.statusCode, 200);
+    assert.deepEqual(first.json().teams[0].members, [{ signupId: s1, seat: 1 }]);
+    const full = await put(2, 1);
+    assert.equal(full.statusCode, 409);
+    assert.equal(full.json().error.code, 'TEAM_FULL');
+    assert.equal((await put(2, 2, 902)).statusCode, 403);
+  });
+
   it('конфигурация и тестовые игроки выключены без тестового режима', async () => {
     const cfg = await app.inject({ method: 'GET', url: '/api/config', headers: auth(801) });
     assert.equal(cfg.statusCode, 200);

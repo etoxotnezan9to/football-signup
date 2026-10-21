@@ -9,6 +9,7 @@ const STATUS: Record<ErrorCode, number> = {
   GAME_NOT_ACTIVE: 409,
   ACTIVE_GAMES_LIMIT: 422,
   STARTS_AT_IN_PAST: 422,
+  TEAM_FULL: 409,
   RATE_LIMITED: 429,
   INTERNAL: 500,
 };

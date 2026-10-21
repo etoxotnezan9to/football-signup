@@ -12,6 +12,7 @@ import {
   plural,
   routeToHash,
   seatsLabel,
+  seatName,
   signupResultText,
   defaultStartsAt,
   type Route,
@@ -42,6 +43,14 @@ describe('teamsLabel', () => {
     assert.equal(teamsLabel(2, 2), 'до 2 команд по 2 игрока');
     assert.equal(teamsLabel(3, 1), 'до 3 команд по 1 игроку');
     assert.equal(teamsLabel(10, 11), 'до 10 команд по 11 игроков');
+  });
+});
+
+describe('seatName', () => {
+  it('друзья по записи подписаны как +1, +2', () => {
+    const u = { firstName: 'Иван', lastName: 'Петров' };
+    assert.equal(seatName(u, 1), 'Иван Петров');
+    assert.equal(seatName(u, 3), 'Иван Петров +2');
   });
 });
 

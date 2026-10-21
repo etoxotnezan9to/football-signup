@@ -194,6 +194,14 @@ export function buildApp(deps: AppDeps): FastifyInstance {
           };
           return service.setPaid(parseId(p.gameId), req.vkId, parseId(p.signupId), body.paidSeats);
         });
+        secured.put('/games/:gameId/teams/:teamNo', async (req) => {
+          const p = req.params as { gameId: string; teamNo: string };
+          return service.setTeamName(parseId(p.gameId), req.vkId, parseId(p.teamNo), req.body);
+        });
+        secured.put('/games/:gameId/team-assignment', async (req) =>
+          service.assignSeat(parseId((req.params as { gameId: string }).gameId), req.vkId, req.body),
+        );
+
         secured.delete('/games/:gameId/signups/:signupId', async (req) => {
           const p = req.params as { gameId: string; signupId: string };
           return service.removeSignup(parseId(p.gameId), req.vkId, parseId(p.signupId));

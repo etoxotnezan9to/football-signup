@@ -237,3 +237,56 @@ test('формат игры: команды и игроки в команде з
   await expect(org.getByText('до 3 команд по 5 игроков')).toBeVisible();
   await expect(org.getByText('занято 0/15')).toBeVisible();
 });
+
+test('команды: организатор распределяет игроков и переименовывает команду, остальные видят', async ({ browser }) => {
+  const org = await openAs(browser, ORGANIZER);
+  await org.getByRole('button', { name: 'Создать игру', exact: true }).click();
+  await choosePlace(org, 'Зал распределения', 'ул. Командная, 5');
+  await org.getByLabel('Взнос, ₽', { exact: true }).fill('0');
+  await org.getByLabel('Количество команд (макс)', { exact: true }).fill('2');
+  await org.getByLabel('Игроков в команде', { exact: true }).fill('2');
+  await org.getByRole('button', { name: 'Создать игру', exact: true }).last().click();
+  await expect(org).toHaveURL(/#\/game\/\d+$/);
+  const gamePath = `/${new URL(org.url()).hash}`;
+
+  const maria = await openAs(browser, MARIA, gamePath);
+  await maria.getByRole('button', { name: '+ Записаться', exact: true }).click();
+  await maria.getByRole('button', { name: '+3', exact: true }).click();
+  await expect(maria.getByText('Вы записаны: 3 места в составе')).toBeVisible();
+
+  await org.getByRole('tab', { name: 'Команды' }).click();
+  const blue = org.getByRole('region', { name: 'Команда Синие' });
+  const pink = org.getByRole('region', { name: 'Команда Розовые' });
+  const none = org.getByRole('region', { name: 'Не распределены' });
+  await expect(blue).toBeVisible();
+  await expect(pink).toBeVisible();
+  await expect(org.getByTestId('team-dot')).toHaveCount(2);
+  await expect(none.getByTestId('team-seat')).toHaveCount(3);
+
+  // перетаскивание мышью
+  await none.getByRole('button', { name: 'Мария Сидорова', exact: true }).dragTo(blue);
+  await expect(blue.getByText('Мария Сидорова', { exact: true })).toBeVisible();
+  // выбор команды нажатием (как на телефоне)
+  await none.getByRole('button', { name: 'Мария Сидорова +1', exact: true }).click();
+  await org.getByRole('button', { name: 'В команду «Синие»', exact: true }).click();
+  await expect(blue.getByText('2/2')).toBeVisible();
+  // в полную команду не предлагается
+  await none.getByRole('button', { name: 'Мария Сидорова +2', exact: true }).click();
+  await expect(org.getByRole('button', { name: 'В команду «Синие»', exact: true })).toHaveCount(0);
+  await org.getByRole('button', { name: 'В команду «Розовые»', exact: true }).click();
+  await expect(pink.getByText('Мария Сидорова +2')).toBeVisible();
+  await expect(none.getByText('Все игроки состава в командах')).toBeVisible();
+
+  // переименование
+  await pink.getByRole('button', { name: /Розовые/ }).click();
+  await org.getByLabel('Название команды', { exact: true }).fill('Ветераны');
+  await org.getByLabel('Название команды', { exact: true }).press('Enter');
+  await expect(org.getByRole('region', { name: 'Команда Ветераны' })).toBeVisible();
+
+  // участник видит команды без перезагрузки, но не может их менять
+  await maria.getByRole('tab', { name: 'Команды' }).click();
+  const veterans = maria.getByRole('region', { name: 'Команда Ветераны' });
+  await expect(veterans.getByText('Мария Сидорова +2')).toBeVisible();
+  await expect(maria.getByRole('button', { name: 'Мария Сидорова', exact: true })).toHaveCount(0);
+  await expect(maria.getByText('Перетащите игрока в команду', { exact: false })).toHaveCount(0);
+});

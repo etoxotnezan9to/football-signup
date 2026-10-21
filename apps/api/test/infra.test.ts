@@ -138,6 +138,8 @@ describe('hub', () => {
       game: {
         ...summary(1),
         roster: [],
+        teams: [],
+        unassigned: [],
         address: '',
         teamsMax: 2,
         playersPerTeam: 2,

@@ -45,6 +45,23 @@ CREATE INDEX idx_games_starts_at ON games (status, starts_at);
 CREATE INDEX idx_games_organizer ON games (organizer_id);
 CREATE INDEX idx_games_place ON games (place_id);
 
+-- миграция 0007: команды
+CREATE TABLE game_teams (            -- только переименованные; иначе название из TEAM_PRESETS
+  game_id  INTEGER NOT NULL REFERENCES games(id) ON DELETE CASCADE,
+  team_no  INTEGER NOT NULL CHECK (team_no >= 1),
+  name     TEXT NOT NULL,
+  PRIMARY KEY (game_id, team_no)
+);
+CREATE TABLE team_assignments (      -- место записи (seat_no из 1..seats) в команде
+  signup_id   INTEGER NOT NULL REFERENCES signups(id) ON DELETE CASCADE,
+  seat_no     INTEGER NOT NULL CHECK (seat_no >= 1),
+  game_id     INTEGER NOT NULL REFERENCES games(id) ON DELETE CASCADE,
+  team_no     INTEGER NOT NULL CHECK (team_no >= 1),
+  created_at  TEXT NOT NULL,         -- порядок внутри команды
+  PRIMARY KEY (signup_id, seat_no)
+);
+CREATE INDEX idx_team_assignments_game ON team_assignments (game_id);
+
 CREATE TABLE signups (
   id          INTEGER PRIMARY KEY AUTOINCREMENT,
   game_id     INTEGER NOT NULL REFERENCES games(id) ON DELETE CASCADE,

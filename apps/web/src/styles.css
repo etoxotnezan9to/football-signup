@@ -122,3 +122,80 @@
 .test-panel > * {
   flex: 1 1 140px;
 }
+
+/* Вкладка «Команды» */
+.teams {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 8px 16px 16px;
+}
+.teams__hint {
+  font-size: 13px;
+  color: var(--vkui--color_text_secondary);
+}
+.team-box {
+  border: 1px solid var(--vkui--color_separator_primary);
+  border-radius: 12px;
+  padding: 8px 12px;
+  transition: background-color 0.15s, border-color 0.15s;
+}
+.team-box--none {
+  border-style: dashed;
+}
+.team-box--over {
+  border-color: var(--vkui--color_stroke_accent);
+  background-color: var(--vkui--color_background_secondary);
+}
+.team-box__header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+}
+.team-box__name {
+  flex: 1;
+  font-weight: 600;
+  text-align: left;
+}
+.team-box__name--button {
+  border: 0;
+  padding: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.team-box__input {
+  flex: 1;
+}
+.team-box__count {
+  font-size: 13px;
+  color: var(--vkui--color_text_secondary);
+}
+.team-box__empty {
+  padding: 6px 0;
+  font-size: 13px;
+  color: var(--vkui--color_text_secondary);
+}
+.team-dot {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 0, 0, 0.2);
+}
+.team-seat {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+}
+.team-seat--editable {
+  cursor: grab;
+  user-select: none;
+}
+.team-seat--editable:active {
+  cursor: grabbing;
+}

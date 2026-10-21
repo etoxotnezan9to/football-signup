@@ -299,6 +299,62 @@ paths:
         '401': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
         '404': { $ref: '#/components/responses/Error' }
+  /games/{gameId}/teams/{teamNo}:
+    parameters:
+      - { $ref: '#/components/parameters/GameId' }
+      - { name: teamNo, in: path, required: true, schema: { type: integer, minimum: 1 }, description: Номер команды, от 1 до teamsMax }
+    put:
+      summary: Переименовать команду (только организатор)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string, minLength: 1, maxLength: 30 }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GameDetails' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /games/{gameId}/team-assignment:
+    parameters:
+      - { $ref: '#/components/parameters/GameId' }
+    put:
+      summary: Отправить место состава в команду или убрать из команд (только организатор)
+      description: >-
+        Место (seat от 1 до mainSeats записи) встаёт в конец команды teamNo; teamNo null убирает его из команд.
+        В заполненную команду (playersPerTeam игроков) нельзя: TEAM_FULL. Места из очереди не распределяются: VALIDATION_ERROR.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [signupId, seat, teamNo]
+              properties:
+                signupId: { type: integer }
+                seat: { type: integer, minimum: 1 }
+                teamNo: { type: integer, minimum: 1, nullable: true }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GameDetails' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
   /me/games:
     get:
       summary: Мои игры (созданные и те, куда я записан)
@@ -357,6 +413,7 @@ components:
                 - GAME_NOT_ACTIVE
                 - ACTIVE_GAMES_LIMIT
                 - STARTS_AT_IN_PAST
+                - TEAM_FULL
                 - RATE_LIMITED
                 - INTERNAL
             message: { type: string }
@@ -426,6 +483,23 @@ components:
         queued: { type: integer, description: Мест в очереди }
         organizer: { $ref: '#/components/schemas/User' }
         mySeats: { type: integer, description: Мои места суммарно, 0 если нет записи }
+    TeamSeat:
+      type: object
+      description: Одно место записи; запись «+3» даёт места 1, 2, 3
+      required: [signupId, seat]
+      properties:
+        signupId: { type: integer }
+        seat: { type: integer, minimum: 1 }
+    Team:
+      type: object
+      required: [no, name, color, members]
+      properties:
+        no: { type: integer, minimum: 1 }
+        name: { type: string, description: 'По умолчанию «Синие», «Розовые», «Салатовые», «Оранжевые», …' }
+        color: { type: string, description: 'Цвет команды, #rrggbb; не меняется' }
+        members:
+          type: array
+          items: { $ref: '#/components/schemas/TeamSeat' }
     RosterEntry:
       type: object
       required: [signupId, user, seats, mainSeats, queueSeats, paidSeats, createdAt]
@@ -441,7 +515,7 @@ components:
       allOf:
         - $ref: '#/components/schemas/GameSummary'
         - type: object
-          required: [address, teamsMax, playersPerTeam, description, paymentInfo, organizerContact, roster]
+          required: [address, teamsMax, playersPerTeam, description, paymentInfo, organizerContact, roster, teams, unassigned]
           properties:
             address: { type: string, description: Адрес места }
             teamsMax: { type: integer }
@@ -453,3 +527,11 @@ components:
               type: array
               description: Все записи в порядке очереди
               items: { $ref: '#/components/schemas/RosterEntry' }
+            teams:
+              type: array
+              description: Команды 1..teamsMax; в каждой не больше playersPerTeam мест из состава
+              items: { $ref: '#/components/schemas/Team' }
+            unassigned:
+              type: array
+              description: Места состава, не распределённые по командам, в порядке состава
+              items: { $ref: '#/components/schemas/TeamSeat' }

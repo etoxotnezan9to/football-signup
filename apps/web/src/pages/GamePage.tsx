@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import {
   Avatar,
   Button,
@@ -8,11 +8,14 @@ import {
   PanelHeader,
   PanelHeaderBack,
   SimpleCell,
+  Tabs,
+  TabsItem,
 } from '@vkontakte/vkui';
 import { formatRosterText, numberLabel, type GameDetails, type RosterEntry } from '@football/shared';
 import { api, type ApiError } from '../api.ts';
 import { Empty } from '../components/Empty.tsx';
 import { MockFill } from '../components/MockFill.tsx';
+import { TeamsTab } from '../components/TeamsTab.tsx';
 import { useApp } from '../context.ts';
 import { fillLabel, formatWhen, fullName, gameLabel, gameLink, routeToHash, seatsLabel, teamsLabel } from '../format.ts';
 import { useGame } from '../hooks.ts';
@@ -70,6 +73,7 @@ function GameView({ id }: { id: number }) {
   const { session, navigate, showToast, setPopout } = useApp();
   const { data: game, error, loading, reload, setData } = useGame(id);
   const openSignup = useSignupFlow(setData);
+  const [tab, setTab] = useState<'roster' | 'teams'>('roster');
   const back = () => navigate(routeToHash({ name: 'list' }));
 
   const header = (
@@ -268,14 +272,33 @@ function GameView({ id }: { id: number }) {
         {active && <MockFill game={game} onUpdate={setData} />}
       </Group>
       {isOrganizer && active && <TestPlayersPanel gameId={game.id} onChanged={setData} />}
-      <Group header={<Header indicator={`${game.taken}/${game.capacity}`}>Состав</Header>}>
-        {mainRows.length === 0 ? (
-          <Empty>Пока никто не записался</Empty>
+      <Group
+        header={
+          <Tabs>
+            <TabsItem selected={tab === 'roster'} onClick={() => setTab('roster')} aria-controls="tab-roster">
+              Состав {game.taken}/{game.capacity}
+            </TabsItem>
+            <TabsItem selected={tab === 'teams'} onClick={() => setTab('teams')} aria-controls="tab-teams">
+              Команды
+            </TabsItem>
+          </Tabs>
+        }
+      >
+        {tab === 'teams' ? (
+          <div id="tab-teams" role="tabpanel">
+            <TeamsTab game={game} editable={isOrganizer && game.status === 'active'} onUpdate={setData} />
+          </div>
         ) : (
-          mainRows.map((r) => cell(r, r.count, true))
+          <div id="tab-roster" role="tabpanel">
+            {mainRows.length === 0 ? (
+              <Empty>Пока никто не записался</Empty>
+            ) : (
+              mainRows.map((r) => cell(r, r.count, true))
+            )}
+          </div>
         )}
       </Group>
-      {queueRows.length > 0 && (
+      {tab === 'roster' && queueRows.length > 0 && (
         <Group header={<Header indicator={String(game.queued)}>Очередь</Header>}>
           {queueRows.map((r) => cell(r, r.count, false))}
         </Group>

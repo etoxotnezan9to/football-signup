@@ -26,6 +26,7 @@ export const ERROR_CODES = [
   'GAME_NOT_ACTIVE',
   'ACTIVE_GAMES_LIMIT',
   'STARTS_AT_IN_PAST',
+  'TEAM_FULL',
   'RATE_LIMITED',
   'INTERNAL',
 ] as const;

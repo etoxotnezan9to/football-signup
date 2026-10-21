@@ -388,3 +388,69 @@ describe('тестовые игроки', () => {
     assert.ok(notified.flat().every((id) => id > 0));
   });
 });
+
+describe('команды', () => {
+  it('по умолчанию 4 команды с цветами, переименовать может только организатор', () => {
+    const g = svc.createGame(ORG, gameBody({ teamsMax: 4, playersPerTeam: 6 }));
+    assert.deepEqual(
+      g.teams.map((t) => t.name),
+      ['Синие', 'Розовые', 'Салатовые', 'Оранжевые'],
+    );
+    const r = svc.setTeamName(g.id, ORG, 2, { name: '  Ветераны ' });
+    assert.equal(r.teams[1]!.name, 'Ветераны');
+    assert.equal(events.at(-1)?.type, 'roster.updated');
+    expectCode(() => svc.setTeamName(g.id, U1, 1, { name: 'Мои' }), 'FORBIDDEN');
+    expectCode(() => svc.setTeamName(g.id, ORG, 5, { name: 'Пятые' }), 'NOT_FOUND');
+    expectCode(() => svc.setTeamName(g.id, ORG, 1, { name: ' ' }), 'VALIDATION_ERROR');
+  });
+
+  it('распределение мест: каждое место записи отдельно, не больше playersPerTeam в команде', () => {
+    const g = svc.createGame(ORG, gameBody({ teamsMax: 2, playersPerTeam: 2 }));
+    const s1 = svc.putSignup(g.id, U1, 3).signup.signupId; // три места, все в составе
+    const s2 = svc.putSignup(g.id, U2, 1).signup.signupId;
+    assert.equal(svc.getGame(g.id, ORG).unassigned.length, 4);
+
+    svc.assignSeat(g.id, ORG, { signupId: s1, seat: 1, teamNo: 1 });
+    svc.assignSeat(g.id, ORG, { signupId: s1, seat: 2, teamNo: 2 });
+    let r = svc.assignSeat(g.id, ORG, { signupId: s2, seat: 1, teamNo: 1 });
+    assert.deepEqual(r.teams[0]!.members, [
+      { signupId: s1, seat: 1 },
+      { signupId: s2, seat: 1 },
+    ]);
+    assert.deepEqual(r.unassigned, [{ signupId: s1, seat: 3 }]);
+
+    assert.throws(
+      () => svc.assignSeat(g.id, ORG, { signupId: s1, seat: 3, teamNo: 1 }),
+      (e: unknown) => e instanceof AppError && e.code === 'TEAM_FULL' && e.status === 409,
+    );
+    // перемещение между командами и обратно в «не распределены»
+    r = svc.assignSeat(g.id, ORG, { signupId: s2, seat: 1, teamNo: 2 });
+    assert.equal(r.teams[0]!.members.length, 1);
+    assert.equal(r.teams[1]!.members.length, 2);
+    r = svc.assignSeat(g.id, ORG, { signupId: s1, seat: 2, teamNo: null });
+    assert.deepEqual(r.teams[1]!.members, [{ signupId: s2, seat: 1 }]);
+
+    expectCode(() => svc.assignSeat(g.id, U1, { signupId: s1, seat: 3, teamNo: 2 }), 'FORBIDDEN');
+    expectCode(() => svc.assignSeat(g.id, ORG, { signupId: s1, seat: 4, teamNo: 2 }), 'VALIDATION_ERROR');
+    expectCode(() => svc.assignSeat(g.id, ORG, { signupId: s1, seat: 1, teamNo: 3 }), 'NOT_FOUND');
+    expectCode(() => svc.assignSeat(g.id, ORG, { signupId: s1, seat: 1 }), 'VALIDATION_ERROR');
+  });
+
+  it('место, ушедшее из состава, и уменьшение команд убирают игроков из команд насовсем', () => {
+    const g = svc.createGame(ORG, gameBody({ teamsMax: 2, playersPerTeam: 2 }));
+    const s1 = svc.putSignup(g.id, U1, 2).signup.signupId;
+    const s2 = svc.putSignup(g.id, U2, 1).signup.signupId;
+    svc.assignSeat(g.id, ORG, { signupId: s1, seat: 2, teamNo: 1 });
+    svc.assignSeat(g.id, ORG, { signupId: s2, seat: 1, teamNo: 2 });
+
+    svc.putSignup(g.id, U1, 1); // второе место U1 исчезло
+    svc.putSignup(g.id, U1, 2); // и вернулось: в команду само не возвращается
+    let r = svc.getGame(g.id, ORG);
+    assert.deepEqual(r.teams[0]!.members, []);
+
+    r = svc.updateGame(g.id, ORG, { playersPerTeam: 1 }); // вместимость 2: U2 уходит в очередь
+    assert.deepEqual(r.teams[1]!.members, []);
+    r = svc.updateGame(g.id, ORG, { playersPerTeam: 2 });
+    assert.deepEqual(r.teams[1]!.members, [], 'распределение не воскресает после возврата в состав');
+  });
+});

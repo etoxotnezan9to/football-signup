@@ -56,6 +56,11 @@ export function fullName(u: { firstName: string; lastName: string }): string {
   return `${u.firstName} ${u.lastName}`.trim();
 }
 
+/** Имя для места записи в командах: само место — «Иван Петров», его друзья — «Иван Петров +1», «+2». */
+export function seatName(u: { firstName: string; lastName: string }, seat: number): string {
+  return seat <= 1 ? fullName(u) : `${fullName(u)} +${seat - 1}`;
+}
+
 /** Подпись состояния заполненности: «занято 18/24, в очереди 3». */
 /** Формат игры для экрана игры: «до 4 команд по 6 игроков». */
 export function teamsLabel(teamsMax: number, playersPerTeam: number): string {

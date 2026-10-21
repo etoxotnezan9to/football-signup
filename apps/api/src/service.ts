@@ -2,8 +2,11 @@
 // поэтому полностью тестируется без HTTP-слоя.
 import type { DatabaseSync } from 'node:sqlite';
 import {
+  buildTeams,
   capacityError,
   gameCapacity,
+  parseTeamName,
+  seatKey,
   FINISH_GRACE_MIN,
   MAX_ACTIVE_GAMES_PER_ORGANIZER,
   REMINDER_LEAD_MIN,
@@ -18,6 +21,7 @@ import {
   parsePlaceInput,
   rosterTotals,
   checkSeats,
+  TEAM_NAME_MAX,
 } from '@football/shared';
 import type {
   GameDetails,
@@ -27,6 +31,7 @@ import type {
   Place,
   RosterEntry,
   ServerEvent,
+  TeamsView,
   User,
 } from '@football/shared';
 import { inTransaction } from './db.ts';
@@ -222,6 +227,45 @@ export function createService(db: DatabaseSync, options: ServiceOptions = {}) {
     return s;
   }
 
+  /** Команды игры по текущему составу; см. buildTeams в packages/shared. */
+  function teamsOf(game: GameRow, entries: readonly RosterEntry[]): TeamsView {
+    const names = db
+      .prepare('SELECT team_no, name FROM game_teams WHERE game_id = ?')
+      .all(game.id) as unknown as { team_no: number; name: string }[];
+    const assignments = db
+      .prepare('SELECT signup_id, seat_no, team_no, created_at FROM team_assignments WHERE game_id = ?')
+      .all(game.id) as unknown as { signup_id: number; seat_no: number; team_no: number; created_at: string }[];
+    return buildTeams({
+      teamsMax: game.teams_max,
+      playersPerTeam: game.players_per_team,
+      names: new Map(names.map((n) => [n.team_no, n.name])),
+      roster: entries,
+      assignments: assignments.map((a) => ({
+        signupId: a.signup_id,
+        seat: a.seat_no,
+        teamNo: a.team_no,
+        createdAt: a.created_at,
+      })),
+    });
+  }
+
+  /**
+   * Удаляет распределение мест, которые больше не попадают в команды: место ушло в очередь или из записи,
+   * команд стало меньше, в команде стало меньше игроков. Иначе такое место вернулось бы в команду позже само.
+   */
+  function pruneAssignments(gameId: number): void {
+    const game = getGameRow(gameId);
+    const { teams } = teamsOf(game, buildRoster(game).entries);
+    const kept = new Set(teams.flatMap((t) => t.members.map(seatKey)));
+    const rows = db
+      .prepare('SELECT signup_id, seat_no FROM team_assignments WHERE game_id = ?')
+      .all(gameId) as unknown as { signup_id: number; seat_no: number }[];
+    const del = db.prepare('DELETE FROM team_assignments WHERE signup_id = ? AND seat_no = ?');
+    for (const r of rows) {
+      if (!kept.has(seatKey({ signupId: r.signup_id, seat: r.seat_no }))) del.run(r.signup_id, r.seat_no);
+    }
+  }
+
   function details(game: GameRow, viewerId?: number): GameDetails {
     const { entries } = buildRoster(game);
     return {
@@ -233,6 +277,7 @@ export function createService(db: DatabaseSync, options: ServiceOptions = {}) {
       paymentInfo: game.payment_info,
       organizerContact: game.organizer_contact,
       roster: entries,
+      ...teamsOf(game, entries),
     };
   }
 
@@ -243,6 +288,7 @@ export function createService(db: DatabaseSync, options: ServiceOptions = {}) {
       emit({ type: 'game.created', game: summary(game) });
       return;
     }
+    pruneAssignments(gameId);
     emit({ type: 'game.updated', game: summary(game) });
     emit({ type: 'roster.updated', game: details(game) });
   }
@@ -623,6 +669,71 @@ export function createService(db: DatabaseSync, options: ServiceOptions = {}) {
           now().toISOString(),
           signupId,
         );
+      });
+      emitGameChanged(gameId, 'roster');
+      return details(getGameRow(gameId), organizerId);
+    },
+
+    /** Организатор переименовывает команду (номер с 1, не больше teamsMax). */
+    setTeamName(gameId: number, organizerId: number, teamNo: number, body: unknown): GameDetails {
+      const name = parseTeamName((body as { name?: unknown } | null)?.name);
+      if (name === null) {
+        throw new AppError('VALIDATION_ERROR', 'Неверное название команды', {
+          name: `длина от 1 до ${TEAM_NAME_MAX}`,
+        });
+      }
+      inTransaction(db, () => {
+        const game = getGameRow(gameId);
+        requireOrganizer(game, organizerId);
+        if (game.status !== 'active') throw new AppError('GAME_NOT_ACTIVE', 'Игра отменена');
+        if (teamNo > game.teams_max) throw new AppError('NOT_FOUND', 'Команда не найдена');
+        db.prepare(
+          `INSERT INTO game_teams (game_id, team_no, name) VALUES (?, ?, ?)
+             ON CONFLICT (game_id, team_no) DO UPDATE SET name = excluded.name`,
+        ).run(gameId, teamNo, name);
+      });
+      emitGameChanged(gameId, 'roster');
+      return details(getGameRow(gameId), organizerId);
+    },
+
+    /**
+     * Организатор отправляет место состава в команду (teamNo) или убирает из команд (teamNo: null).
+     * Место перемещается в конец выбранной команды; в полную команду нельзя (TEAM_FULL).
+     */
+    assignSeat(gameId: number, organizerId: number, body: unknown): GameDetails {
+      const b = (typeof body === 'object' && body !== null ? body : {}) as Record<string, unknown>;
+      const isPositiveInt = (v: unknown): v is number => typeof v === 'number' && Number.isInteger(v) && v >= 1;
+      if (!isPositiveInt(b.signupId) || !isPositiveInt(b.seat) || !(b.teamNo === null || isPositiveInt(b.teamNo))) {
+        throw new AppError('VALIDATION_ERROR', 'Неверные данные распределения');
+      }
+      const signupId = b.signupId;
+      const seat = b.seat;
+      const teamNo = b.teamNo as number | null;
+      inTransaction(db, () => {
+        const game = getGameRow(gameId);
+        requireOrganizer(game, organizerId);
+        if (game.status !== 'active') throw new AppError('GAME_NOT_ACTIVE', 'Игра отменена');
+        const { entries } = buildRoster(game);
+        const entry = entries.find((e) => e.signupId === signupId);
+        if (!entry) throw new AppError('NOT_FOUND', 'Запись не найдена');
+        if (seat > entry.mainSeats) {
+          throw new AppError('VALIDATION_ERROR', 'В команды распределяются только места из состава');
+        }
+        if (teamNo === null) {
+          db.prepare('DELETE FROM team_assignments WHERE signup_id = ? AND seat_no = ?').run(signupId, seat);
+          return;
+        }
+        if (teamNo > game.teams_max) throw new AppError('NOT_FOUND', 'Команда не найдена');
+        const team = teamsOf(game, entries).teams[teamNo - 1]!;
+        const key = seatKey({ signupId, seat });
+        if (team.members.some((m) => seatKey(m) === key)) return;
+        if (team.members.length >= game.players_per_team) {
+          throw new AppError('TEAM_FULL', `В команде «${team.name}» уже ${game.players_per_team} игроков`);
+        }
+        db.prepare(
+          `INSERT INTO team_assignments (signup_id, seat_no, game_id, team_no, created_at) VALUES (?, ?, ?, ?, ?)
+             ON CONFLICT (signup_id, seat_no) DO UPDATE SET team_no = excluded.team_no, created_at = excluded.created_at`,
+        ).run(signupId, seat, gameId, teamNo, now().toISOString());
       });
       emitGameChanged(gameId, 'roster');
       return details(getGameRow(gameId), organizerId);

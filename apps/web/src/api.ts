@@ -63,6 +63,10 @@ export const api = {
   addTestPlayers: (id: number, count: number, seats: number) =>
     request<GameDetails>('POST', `/games/${id}/test-players`, { count, seats }),
   removeTestPlayers: (id: number) => request<GameDetails>('DELETE', `/games/${id}/test-players`),
+  setTeamName: (id: number, teamNo: number, name: string) =>
+    request<GameDetails>('PUT', `/games/${id}/teams/${teamNo}`, { name }),
+  assignSeat: (id: number, signupId: number, seat: number, teamNo: number | null) =>
+    request<GameDetails>('PUT', `/games/${id}/team-assignment`, { signupId, seat, teamNo }),
   listPlaces: () => request<{ items: Place[] }>('GET', '/places'),
   createPlace: (body: { name: string; address: string }) => request<Place>('POST', '/places', body),
   listGames: () => request<GamesPage>('GET', '/games?limit=50'),

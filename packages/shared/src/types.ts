@@ -1,5 +1,6 @@
 // Типы ответов API и событий WebSocket (docs/openapi.yaml, docs/realtime.md).
 import type { ErrorCode } from './constants.ts';
+import type { Team, TeamSeat } from './teams.ts';
 
 export interface User {
   vkId: number;
@@ -57,6 +58,10 @@ export interface GameDetails extends GameSummary {
   paymentInfo: string;
   organizerContact: string;
   roster: RosterEntry[];
+  /** Команды (их teamsMax) с распределёнными игроками состава */
+  teams: Team[];
+  /** Места состава, ещё не распределённые по командам */
+  unassigned: TeamSeat[];
 }
 
 export interface ErrorBody {
