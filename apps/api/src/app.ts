@@ -198,9 +198,6 @@ export function buildApp(deps: AppDeps): FastifyInstance {
           const p = req.params as { gameId: string; teamNo: string };
           return service.setTeamName(parseId(p.gameId), req.vkId, parseId(p.teamNo), req.body);
         });
-        secured.post('/games/:gameId/teams/auto', async (req) =>
-          service.autoAssignTeams(parseId((req.params as { gameId: string }).gameId), req.vkId),
-        );
         secured.put('/games/:gameId/team-assignment', async (req) =>
           service.assignSeat(parseId((req.params as { gameId: string }).gameId), req.vkId, req.body),
         );

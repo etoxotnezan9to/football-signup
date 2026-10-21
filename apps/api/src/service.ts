@@ -283,13 +283,49 @@ export function createService(db: DatabaseSync, options: ServiceOptions = {}) {
   }
 
   /** События без данных конкретного получателя (mySeats не передаётся). */
-  function emitGameChanged(gameId: number, kind: 'created' | 'updated' | 'roster'): void {
+  /** Места состава игры («запись:место»): по ним видно, кто только что попал в состав. */
+  function mainSeatKeys(gameId: number): Set<string> {
+    const keys = new Set<string>();
+    for (const e of buildRoster(getGameRow(gameId)).entries) {
+      for (let seat = 1; seat <= e.mainSeats; seat++) keys.add(seatKey({ signupId: e.signupId, seat }));
+    }
+    return keys;
+  }
+
+  /**
+   * Места, попавшие в состав после seatsBefore (новая запись, больше мест, переход из очереди, больше мест в игре),
+   * сразу распределяются по командам (autoAssign: места одной записи вместе). Уже распределённые и убранные
+   * организатором из команд места не трогаются.
+   */
+  function autoAssignNewSeats(gameId: number, seatsBefore: ReadonlySet<string>): void {
+    const game = getGameRow(gameId);
+    if (game.status !== 'active') return;
+    const view = teamsOf(game, buildRoster(game).entries);
+    const fresh = view.unassigned.filter((s) => !seatsBefore.has(seatKey(s)));
+    if (fresh.length === 0) return;
+    const ts = now().getTime();
+    const upsert = db.prepare(
+      `INSERT INTO team_assignments (signup_id, seat_no, game_id, team_no, created_at) VALUES (?, ?, ?, ?, ?)
+         ON CONFLICT (signup_id, seat_no) DO UPDATE SET team_no = excluded.team_no, created_at = excluded.created_at`,
+    );
+    // по миллисекунде на место: порядок внутри команды совпадает с порядком распределения
+    autoAssign({ ...view, unassigned: fresh }, game.players_per_team).forEach((a, i) =>
+      upsert.run(a.signupId, a.seat, gameId, a.teamNo, new Date(ts + i).toISOString()),
+    );
+  }
+
+  function emitGameChanged(
+    gameId: number,
+    kind: 'created' | 'updated' | 'roster',
+    seatsBefore?: ReadonlySet<string>,
+  ): void {
     const game = getGameRow(gameId);
     if (kind === 'created') {
       emit({ type: 'game.created', game: summary(game) });
       return;
     }
     pruneAssignments(gameId);
+    if (seatsBefore) autoAssignNewSeats(gameId, seatsBefore);
     emit({ type: 'game.updated', game: summary(game) });
     emit({ type: 'roster.updated', game: details(game) });
   }
@@ -512,6 +548,7 @@ export function createService(db: DatabaseSync, options: ServiceOptions = {}) {
       if (!parsed.ok) throw new AppError('VALIDATION_ERROR', 'Неверные данные игры', parsed.errors);
       const patch = parsed.value;
       const before = snapshot(gameId);
+      const seatsBefore = mainSeatKeys(gameId);
       const old = inTransaction(db, () => {
         const game = getGameRow(gameId);
         requireOrganizer(game, userId);
@@ -550,7 +587,7 @@ export function createService(db: DatabaseSync, options: ServiceOptions = {}) {
         db.prepare(`UPDATE games SET ${sets.join(', ')} WHERE id = ?`).run(...values);
         return game; // состояние до правки
       });
-      emitGameChanged(gameId, 'roster');
+      emitGameChanged(gameId, 'roster', seatsBefore);
       if (notify) {
         const promoted = notifyPromotions(gameId, before, userId);
         const current = getGameRow(gameId);
@@ -613,6 +650,7 @@ export function createService(db: DatabaseSync, options: ServiceOptions = {}) {
         );
       }
       const before = snapshot(gameId);
+      const seatsBefore = mainSeatKeys(gameId);
       inTransaction(db, () => {
         const game = getGameRow(gameId);
         requireOpen(game);
@@ -633,7 +671,7 @@ export function createService(db: DatabaseSync, options: ServiceOptions = {}) {
           ).run(gameId, userId, check.seats, ts, ts);
         }
       });
-      emitGameChanged(gameId, 'roster');
+      emitGameChanged(gameId, 'roster', seatsBefore);
       notifyPromotions(gameId, before, userId);
       const game = details(getGameRow(gameId), userId);
       const signup = game.roster.find((e) => e.user.vkId === userId)!;
@@ -642,13 +680,14 @@ export function createService(db: DatabaseSync, options: ServiceOptions = {}) {
 
     deleteSignup(gameId: number, userId: number): GameDetails {
       const before = snapshot(gameId);
+      const seatsBefore = mainSeatKeys(gameId);
       inTransaction(db, () => {
         const game = getGameRow(gameId);
         requireOpen(game);
         const res = db.prepare('DELETE FROM signups WHERE game_id = ? AND user_id = ?').run(gameId, userId);
         if (Number(res.changes) === 0) throw new AppError('NOT_FOUND', 'Вы не записаны на эту игру');
       });
-      emitGameChanged(gameId, 'roster');
+      emitGameChanged(gameId, 'roster', seatsBefore);
       notifyPromotions(gameId, before, userId);
       return details(getGameRow(gameId), userId);
     },
@@ -740,35 +779,16 @@ export function createService(db: DatabaseSync, options: ServiceOptions = {}) {
       return details(getGameRow(gameId), organizerId);
     },
 
-    /** Организатор раскладывает нераспределённых игроков по командам автоматически (autoAssign в packages/shared). */
-    autoAssignTeams(gameId: number, organizerId: number): GameDetails {
-      inTransaction(db, () => {
-        const game = getGameRow(gameId);
-        requireOrganizer(game, organizerId);
-        if (game.status !== 'active') throw new AppError('GAME_NOT_ACTIVE', 'Игра отменена');
-        const view = teamsOf(game, buildRoster(game).entries);
-        const ts = now().getTime();
-        const insert = db.prepare(
-          'INSERT INTO team_assignments (signup_id, seat_no, game_id, team_no, created_at) VALUES (?, ?, ?, ?, ?)',
-        );
-        // по миллисекунде на место: порядок внутри команды совпадает с порядком распределения
-        autoAssign(view, game.players_per_team).forEach((a, i) =>
-          insert.run(a.signupId, a.seat, gameId, a.teamNo, new Date(ts + i).toISOString()),
-        );
-      });
-      emitGameChanged(gameId, 'roster');
-      return details(getGameRow(gameId), organizerId);
-    },
-
     removeSignup(gameId: number, organizerId: number, signupId: number): GameDetails {
       const before = snapshot(gameId);
+      const seatsBefore = mainSeatKeys(gameId);
       inTransaction(db, () => {
         const game = getGameRow(gameId);
         requireOrganizer(game, organizerId);
         const res = db.prepare('DELETE FROM signups WHERE id = ? AND game_id = ?').run(signupId, gameId);
         if (Number(res.changes) === 0) throw new AppError('NOT_FOUND', 'Запись не найдена');
       });
-      emitGameChanged(gameId, 'roster');
+      emitGameChanged(gameId, 'roster', seatsBefore);
       notifyPromotions(gameId, before, organizerId);
       return details(getGameRow(gameId), organizerId);
     },
@@ -855,6 +875,7 @@ export function createService(db: DatabaseSync, options: ServiceOptions = {}) {
       const seats = checkSeats(seatsInput);
       if (!seats.ok) throw new AppError('VALIDATION_ERROR', 'Неверное число мест');
       const before = snapshot(gameId);
+      const seatsBefore = mainSeatKeys(gameId);
       inTransaction(db, () => {
         const game = getGameRow(gameId);
         requireOrganizer(game, organizerId);
@@ -878,7 +899,7 @@ export function createService(db: DatabaseSync, options: ServiceOptions = {}) {
           nextId -= 1;
         }
       });
-      emitGameChanged(gameId, 'roster');
+      emitGameChanged(gameId, 'roster', seatsBefore);
       notifyPromotions(gameId, before, organizerId);
       return details(getGameRow(gameId), organizerId);
     },
@@ -887,12 +908,13 @@ export function createService(db: DatabaseSync, options: ServiceOptions = {}) {
     removeTestPlayers(gameId: number, organizerId: number): GameDetails {
       if (!testMode) throw new AppError('FORBIDDEN', 'Тестовый режим выключен');
       const before = snapshot(gameId);
+      const seatsBefore = mainSeatKeys(gameId);
       inTransaction(db, () => {
         const game = getGameRow(gameId);
         requireOrganizer(game, organizerId);
         db.prepare('DELETE FROM signups WHERE game_id = ? AND user_id < 0').run(gameId);
       });
-      emitGameChanged(gameId, 'roster');
+      emitGameChanged(gameId, 'roster', seatsBefore);
       notifyPromotions(gameId, before, organizerId);
       return details(getGameRow(gameId), organizerId);
     },

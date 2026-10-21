@@ -238,7 +238,40 @@ test('формат игры: команды и игроки в команде з
   await expect(org.getByText('занято 0/15')).toBeVisible();
 });
 
-test('команды: организатор распределяет игроков и переименовывает команду, остальные видят', async ({ browser }) => {
+test('команды: новые игроки распределяются сами, запись держится вместе', async ({ browser }) => {
+  const org = await openAs(browser, ORGANIZER);
+  await org.getByRole('button', { name: 'Создать игру', exact: true }).click();
+  await choosePlace(org, 'Зал автораспределения', 'ул. Командная, 7');
+  await org.getByLabel('Взнос, ₽', { exact: true }).fill('0');
+  await org.getByLabel('Количество команд (макс)', { exact: true }).fill('2');
+  await org.getByLabel('Игроков в команде', { exact: true }).fill('3');
+  await org.getByRole('button', { name: 'Создать игру', exact: true }).last().click();
+  await expect(org).toHaveURL(/#\/game\/\d+$/);
+  const gamePath = `/${new URL(org.url()).hash}`;
+  await org.getByRole('tab', { name: 'Команды' }).click();
+  await expect(org.getByRole('button', { name: 'Распределить автоматически' })).toHaveCount(0);
+
+  for (const [user, seats] of [
+    [ALEXEY, '+2'],
+    [MARIA, '+3'],
+  ] as const) {
+    const page = await openAs(browser, user, gamePath);
+    await page.getByRole('button', { name: '+ Записаться', exact: true }).click();
+    await page.getByRole('button', { name: seats, exact: true }).click();
+    await expect(page.getByText(/Вы записаны/)).toBeVisible();
+  }
+
+  // у организатора команды обновились без перезагрузки: каждая запись целиком в своей команде
+  const blue = org.getByRole('region', { name: 'Команда Синие' });
+  const pink = org.getByRole('region', { name: 'Команда Розовые' });
+  await expect(blue.getByTestId('team-seat')).toHaveText(['Алексей Смирнов', 'Алексей Смирнов +1']);
+  await expect(pink.getByTestId('team-seat')).toHaveText(['Мария Сидорова', 'Мария Сидорова +1', 'Мария Сидорова +2']);
+  await expect(org.getByRole('region', { name: 'Не распределены' }).getByTestId('team-seat')).toHaveCount(0);
+});
+
+test('команды: организатор перераспределяет игроков и переименовывает команду, остальные видят', async ({
+  browser,
+}) => {
   const org = await openAs(browser, ORGANIZER);
   await org.getByRole('button', { name: 'Создать игру', exact: true }).click();
   await choosePlace(org, 'Зал распределения', 'ул. Командная, 5');
@@ -249,6 +282,7 @@ test('команды: организатор распределяет игрок
   await expect(org).toHaveURL(/#\/game\/\d+$/);
   const gamePath = `/${new URL(org.url()).hash}`;
 
+  // «+3» в команды по 2 целиком не помещается: двое в первой, третий во второй
   const maria = await openAs(browser, MARIA, gamePath);
   await maria.getByRole('button', { name: '+ Записаться', exact: true }).click();
   await maria.getByRole('button', { name: '+3', exact: true }).click();
@@ -258,23 +292,18 @@ test('команды: организатор распределяет игрок
   const blue = org.getByRole('region', { name: 'Команда Синие' });
   const pink = org.getByRole('region', { name: 'Команда Розовые' });
   const none = org.getByRole('region', { name: 'Не распределены' });
-  await expect(blue).toBeVisible();
-  await expect(pink).toBeVisible();
   await expect(org.getByTestId('team-dot')).toHaveCount(2);
-  await expect(none.getByTestId('team-seat')).toHaveCount(3);
+  await expect(blue.getByTestId('team-seat')).toHaveText(['Мария Сидорова', 'Мария Сидорова +1']);
+  await expect(pink.getByTestId('team-seat')).toHaveText(['Мария Сидорова +2']);
 
-  // перетаскивание мышью
-  await none.getByRole('button', { name: 'Мария Сидорова', exact: true }).dragTo(blue);
-  await expect(blue.getByText('Мария Сидорова', { exact: true })).toBeVisible();
-  // выбор команды нажатием (как на телефоне)
-  await none.getByRole('button', { name: 'Мария Сидорова +1', exact: true }).click();
-  await org.getByRole('button', { name: 'В команду «Синие»', exact: true }).click();
-  await expect(blue.getByText('2/2')).toBeVisible();
-  // в полную команду не предлагается
+  // перетаскивание мышью: из команды в «не распределены»
+  await pink.getByRole('button', { name: 'Мария Сидорова +2', exact: true }).dragTo(none);
+  await expect(none.getByText('Мария Сидорова +2')).toBeVisible();
+  // выбор команды нажатием (как на телефоне); в полную команду не предлагается
   await none.getByRole('button', { name: 'Мария Сидорова +2', exact: true }).click();
   await expect(org.getByRole('button', { name: 'В команду «Синие»', exact: true })).toHaveCount(0);
   await org.getByRole('button', { name: 'В команду «Розовые»', exact: true }).click();
-  await expect(pink.getByText('Мария Сидорова +2')).toBeVisible();
+  await expect(pink.getByText('1/2')).toBeVisible();
   await expect(none.getByText('Все игроки состава в командах')).toBeVisible();
 
   // переименование
@@ -289,37 +318,4 @@ test('команды: организатор распределяет игрок
   await expect(veterans.getByText('Мария Сидорова +2')).toBeVisible();
   await expect(maria.getByRole('button', { name: 'Мария Сидорова', exact: true })).toHaveCount(0);
   await expect(maria.getByText('Перетащите игрока в команду', { exact: false })).toHaveCount(0);
-});
-
-test('команды: автоматическое распределение держит игроков одной записи вместе', async ({ browser }) => {
-  const org = await openAs(browser, ORGANIZER);
-  await org.getByRole('button', { name: 'Создать игру', exact: true }).click();
-  await choosePlace(org, 'Зал автораспределения', 'ул. Командная, 7');
-  await org.getByLabel('Взнос, ₽', { exact: true }).fill('0');
-  await org.getByLabel('Количество команд (макс)', { exact: true }).fill('2');
-  await org.getByLabel('Игроков в команде', { exact: true }).fill('3');
-  await org.getByRole('button', { name: 'Создать игру', exact: true }).last().click();
-  await expect(org).toHaveURL(/#\/game\/\d+$/);
-  const gamePath = `/${new URL(org.url()).hash}`;
-
-  for (const [user, seats] of [
-    [ALEXEY, '+2'],
-    [MARIA, '+3'],
-  ] as const) {
-    const page = await openAs(browser, user, gamePath);
-    await page.getByRole('button', { name: '+ Записаться', exact: true }).click();
-    await page.getByRole('button', { name: seats, exact: true }).click();
-    await expect(page.getByText(/Вы записаны/)).toBeVisible();
-  }
-
-  await org.getByRole('tab', { name: 'Команды' }).click();
-  await expect(org.getByRole('region', { name: 'Не распределены' }).getByTestId('team-seat')).toHaveCount(5);
-  await org.getByRole('button', { name: 'Распределить автоматически', exact: true }).click();
-  await expect(org.getByText('Игроки распределены', { exact: true })).toBeVisible();
-  const blue = org.getByRole('region', { name: 'Команда Синие' });
-  const pink = org.getByRole('region', { name: 'Команда Розовые' });
-  // запись «+3» целиком в одной команде, «+2» — в другой
-  await expect(blue.getByTestId('team-seat')).toHaveText(['Мария Сидорова', 'Мария Сидорова +1', 'Мария Сидорова +2']);
-  await expect(pink.getByTestId('team-seat')).toHaveText(['Алексей Смирнов', 'Алексей Смирнов +1']);
-  await expect(org.getByRole('button', { name: 'Распределить автоматически', exact: true })).toHaveCount(0);
 });
