@@ -77,6 +77,16 @@ describe('formatRosterText', () => {
     ]);
   });
 
+  it('описание, начинающееся с картинки, копируется без значка 📝', () => {
+    for (const description of ['⚽ Берите мяч', '🔥 Финал', '🇷🇺 Сборная']) {
+      const text = formatRosterText({ ...game, description }, []);
+      assert.ok(text.split('\n').includes(description), description);
+      assert.ok(!text.includes('📝'), description);
+    }
+    assert.ok(formatRosterText({ ...game, description: 'Берите мяч ⚽' }, []).includes('📝 Берите мяч ⚽'));
+    assert.ok(formatRosterText({ ...game, description: '1. Сбор у входа' }, []).includes('📝 1. Сбор у входа'));
+  });
+
   it('пустые необязательные поля пропускаются', () => {
     const text = formatRosterText({ ...game, organizerName: 'Иван Петров', paymentInfo: ' ', description: '' }, []);
     assert.ok(text.includes('🕺 Организатор: Иван Петров\n'));

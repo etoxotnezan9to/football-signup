@@ -44,6 +44,11 @@ function paidLabel(paidSeats: number, seats: number): string {
   return '';
 }
 
+/** Начинается ли текст с картинки-эмодзи (включая флаги из региональных индикаторов). */
+export function startsWithEmoji(text: string): boolean {
+  return /^(\p{Extended_Pictographic}|\p{Regional_Indicator})/u.test(text);
+}
+
 /**
  * Вся информация о сборе для чата: сведения (те же значки, что на экране сбора; пустые поля пропускаются),
  * затем состав и очередь.
@@ -59,7 +64,9 @@ export function formatRosterText(game: TextGameInfo, entries: readonly TextRoste
     lines.push(`🕺 Организатор: ${game.organizerName}${contact}`);
   }
   if (game.paymentInfo?.trim()) lines.push(`❗ Предоплата: ${game.paymentInfo.trim()}`);
-  if (game.description?.trim()) lines.push(`📝 ${game.description.trim()}`);
+  const description = game.description?.trim();
+  // описание, которое уже начинается с картинки (эмодзи), не получает свой значок 📝
+  if (description) lines.push(startsWithEmoji(description) ? description : `📝 ${description}`);
   if (game.fillLabel) lines.push(`👥 ${game.fillLabel[0]!.toUpperCase()}${game.fillLabel.slice(1)}`);
   lines.push('', 'Список:');
 
