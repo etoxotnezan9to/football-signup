@@ -14,6 +14,7 @@ import {
   seatsLabel,
   seatName,
   nextWeekOf,
+  profileUrl,
   signupResultText,
   defaultStartsAt,
   type Route,
@@ -65,6 +66,14 @@ describe('nextWeekOf', () => {
     const src = new Date(2026, 8, 2, 21, 0).toISOString(); // 2 сентября
     // 9, 16, 23, 30 сентября, 7 и 14 октября уже прошли; 21 октября в 21:00 ещё впереди
     assert.equal(nextWeekOf(src, new Date(2026, 9, 21, 12, 0)), '2026-10-21T21:00');
+  });
+});
+
+describe('profileUrl', () => {
+  it('страница ВКонтакте по vkId; у тестовых игроков (vkId ≤ 0) её нет', () => {
+    assert.equal(profileUrl(1002), 'https://vk.com/id1002');
+    assert.equal(profileUrl(-5), null);
+    assert.equal(profileUrl(0), null);
   });
 });
 

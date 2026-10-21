@@ -15,10 +15,22 @@ import { formatRosterText, numberLabel, type GameDetails, type RosterEntry } fro
 import { api, type ApiError } from '../api.ts';
 import { Empty } from '../components/Empty.tsx';
 import { MockFill } from '../components/MockFill.tsx';
+import { PlayerLink } from '../components/PlayerLink.tsx';
 import { ResultsTab } from '../components/ResultsTab.tsx';
 import { TeamsTab } from '../components/TeamsTab.tsx';
 import { useApp } from '../context.ts';
-import { fillLabel, formatWhen, fullName, gameLabel, gameLink, routeToHash, seatsLabel, teamsLabel } from '../format.ts';
+import {
+  fillLabel,
+  formatWhen,
+  fullName,
+  gameLabel,
+  gameLink,
+  openProfile,
+  profileUrl,
+  routeToHash,
+  seatsLabel,
+  teamsLabel,
+} from '../format.ts';
 import { useGame } from '../hooks.ts';
 import { TestPlayersPanel } from '../components/TestPlayersPanel.tsx';
 import { confirmPopout, entryMenuPopout } from '../seats.tsx';
@@ -159,6 +171,7 @@ function GameView({ id }: { id: number }) {
         seats: e.seats,
         paidSeats: e.paidSeats,
         onClose: close,
+        ...(profileUrl(e.user.vkId) ? { onProfile: () => openProfile(e.user.vkId) } : {}),
         onPaid: (n) => {
           close();
           api.setPaid(game.id, e.signupId, n).then(setData).catch(fail);
@@ -183,12 +196,19 @@ function GameView({ id }: { id: number }) {
   const cell = (row: Numbered, count: number, showPaid: boolean) => {
     const e = row.entry;
     const mine = e.user.vkId === session.user.id;
+    const url = profileUrl(e.user.vkId);
+    // организатор по нажатию открывает меню (там же «Страница ВКонтакте»), остальные — сразу страницу участника
+    const action = isOrganizer
+      ? { onClick: () => openEntryMenu(e) }
+      : url
+        ? { Component: 'a' as const, href: url, target: '_blank', rel: 'noopener noreferrer' }
+        : {};
     return (
       <SimpleCell
         key={`${e.signupId}-${showPaid ? 'm' : 'q'}`}
         before={<Avatar size={36} src={e.user.photoUrl ?? undefined} />}
         subtitle={`${row.label}${count > 1 ? ` ${seatsLabel(count)}` : ''}${showPaid ? paidText(e) : ''}`}
-        {...(isOrganizer ? { onClick: () => openEntryMenu(e) } : {})}
+        {...action}
       >
         {fullName(e.user)}
         {mine ? ' (вы)' : ''}
@@ -224,7 +244,7 @@ function GameView({ id }: { id: number }) {
             {game.feeRub} ₽
           </Row>
           <Row icon="🕺" label="Организатор">
-            {fullName(game.organizer)}
+            <PlayerLink user={game.organizer} />
             {game.organizerContact ? `, ${game.organizerContact}` : ''}
           </Row>
           {game.paymentInfo && (

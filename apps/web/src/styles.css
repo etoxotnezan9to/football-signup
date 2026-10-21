@@ -370,3 +370,14 @@
   align-items: center;
   gap: 4px;
 }
+
+/* Имя игрока — ссылка на страницу ВКонтакте */
+.player-link {
+  color: inherit;
+  text-decoration: none;
+}
+.player-link:hover,
+.player-link:focus-visible {
+  color: var(--vkui--color_text_link);
+  text-decoration: underline;
+}

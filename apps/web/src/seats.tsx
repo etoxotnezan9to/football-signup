@@ -75,8 +75,13 @@ export function entryMenuPopout(opts: {
   onPaid: (paidSeats: number) => void;
   onRemove: () => void;
   onClose: () => void;
+  /** Открыть страницу участника ВКонтакте; нет — пункта нет (тестовый игрок) */
+  onProfile?: () => void;
 }) {
   const actions = [];
+  if (opts.onProfile) {
+    actions.push({ title: 'Страница ВКонтакте', mode: 'default' as const, action: opts.onProfile });
+  }
   for (let n = 0; n <= opts.seats; n++) {
     const base = n === 0 ? 'Не оплачено' : `Оплачено: ${n} из ${opts.seats}`;
     actions.push({

@@ -64,6 +64,17 @@ export function nextWeekOf(iso: string, now: Date): string {
   return toLocalInput(d.toISOString());
 }
 
+/** Страница пользователя ВКонтакте; у тестовых игроков (vkId ≤ 0) страницы нет — null. */
+export function profileUrl(vkId: number): string | null {
+  return Number.isInteger(vkId) && vkId > 0 ? `https://vk.com/id${vkId}` : null;
+}
+
+/** Открыть страницу пользователя из меню действий (в новой вкладке; приложение VK открывает профиль у себя). */
+export function openProfile(vkId: number): void {
+  const url = profileUrl(vkId);
+  if (url) window.open(url, '_blank', 'noopener,noreferrer');
+}
+
 export function fullName(u: { firstName: string; lastName: string }): string {
   return `${u.firstName} ${u.lastName}`.trim();
 }

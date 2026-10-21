@@ -4,6 +4,7 @@ import { POINTS_BEST_PLAYER, type GameDetails } from '@football/shared';
 import { api, type ApiError } from '../api.ts';
 import { useApp } from '../context.ts';
 import { fullName } from '../format.ts';
+import { PlayerLink } from './PlayerLink.tsx';
 
 /**
  * Лучший игрок сбора. Организатор выбирает его выпадающим списком, где игроки сгруппированы по командам
@@ -43,7 +44,10 @@ export function BestPlayerPicker({
         {best ? (
           <>
             <span className="team-dot" style={{ backgroundColor: best.team.color }} aria-hidden="true" />{' '}
-            <strong>{fullName(best.user)}</strong> ({best.team.name})
+            <strong>
+              <PlayerLink user={best.user} />
+            </strong>{' '}
+            ({best.team.name})
           </>
         ) : (
           'не выбран'

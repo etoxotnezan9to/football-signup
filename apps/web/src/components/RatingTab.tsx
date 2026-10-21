@@ -3,7 +3,7 @@ import { Avatar } from '@vkontakte/vkui';
 import { percent, type RatingRow } from '@football/shared';
 import { api, ApiError } from '../api.ts';
 import { Empty } from './Empty.tsx';
-import { fullName } from '../format.ts';
+import { PlayerLink } from './PlayerLink.tsx';
 
 /** Вкладка «Рейтинг» на главном экране: игроки по сборам с сохранённым счётом. Загружается при открытии. */
 export function RatingTab() {
@@ -75,7 +75,7 @@ export function RatingTab() {
                 <th scope="row" className="standings__team">
                   <span className="rating__player">
                     <Avatar size={24} src={r.user.photoUrl ?? undefined} />
-                    {fullName(r.user)}
+                    <PlayerLink user={r.user} />
                   </span>
                 </th>
                 <td>{r.matches.played}</td>

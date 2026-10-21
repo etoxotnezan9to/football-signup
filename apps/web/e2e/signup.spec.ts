@@ -493,3 +493,39 @@ test('новый сбор: заголовок и «Копировать сбор
   await expect(org.getByText('занято 0/15')).toBeVisible();
   await expect(org.getByText('Пока никто не записался')).toBeVisible();
 });
+
+test('игроки кликабельны: ссылка на страницу ВКонтакте, у организатора — пункт в меню', async ({ browser }) => {
+  const org = await openAs(browser, DMITRY);
+  await org.getByRole('button', { name: 'Создать игру', exact: true }).click();
+  await choosePlace(org, 'Зал ссылок', 'ул. Профильная, 1');
+  await org.getByLabel('Взнос, ₽', { exact: true }).fill('0');
+  await org.getByLabel('Количество команд (макс)', { exact: true }).fill('2');
+  await org.getByLabel('Игроков в команде', { exact: true }).fill('2');
+  await org.getByRole('button', { name: 'Создать игру', exact: true }).last().click();
+  await expect(org).toHaveURL(/#\/game\/\d+$/);
+  const gamePath = `/${new URL(org.url()).hash}`;
+
+  const maria = await openAs(browser, MARIA, gamePath);
+  await maria.getByRole('button', { name: '+ Записаться', exact: true }).click();
+  await maria.getByRole('button', { name: '+1', exact: true }).click();
+  await expect(maria.getByText(/Вы записаны/)).toBeVisible();
+
+  // участник: строка состава и организатор — ссылки на страницы ВКонтакте
+  const alexey = await openAs(browser, ALEXEY, gamePath);
+  const row = alexey.getByRole('link', { name: /Мария Сидорова/ });
+  await expect(row).toHaveAttribute('href', 'https://vk.com/id1002');
+  await expect(row).toHaveAttribute('target', '_blank');
+  await expect(alexey.getByRole('link', { name: 'Дмитрий Козлов', exact: true })).toHaveAttribute(
+    'href',
+    'https://vk.com/id1004',
+  );
+  await alexey.getByRole('tab', { name: 'Команды' }).click();
+  await expect(
+    alexey.getByRole('region', { name: 'Команда Синие' }).getByRole('link', { name: 'Мария Сидорова' }),
+  ).toHaveAttribute('href', 'https://vk.com/id1002');
+
+  // организатор: нажатие открывает меню, в нём «Страница ВКонтакте»
+  await org.getByText('Мария Сидорова', { exact: true }).click();
+  await expect(org.getByRole('button', { name: 'Страница ВКонтакте', exact: true })).toBeVisible();
+  await expect(org.getByRole('button', { name: 'Удалить из списка', exact: true })).toBeVisible();
+});

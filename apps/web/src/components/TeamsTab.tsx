@@ -4,7 +4,8 @@ import { TEAM_NAME_MAX, type GameDetails, type Team, type TeamSeat } from '@foot
 import { api, type ApiError } from '../api.ts';
 import { Empty } from './Empty.tsx';
 import { useApp } from '../context.ts';
-import { seatName } from '../format.ts';
+import { openProfile, profileUrl, seatName } from '../format.ts';
+import { PlayerLink } from './PlayerLink.tsx';
 
 /** Куда бросили место: номер команды или null — «не распределены». */
 type Target = number | null;
@@ -52,6 +53,10 @@ export function TeamsTab({
       .map((t) => ({ title: `В команду «${t.name}»`, mode: 'default' as const, action: () => void move(s, t.no) }));
     if (current !== null) {
       actions.push({ title: 'Убрать из команды', mode: 'default' as const, action: () => void move(s, null) });
+    }
+    // страница есть только у самого записавшегося, не у его друзей «+1»
+    if (s.seat === 1 && profileUrl(entry.user.vkId)) {
+      actions.push({ title: 'Страница ВКонтакте', mode: 'default' as const, action: () => void openProfile(entry.user.vkId) });
     }
     setPopout(
       <Alert
@@ -118,7 +123,8 @@ export function TeamsTab({
           : {})}
       >
         <Avatar size={28} src={entry.user.photoUrl ?? undefined} />
-        <span>{name}</span>
+        {/* у организатора нажатие открывает меню с «Страница ВКонтакте»; у остальных имя — ссылка */}
+        {!editable && s.seat === 1 ? <PlayerLink user={entry.user}>{name}</PlayerLink> : <span>{name}</span>}
       </div>
     );
   };
