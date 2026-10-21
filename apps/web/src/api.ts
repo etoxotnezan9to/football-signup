@@ -69,6 +69,8 @@ export const api = {
     request<GameDetails>('PUT', `/games/${id}/matches/${teamA}/${teamB}/${leg}`, { goalsA, goalsB }),
   clearMatchScore: (id: number, teamA: number, teamB: number, leg: number) =>
     request<GameDetails>('DELETE', `/games/${id}/matches/${teamA}/${teamB}/${leg}`),
+  setBestPlayer: (id: number, userId: number | null) =>
+    request<GameDetails>('PUT', `/games/${id}/best-player`, { userId }),
   assignSeat: (id: number, signupId: number, seat: number, teamNo: number | null) =>
     request<GameDetails>('PUT', `/games/${id}/team-assignment`, { signupId, seat, teamNo }),
   rating: () => request<{ items: RatingRow[] }>('GET', '/rating'),

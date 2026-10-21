@@ -65,6 +65,8 @@ export interface GameDetails extends GameSummary {
   teams: Team[];
   /** Места состава, ещё не распределённые по командам */
   unassigned: TeamSeat[];
+  /** Лучший игрок сбора (vkId, выбирает организатор из записавшихся, кто в командах); null — не выбран */
+  bestPlayerId: number | null;
   /** Счёт сыгранных встреч между командами (каждая пара — meetings встреч) */
   results: MatchResult[];
 }
@@ -74,6 +76,8 @@ export interface RatingRow {
   user: User;
   matches: { played: number; won: number; drawn: number; lost: number };
   gatherings: { played: number; won: number };
+  /** Сколько раз игрок был лучшим игроком сбора */
+  bestPlayer: number;
   points: number;
 }
 

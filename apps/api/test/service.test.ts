@@ -566,3 +566,33 @@ describe('рейтинг', () => {
     );
   });
 });
+
+describe('лучший игрок сбора', () => {
+  it('выбирает организатор из записавшихся в командах; в рейтинге 2 очка вместо 1', () => {
+    const g = svc.createGame(ORG, gameBody({ teamsMax: 2, playersPerTeam: 2 }));
+    svc.putSignup(g.id, U1, 2); // U1 и друг — команда 1
+    svc.putSignup(g.id, U2, 1); // U2 — команда 2
+    svc.setMatchScore(g.id, ORG, 1, 2, 1, { goalsA: 1, goalsB: 0 });
+    assert.equal(svc.getGame(g.id, ORG).bestPlayerId, null);
+
+    expectCode(() => svc.setBestPlayer(g.id, U1, { userId: U1 }), 'FORBIDDEN');
+    expectCode(() => svc.setBestPlayer(g.id, ORG, { userId: U3 }), 'VALIDATION_ERROR'); // не записан
+    expectCode(() => svc.setBestPlayer(g.id, ORG, { userId: 'x' }), 'VALIDATION_ERROR');
+
+    let r = svc.setBestPlayer(g.id, ORG, { userId: U1 });
+    assert.equal(r.bestPlayerId, U1);
+    assert.equal(events.at(-1)?.type, 'roster.updated');
+    let rating = Object.fromEntries(svc.rating().map((x) => [x.user.vkId, [x.points, x.bestPlayer]]));
+    assert.deepEqual(rating, { [U1]: [2, 1], [U2]: [0, 0] });
+
+    r = svc.setBestPlayer(g.id, ORG, { userId: U2 });
+    rating = Object.fromEntries(svc.rating().map((x) => [x.user.vkId, [x.points, x.bestPlayer]]));
+    assert.deepEqual(rating, { [U1]: [1, 0], [U2]: [2, 1] });
+
+    // лучший игрок отменил запись: выбор не показывается и не учитывается
+    svc.deleteSignup(g.id, U2);
+    assert.equal(svc.getGame(g.id, ORG).bestPlayerId, null);
+    r = svc.setBestPlayer(g.id, ORG, { userId: null });
+    assert.equal(r.bestPlayerId, null);
+  });
+});

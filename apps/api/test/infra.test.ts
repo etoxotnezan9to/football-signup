@@ -140,6 +140,7 @@ describe('hub', () => {
         roster: [],
         teams: [],
         unassigned: [],
+        bestPlayerId: null,
         results: [],
         address: '',
         teamsMax: 2,

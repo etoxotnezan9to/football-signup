@@ -3,6 +3,8 @@ import { standings, type MatchResult } from './matches.ts';
 
 /** Очко игрока за победу его команды в сборе */
 export const POINTS_PER_GATHERING_WIN = 1;
+/** Очки лучшему игроку сбора; с очком за победу команды не складываются (берётся большее) */
+export const POINTS_BEST_PLAYER = 2;
 
 /** Один сбор: какие команды есть, кто из записавшихся в какой команде, счёт встреч. */
 export interface RatingGame {
@@ -10,6 +12,8 @@ export interface RatingGame {
   /** Записавшиеся (только сами люди, без их друзей) и номер их команды */
   players: readonly { userId: number; teamNo: number }[];
   results: readonly MatchResult[];
+  /** Лучший игрок сбора (выбирает организатор); null — не выбран */
+  bestPlayerId?: number | null;
 }
 
 export interface RatingStats {
@@ -17,7 +21,12 @@ export interface RatingStats {
   matches: { played: number; won: number; drawn: number; lost: number };
   /** Сборы с сохранённым счётом, где игрок был в команде, и сколько из них выиграла его команда */
   gatherings: { played: number; won: number };
-  /** Персональные очки: POINTS_PER_GATHERING_WIN за каждую победу в сборе */
+  /** Сколько раз игрок был лучшим игроком сбора */
+  bestPlayer: number;
+  /**
+   * Персональные очки за каждый сбор: POINTS_BEST_PLAYER лучшему игроку, иначе POINTS_PER_GATHERING_WIN
+   * за победу команды (не складываются)
+   */
   points: number;
 }
 
@@ -42,7 +51,7 @@ export function gatheringWinner(teamNos: readonly number[], results: readonly Ma
 
 /**
  * Статистика каждого игрока, который был в команде хотя бы в одном сборе с сохранённым счётом:
- * матчи его команды (каждая встреча — матч), сборы и победы в них, очки.
+ * матчи его команды (каждая встреча — матч), сборы и победы в них, сколько раз был лучшим игроком, очки.
  * Порядок: очки, доля побед в матчах, победы в матчах, сыграно матчей, затем userId.
  */
 export function computeRating(games: readonly RatingGame[]): RatingStats[] {
@@ -50,7 +59,13 @@ export function computeRating(games: readonly RatingGame[]): RatingStats[] {
   const statsOf = (userId: number): RatingStats => {
     let s = byUser.get(userId);
     if (!s) {
-      s = { userId, matches: { played: 0, won: 0, drawn: 0, lost: 0 }, gatherings: { played: 0, won: 0 }, points: 0 };
+      s = {
+        userId,
+        matches: { played: 0, won: 0, drawn: 0, lost: 0 },
+        gatherings: { played: 0, won: 0 },
+        bestPlayer: 0,
+        points: 0,
+      };
       byUser.set(userId, s);
     }
     return s;
@@ -68,10 +83,11 @@ export function computeRating(games: readonly RatingGame[]): RatingStats[] {
       seen.add(p.userId);
       const s = statsOf(p.userId);
       s.gatherings.played += 1;
-      if (winner === p.teamNo) {
-        s.gatherings.won += 1;
-        s.points += POINTS_PER_GATHERING_WIN;
-      }
+      const best = game.bestPlayerId === p.userId;
+      if (best) s.bestPlayer += 1;
+      if (winner === p.teamNo) s.gatherings.won += 1;
+      // лучший игрок получает свои очки вместо очка за победу команды, а не вдобавок к нему
+      s.points += best ? POINTS_BEST_PLAYER : winner === p.teamNo ? POINTS_PER_GATHERING_WIN : 0;
       for (const r of results) {
         if (r.teamA !== p.teamNo && r.teamB !== p.teamNo) continue;
         const [mine, theirs] = r.teamA === p.teamNo ? [r.goalsA, r.goalsB] : [r.goalsB, r.goalsA];

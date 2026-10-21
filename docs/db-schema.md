@@ -32,6 +32,7 @@ CREATE TABLE games (
   teams_max         INTEGER,          -- миграция 0005, вместе с players_per_team заменила format; с миграции 0006 всегда задано
   players_per_team  INTEGER,
   meetings          INTEGER NOT NULL DEFAULT 2 CHECK (meetings BETWEEN 1 AND 10),  -- миграция 0009
+  best_player_id    INTEGER REFERENCES users(vk_id),  -- миграция 0010: лучший игрок сбора, NULL — не выбран
   fee_rub           INTEGER NOT NULL CHECK (fee_rub >= 0),
   capacity          INTEGER NOT NULL CHECK (capacity BETWEEN 2 AND 60),  -- = teams_max * players_per_team (с миграции 0006)
   description       TEXT NOT NULL DEFAULT '',

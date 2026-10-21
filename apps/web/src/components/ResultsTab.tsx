@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Button } from '@vkontakte/vkui';
 import { MAX_GOALS, matchKey, matchPairs, standings, type GameDetails, type Team } from '@football/shared';
 import { api, type ApiError } from '../api.ts';
+import { BestPlayerPicker } from './BestPlayerPicker.tsx';
 import { Empty } from './Empty.tsx';
 import { useApp } from '../context.ts';
 import { plural } from '../format.ts';
@@ -159,6 +160,8 @@ export function ResultsTab({
           </section>
         );
       })}
+
+      <BestPlayerPicker game={game} editable={editable} onUpdate={onUpdate} />
 
       <div className="results__table-wrap">
         <table className="standings" aria-label="Турнирная таблица">

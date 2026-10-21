@@ -403,13 +403,33 @@ test('главная: вкладки «Сборы» и «Рейтинг», ре�
   await leg.getByRole('button', { name: 'Сохранить', exact: true }).click();
   await expect(leg.getByRole('button', { name: 'Стереть', exact: true })).toBeVisible();
 
+  // лучший игрок: выбор из списка, сгруппированного по командам; Мария из победившей команды
+  await org.getByLabel('Лучший игрок', { exact: true }).click();
+  await expect(org.getByRole('option', { name: 'Синие', exact: true })).toBeVisible();
+  await expect(org.getByRole('option', { name: 'Розовые', exact: true })).toBeVisible();
+  await org.getByRole('option', { name: /Мария Сидорова/ }).click();
+  const alexeyGame = await openAs(browser, ALEXEY, gamePath);
+  await alexeyGame.getByRole('tab', { name: 'Результаты' }).click();
+  await expect(alexeyGame.getByText('Мария Сидорова', { exact: true })).toBeVisible();
+  await expect(alexeyGame.getByText('Лучший игрок:')).toBeVisible();
+
   const viewer = await openAs(browser, ALEXEY);
   await viewer.getByRole('tab', { name: 'Рейтинг' }).click();
   const table = viewer.getByRole('table', { name: 'Рейтинг игроков' });
   const maria = table.getByRole('row').filter({ hasText: 'Мария Сидорова' });
   const alexey = table.getByRole('row').filter({ hasText: 'Алексей Смирнов' });
-  // Мария: 1 матч, победа, 1 сбор, победа в сборе, 1 очко
-  await expect(maria.getByRole('cell')).toHaveText(['1', '1', '1 (100%)', '0 (0%)', '0 (0%)', '1', '1 (100%)', '1']);
+  // Мария: 1 матч, победа, 1 сбор, победа в сборе, лучший игрок — 2 очка, а не 1 + 2
+  await expect(maria.getByRole('cell')).toHaveText([
+    '1',
+    '1',
+    '1 (100%)',
+    '0 (0%)',
+    '0 (0%)',
+    '1',
+    '1 (100%)',
+    '1',
+    '2',
+  ]);
   await expect(alexey.getByRole('cell').nth(4)).toHaveText('1 (100%)');
   await expect(alexey.getByRole('cell').last()).toHaveText('0');
   // вкладка запоминается после перезагрузки

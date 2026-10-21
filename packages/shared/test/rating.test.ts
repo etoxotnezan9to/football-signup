@@ -98,6 +98,33 @@ describe('computeRating', () => {
   });
 });
 
+describe('лучший игрок сбора', () => {
+  const game = (bestPlayerId: number | null) => ({
+    teamNos: [1, 2],
+    players: [
+      { userId: 1, teamNo: 1 },
+      { userId: 2, teamNo: 1 },
+      { userId: 3, teamNo: 2 },
+    ],
+    results: [m(1, 2, 2, 0)], // команда 1 выиграла сбор
+    bestPlayerId,
+  });
+  const points = (rows: ReturnType<typeof computeRating>) =>
+    Object.fromEntries(rows.map((r) => [r.userId, [r.points, r.bestPlayer]]));
+
+  it('2 очка вместо очка за победу команды, а не вдобавок', () => {
+    assert.deepEqual(points(computeRating([game(1)])), { 1: [2, 1], 2: [1, 0], 3: [0, 0] });
+  });
+
+  it('лучший игрок проигравшей команды тоже получает 2 очка', () => {
+    assert.deepEqual(points(computeRating([game(3)])), { 1: [1, 0], 2: [1, 0], 3: [2, 1] });
+  });
+
+  it('выбор игрока, которого нет в командах сбора, не учитывается', () => {
+    assert.deepEqual(points(computeRating([game(99)])), { 1: [1, 0], 2: [1, 0], 3: [0, 0] });
+  });
+});
+
 describe('percent', () => {
   it('округляет и не делит на ноль', () => {
     assert.equal(percent(1, 3), 33);

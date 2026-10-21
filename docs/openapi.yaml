@@ -367,6 +367,34 @@ paths:
         '403': { $ref: '#/components/responses/Error' }
         '404': { $ref: '#/components/responses/Error' }
         '409': { $ref: '#/components/responses/Error' }
+  /games/{gameId}/best-player:
+    parameters:
+      - { $ref: '#/components/parameters/GameId' }
+    put:
+      summary: Выбрать лучшего игрока сбора (только организатор; можно и после окончания игры)
+      description: >-
+        Выбирается из записавшихся (без их друзей), кто сейчас в командах; иначе VALIDATION_ERROR с details.userId.
+        userId null снимает выбор. В рейтинге лучший игрок получает 2 очка за сбор вместо 1 за победу команды.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [userId]
+              properties:
+                userId: { type: integer, nullable: true }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GameDetails' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
   /games/{gameId}/team-assignment:
     parameters:
       - { $ref: '#/components/parameters/GameId' }
@@ -404,7 +432,8 @@ paths:
       description: >-
         Все записавшиеся (без их друзей по записи), кто был в команде хотя бы в одном неотменённом сборе
         с сохранённым счётом. Каждая встреча — матч его команды. Победа в сборе — первое место команды
-        в турнирной таблице сбора (при полном равенстве с второй командой победителя нет); за неё 1 очко.
+        в турнирной таблице сбора (при полном равенстве с второй командой победителя нет); за неё 1 очко,
+        лучшему игроку сбора — 2 очка вместо этого (не складываются).
         Порядок: очки, доля побед в матчах, победы, сыграно матчей. Логика — computeRating в packages/shared.
       responses:
         '200':
@@ -551,7 +580,7 @@ components:
         mySeats: { type: integer, description: Мои места суммарно, 0 если нет записи }
     RatingRow:
       type: object
-      required: [user, matches, gatherings, points]
+      required: [user, matches, gatherings, bestPlayer, points]
       properties:
         user: { $ref: '#/components/schemas/User' }
         matches:
@@ -569,7 +598,8 @@ components:
           properties:
             played: { type: integer }
             won: { type: integer }
-        points: { type: integer, description: Персональные очки, 1 за каждую победу в сборе }
+        bestPlayer: { type: integer, description: Сколько раз игрок был лучшим игроком сбора }
+        points: { type: integer, description: 'Персональные очки за каждый сбор: 2 лучшему игроку, иначе 1 за победу команды' }
     TeamSeat:
       type: object
       description: Одно место записи; запись «+3» даёт места 1, 2, 3
@@ -612,7 +642,7 @@ components:
       allOf:
         - $ref: '#/components/schemas/GameSummary'
         - type: object
-          required: [address, teamsMax, playersPerTeam, meetings, description, paymentInfo, organizerContact, roster, teams, unassigned, results]
+          required: [address, teamsMax, playersPerTeam, meetings, description, paymentInfo, organizerContact, roster, teams, unassigned, bestPlayerId, results]
           properties:
             address: { type: string, description: Адрес места }
             teamsMax: { type: integer }
@@ -633,6 +663,10 @@ components:
               type: array
               description: Места состава, не распределённые по командам, в порядке состава
               items: { $ref: '#/components/schemas/TeamSeat' }
+            bestPlayerId:
+              type: integer
+              nullable: true
+              description: vkId лучшего игрока сбора; null — не выбран или вышел из команд
             results:
               type: array
               description: >-

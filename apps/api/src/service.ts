@@ -62,6 +62,7 @@ interface GameRow {
   address: string;
   teams_max: number;
   meetings: number;
+  best_player_id: number | null;
   players_per_team: number;
   fee_rub: number;
   capacity: number;
@@ -296,8 +297,27 @@ export function createService(db: DatabaseSync, options: ServiceOptions = {}) {
     }));
   }
 
+  /** Записавшиеся (первое место записи), которые сейчас в командах: из них выбирается лучший игрок. */
+  function teamPlayerIds(entries: readonly RosterEntry[], teams: TeamsView['teams']): Set<number> {
+    const bySignup = new Map(entries.map((e) => [e.signupId, e.user.vkId]));
+    const ids = new Set<number>();
+    for (const t of teams) {
+      for (const m of t.members) {
+        const id = bySignup.get(m.signupId);
+        if (m.seat === 1 && id !== undefined) ids.add(id);
+      }
+    }
+    return ids;
+  }
+
   function details(game: GameRow, viewerId?: number): GameDetails {
     const { entries } = buildRoster(game);
+    const teams = teamsOf(game, entries);
+    // выбранный лучший игрок мог выйти из команд (отменил запись, ушёл в очередь): тогда он не показывается
+    const best =
+      game.best_player_id !== null && teamPlayerIds(entries, teams.teams).has(game.best_player_id)
+        ? game.best_player_id
+        : null;
     return {
       ...summary(game, viewerId),
       address: game.address,
@@ -308,7 +328,8 @@ export function createService(db: DatabaseSync, options: ServiceOptions = {}) {
       paymentInfo: game.payment_info,
       organizerContact: game.organizer_contact,
       roster: entries,
-      ...teamsOf(game, entries),
+      ...teams,
+      bestPlayerId: best,
       results: resultsOf(game),
     };
   }
@@ -861,6 +882,38 @@ export function createService(db: DatabaseSync, options: ServiceOptions = {}) {
       return details(getGameRow(gameId), organizerId);
     },
 
+    /**
+     * Организатор выбирает лучшего игрока сбора (userId) из записавшихся, кто сейчас в командах,
+     * или снимает выбор (userId: null). Можно и после окончания игры, но не в отменённой игре.
+     */
+    setBestPlayer(gameId: number, organizerId: number, body: unknown): GameDetails {
+      const userId = (typeof body === 'object' && body !== null ? body : {}) as { userId?: unknown };
+      const value = userId.userId;
+      if (value !== null && !(typeof value === 'number' && Number.isInteger(value))) {
+        throw new AppError('VALIDATION_ERROR', 'Неверный игрок');
+      }
+      inTransaction(db, () => {
+        const game = getGameRow(gameId);
+        requireOrganizer(game, organizerId);
+        if (game.status !== 'active') throw new AppError('GAME_NOT_ACTIVE', 'Игра отменена');
+        if (value !== null) {
+          const { entries } = buildRoster(game);
+          if (!teamPlayerIds(entries, teamsOf(game, entries).teams).has(value)) {
+            throw new AppError('VALIDATION_ERROR', 'Лучшего игрока можно выбрать только из игроков команд', {
+              userId: 'игрок не в команде',
+            });
+          }
+        }
+        db.prepare('UPDATE games SET best_player_id = ?, updated_at = ? WHERE id = ?').run(
+          value,
+          now().toISOString(),
+          gameId,
+        );
+      });
+      emitGameChanged(gameId, 'roster');
+      return details(getGameRow(gameId), organizerId);
+    },
+
     removeSignup(gameId: number, organizerId: number, signupId: number): GameDetails {
       const before = snapshot(gameId);
       const seatsBefore = mainSeatKeys(gameId);
@@ -943,12 +996,18 @@ export function createService(db: DatabaseSync, options: ServiceOptions = {}) {
             players.push({ userId: user.vkId, teamNo: t.no });
           }
         }
-        return { teamNos: teams.map((t) => t.no), players, results: resultsOf(game) };
+        return {
+          teamNos: teams.map((t) => t.no),
+          players,
+          results: resultsOf(game),
+          bestPlayerId: game.best_player_id,
+        };
       });
       return computeRating(games).map((s) => ({
         user: users.get(s.userId)!,
         matches: s.matches,
         gatherings: s.gatherings,
+        bestPlayer: s.bestPlayer,
         points: s.points,
       }));
     },

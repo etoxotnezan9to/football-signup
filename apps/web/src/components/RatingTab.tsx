@@ -60,7 +60,10 @@ export function RatingTab() {
               <th scope="col" title="Победы в сборах: первое место команды">
                 Победы в сборах
               </th>
-              <th scope="col" title="Персональные очки: 1 за победу в сборе">
+              <th scope="col" title="Сколько раз был лучшим игроком сбора">
+                Лучший игрок
+              </th>
+              <th scope="col" title="Персональные очки: 2 лучшему игроку сбора, иначе 1 за победу команды">
                 Очки
               </th>
             </tr>
@@ -81,6 +84,7 @@ export function RatingTab() {
                 <td>{share(r.matches.lost, r.matches.played)}</td>
                 <td>{r.gatherings.played}</td>
                 <td>{share(r.gatherings.won, r.gatherings.played)}</td>
+                <td>{r.bestPlayer}</td>
                 <td className="standings__points">{r.points}</td>
               </tr>
             ))}
@@ -89,7 +93,8 @@ export function RatingTab() {
       </div>
       <div className="results__hint">
         Каждая встреча команд — отдельный матч. Победа в сборе — первое место команды в турнирной таблице сбора, за
-        неё 1 очко. Учитываются только записавшиеся, без их друзей «+1».
+        неё 1 очко; лучший игрок сбора получает 2 очка вместо этого (очки не складываются). Учитываются только
+        записавшиеся, без их друзей «+1».
       </div>
     </div>
   );
