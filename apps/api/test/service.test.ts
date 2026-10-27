@@ -589,6 +589,45 @@ describe('рейтинг', () => {
   });
 });
 
+describe('порядок встреч', () => {
+  it('по умолчанию расписание без долгих серий; организатор меняет порядок и возвращает его', () => {
+    const g = svc.createGame(ORG, gameBody({ teamsMax: 3, playersPerTeam: 2, meetings: 1 }));
+    let r = svc.getGame(g.id, U1);
+    assert.equal(r.matchOrderCustom, false);
+    assert.deepEqual(
+      r.matches.map((m) => `${m.teamA}-${m.teamB}-${m.leg}`),
+      ['1-2-1', '1-3-1', '2-3-1'],
+    );
+
+    const order = ['2-3-1', '1-2-1', '1-3-1'];
+    expectCode(() => svc.setMatchOrder(g.id, U1, { order }), 'FORBIDDEN');
+    expectCode(() => svc.setMatchOrder(g.id, ORG, { order: ['1-2-1', '1-3-1'] }), 'VALIDATION_ERROR');
+    expectCode(() => svc.setMatchOrder(g.id, ORG, { order: ['1-2-1', '1-2-1', '2-3-1'] }), 'VALIDATION_ERROR');
+    expectCode(() => svc.setMatchOrder(g.id, ORG, { order: 'x' }), 'VALIDATION_ERROR');
+
+    r = svc.setMatchOrder(g.id, ORG, { order });
+    assert.equal(r.matchOrderCustom, true);
+    assert.deepEqual(r.matches.map((m) => `${m.teamA}-${m.teamB}-${m.leg}`), order);
+    assert.equal(events.at(-1)?.type, 'roster.updated');
+    assert.equal(svc.getGame(g.id, U2).matchOrderCustom, true);
+
+    // больше встреч: сохранённый порядок не подходит, действует порядок по умолчанию
+    svc.updateGame(g.id, ORG, { meetings: 2 });
+    r = svc.getGame(g.id, ORG);
+    assert.equal(r.matchOrderCustom, false);
+    assert.equal(r.matches.length, 6);
+    svc.updateGame(g.id, ORG, { meetings: 1 });
+    assert.equal(svc.getGame(g.id, ORG).matchOrderCustom, true);
+
+    r = svc.setMatchOrder(g.id, ORG, { order: null });
+    assert.equal(r.matchOrderCustom, false);
+    assert.equal(r.matches[0]?.teamA, 1);
+
+    svc.cancelGame(g.id, ORG);
+    expectCode(() => svc.setMatchOrder(g.id, ORG, { order }), 'GAME_NOT_ACTIVE');
+  });
+});
+
 describe('лучший игрок сбора', () => {
   it('выбирает организатор из записавшихся в командах; в рейтинге 2 очка вместо 1', () => {
     const g = svc.createGame(ORG, gameBody({ teamsMax: 2, playersPerTeam: 2 }));

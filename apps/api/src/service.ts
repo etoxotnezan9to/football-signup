@@ -25,6 +25,9 @@ import {
   rosterTotals,
   checkSeats,
   TEAM_NAME_MAX,
+  allMatches,
+  isMatchPermutation,
+  matchOrder,
 } from '@football/shared';
 import type {
   GameDetails,
@@ -34,6 +37,7 @@ import type {
   Place,
   RosterEntry,
   MatchResult,
+  MatchSlot,
   RatingGame,
   RatingRow,
   ServerEvent,
@@ -63,6 +67,8 @@ interface GameRow {
   teams_max: number;
   meetings: number;
   best_player_id: number | null;
+  /** JSON-массив ключей встреч в порядке организатора; null — порядок по умолчанию */
+  match_order: string | null;
   players_per_team: number;
   fee_rub: number;
   capacity: number;
@@ -297,6 +303,21 @@ export function createService(db: DatabaseSync, options: ServiceOptions = {}) {
     }));
   }
 
+  /** Встречи в порядке проведения: сохранённый организатором порядок, если он подходит к текущим командам и встречам. */
+  function matchesOf(game: GameRow): { matches: MatchSlot[]; matchOrderCustom: boolean } {
+    let saved: string[] | null = null;
+    if (game.match_order !== null) {
+      try {
+        const v: unknown = JSON.parse(game.match_order);
+        if (Array.isArray(v) && v.every((k) => typeof k === 'string')) saved = v as string[];
+      } catch {
+        // повреждённое значение: порядок по умолчанию
+      }
+    }
+    const { matches, custom } = matchOrder(game.teams_max, game.meetings, saved);
+    return { matches, matchOrderCustom: custom };
+  }
+
   /** Записавшиеся (первое место записи), которые сейчас в командах: из них выбирается лучший игрок. */
   function teamPlayerIds(entries: readonly RosterEntry[], teams: TeamsView['teams']): Set<number> {
     const bySignup = new Map(entries.map((e) => [e.signupId, e.user.vkId]));
@@ -331,6 +352,7 @@ export function createService(db: DatabaseSync, options: ServiceOptions = {}) {
       ...teams,
       bestPlayerId: best,
       results: resultsOf(game),
+      ...matchesOf(game),
     };
   }
 
@@ -913,6 +935,35 @@ export function createService(db: DatabaseSync, options: ServiceOptions = {}) {
              ON CONFLICT (game_id, team_a, team_b, leg)
              DO UPDATE SET goals_a = excluded.goals_a, goals_b = excluded.goals_b, updated_at = excluded.updated_at`,
         ).run(gameId, a, b, leg, ga, gb, now().toISOString());
+      });
+      emitGameChanged(gameId, 'roster');
+      return details(getGameRow(gameId), organizerId);
+    },
+
+    /**
+     * Организатор задаёт порядок встреч (body.order — ключи matchKey всех встреч сбора, каждая по разу)
+     * или возвращает порядок по умолчанию (order: null). Не в отменённой игре.
+     */
+    setMatchOrder(gameId: number, organizerId: number, body: unknown): GameDetails {
+      const raw = (typeof body === 'object' && body !== null ? body : {}) as { order?: unknown };
+      const order = raw.order;
+      if (order !== null && !(Array.isArray(order) && order.every((k) => typeof k === 'string'))) {
+        throw new AppError('VALIDATION_ERROR', 'Неверный порядок встреч', { order: 'массив ключей встреч или null' });
+      }
+      inTransaction(db, () => {
+        const game = getGameRow(gameId);
+        requireOrganizer(game, organizerId);
+        if (game.status !== 'active') throw new AppError('GAME_NOT_ACTIVE', 'Сбор отменён');
+        if (order !== null && !isMatchPermutation(order, allMatches(game.teams_max, game.meetings))) {
+          throw new AppError('VALIDATION_ERROR', 'Неверный порядок встреч', {
+            order: 'нужны все встречи сбора, каждая по одному разу',
+          });
+        }
+        db.prepare('UPDATE games SET match_order = ?, updated_at = ? WHERE id = ?').run(
+          order === null ? null : JSON.stringify(order),
+          now().toISOString(),
+          gameId,
+        );
       });
       emitGameChanged(gameId, 'roster');
       return details(getGameRow(gameId), organizerId);

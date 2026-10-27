@@ -1,6 +1,7 @@
 // Типы ответов API и событий WebSocket (docs/openapi.yaml, docs/realtime.md).
 import type { ErrorCode } from './constants.ts';
 import type { MatchResult } from './matches.ts';
+import type { MatchSlot } from './schedule.ts';
 import type { Team, TeamSeat } from './teams.ts';
 
 export interface User {
@@ -69,6 +70,10 @@ export interface GameDetails extends GameSummary {
   bestPlayerId: number | null;
   /** Счёт сыгранных встреч между командами (каждая пара — meetings встреч) */
   results: MatchResult[];
+  /** Все встречи в порядке проведения: заданном организатором или по умолчанию (defaultMatchOrder) */
+  matches: MatchSlot[];
+  /** Порядок встреч задан организатором (иначе — по умолчанию) */
+  matchOrderCustom: boolean;
 }
 
 /** Строка рейтинга игроков (GET /rating) */

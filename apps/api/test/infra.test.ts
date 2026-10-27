@@ -142,6 +142,8 @@ describe('hub', () => {
         unassigned: [],
         bestPlayerId: null,
         results: [],
+        matches: [],
+        matchOrderCustom: false,
         address: '',
         teamsMax: 2,
         playersPerTeam: 2,

@@ -377,6 +377,36 @@ paths:
         '403': { $ref: '#/components/responses/Error' }
         '404': { $ref: '#/components/responses/Error' }
         '409': { $ref: '#/components/responses/Error' }
+  /games/{gameId}/match-order:
+    parameters:
+      - { $ref: '#/components/parameters/GameId' }
+    put:
+      summary: Задать порядок встреч (только организатор, перетаскиванием на вкладке «Результаты»)
+      description: >-
+        order — ключи всех встреч сбора «teamA-teamB-leg» (teamA < teamB), каждая по одному разу; иначе
+        VALIDATION_ERROR с details.order. order null возвращает порядок по умолчанию: как можно меньше матчей подряд
+        у любой команды, затем как можно меньше ожиданий подряд (defaultMatchOrder в packages/shared).
+        Если потом меняется число команд или встреч, сохранённый порядок не подходит и действует порядок по умолчанию.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [order]
+              properties:
+                order: { type: array, nullable: true, items: { type: string, example: '1-2-1' } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GameDetails' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
   /games/{gameId}/best-player:
     parameters:
       - { $ref: '#/components/parameters/GameId' }
@@ -644,6 +674,14 @@ components:
         leg: { type: integer, minimum: 1, description: 'Номер встречи этой пары, от 1 до meetings' }
         goalsA: { type: integer, minimum: 0, maximum: 99 }
         goalsB: { type: integer, minimum: 0, maximum: 99 }
+    MatchSlot:
+      type: object
+      description: Встреча leg команд teamA < teamB
+      required: [teamA, teamB, leg]
+      properties:
+        teamA: { type: integer, minimum: 1 }
+        teamB: { type: integer, minimum: 2 }
+        leg: { type: integer, minimum: 1 }
     Team:
       type: object
       required: [no, name, color, members]
@@ -669,7 +707,7 @@ components:
       allOf:
         - $ref: '#/components/schemas/GameSummary'
         - type: object
-          required: [address, teamsMax, playersPerTeam, meetings, description, paymentInfo, organizerContact, roster, teams, unassigned, bestPlayerId, results]
+          required: [address, teamsMax, playersPerTeam, meetings, description, paymentInfo, organizerContact, roster, teams, unassigned, bestPlayerId, results, matches, matchOrderCustom]
           properties:
             address: { type: string, description: Адрес места }
             teamsMax: { type: integer }
@@ -700,3 +738,8 @@ components:
                 Счёт сыгранных встреч между командами 1..teamsMax (каждая пара — meetings встреч). Пары и турнирную
                 таблицу клиент считает функциями matchPairs и standings из packages/shared
               items: { $ref: '#/components/schemas/MatchResult' }
+            matches:
+              type: array
+              description: Все встречи сбора в порядке проведения (заданном организатором или по умолчанию)
+              items: { $ref: '#/components/schemas/MatchSlot' }
+            matchOrderCustom: { type: boolean, description: 'Порядок встреч задан организатором' }

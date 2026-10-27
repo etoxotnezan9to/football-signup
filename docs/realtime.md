@@ -23,7 +23,7 @@
 |---|---|---|
 | `game.created` | создана игра | `{"type":"game.created","game": GameSummary}` → подписчикам `games` |
 | `game.updated` | игра изменена, отменена, изменился состав | `{"type":"game.updated","game": GameSummary}` → подписчикам `games` |
-| `roster.updated` | изменилась запись, оплата, вместимость, команды, счёт матча, лучший игрок | `{"type":"roster.updated","game": GameDetails}` → подписчикам `game:N` |
+| `roster.updated` | изменилась запись, оплата, вместимость, команды, счёт матча, порядок встреч, лучший игрок | `{"type":"roster.updated","game": GameDetails}` → подписчикам `game:N` |
 
 Схемы `GameSummary` и `GameDetails` — как в `openapi.yaml`. Поле `mySeats` в событиях не передаётся (зависит от получателя), клиент считает его по `roster` и `vkId`.
 

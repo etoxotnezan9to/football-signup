@@ -237,6 +237,9 @@ export function buildApp(deps: AppDeps): FastifyInstance {
             null,
           );
         });
+        secured.put('/games/:gameId/match-order', async (req) =>
+          service.setMatchOrder(parseId((req.params as { gameId: string }).gameId), req.vkId, req.body),
+        );
         secured.put('/games/:gameId/best-player', async (req) =>
           service.setBestPlayer(parseId((req.params as { gameId: string }).gameId), req.vkId, req.body),
         );
