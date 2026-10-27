@@ -69,6 +69,9 @@ export const api = {
     request<GameDetails>('PUT', `/games/${id}/matches/${teamA}/${teamB}/${leg}`, { goalsA, goalsB }),
   clearMatchScore: (id: number, teamA: number, teamB: number, leg: number) =>
     request<GameDetails>('DELETE', `/games/${id}/matches/${teamA}/${teamB}/${leg}`),
+  /** order — ключи matchKey всех встреч в новом порядке; null — порядок по умолчанию */
+  setMatchOrder: (id: number, order: string[] | null) =>
+    request<GameDetails>('PUT', `/games/${id}/match-order`, { order }),
   setBestPlayer: (id: number, userId: number | null) =>
     request<GameDetails>('PUT', `/games/${id}/best-player`, { userId }),
   assignSeat: (id: number, signupId: number, seat: number, teamNo: number | null) =>

@@ -340,7 +340,7 @@ test('команды: организатор перераспределяет и
   await expect(maria.getByText('Перетащите игрока в команду', { exact: false })).toHaveCount(0);
 });
 
-test('результаты: пары команд со счётом каждой встречи и турнирная таблица', async ({ browser }) => {
+test('результаты: матчи по порядку со счётом каждой встречи и турнирная таблица', async ({ browser }) => {
   const org = await openAs(browser, ORGANIZER);
   await org.getByRole('button', { name: 'Создать сбор', exact: true }).last().click();
   await choosePlace(org, 'Стадион результатов', 'ул. Турнирная, 1');
@@ -355,19 +355,23 @@ test('результаты: пары команд со счётом каждой
   const gamePath = `/${new URL(org.url()).hash}`;
 
   await org.getByRole('tab', { name: 'Результаты' }).click();
-  // 3 команды: 3 пары по 3 встречи, без деления на туры
-  await expect(org.getByText(/^Тур /)).toHaveCount(0);
-  await expect(org.getByText('Каждая пара команд играет 3 раза')).toBeVisible();
-  const pair = org.getByRole('region', { name: 'Синие — Розовые' });
-  await expect(org.getByRole('region', { name: / — / })).toHaveCount(3);
-  await expect(pair.getByRole('group', { name: /^Встреча / })).toHaveCount(3);
+  // 3 команды по 3 встречи: 9 матчей одним списком; пары по кругу, никто не ждёт два матча подряд
+  await expect(org.getByText(/^Каждая пара команд играет 3 раза/)).toBeVisible();
+  const matches = org.getByRole('group', { name: /^Матч \d+: / });
+  await expect(matches).toHaveCount(9);
+  const names = await matches.evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')));
+  expect(names.slice(0, 3)).toEqual([
+    'Матч 1: Синие — Розовые',
+    'Матч 2: Синие — Салатовые',
+    'Матч 3: Розовые — Салатовые',
+  ]);
 
-  const first = pair.getByRole('group', { name: 'Встреча 1' });
+  const first = org.getByRole('group', { name: 'Матч 1: Синие — Розовые' });
   await first.getByLabel('Голы Синие', { exact: true }).fill('2');
   await first.getByLabel('Голы Розовые', { exact: true }).fill('1');
   await first.getByRole('button', { name: 'Сохранить', exact: true }).click();
   await expect(first.getByRole('button', { name: 'Стереть', exact: true })).toBeVisible();
-  const second = pair.getByRole('group', { name: 'Встреча 2' });
+  const second = org.getByRole('group', { name: 'Матч 4: Синие — Розовые' });
   await second.getByLabel('Голы Синие', { exact: true }).fill('1');
   await second.getByLabel('Голы Розовые', { exact: true }).fill('1');
   await second.getByRole('button', { name: 'Сохранить', exact: true }).click();
@@ -384,14 +388,34 @@ test('результаты: пары команд со счётом каждой
   // участник видит счёт встреч и таблицу, но не может их менять
   const maria = await openAs(browser, MARIA, gamePath);
   await maria.getByRole('tab', { name: 'Результаты' }).click();
-  const seen = maria.getByRole('region', { name: 'Синие — Розовые' });
-  await expect(seen.getByRole('group', { name: 'Встреча 1' }).getByText('2 : 1')).toBeVisible();
-  await expect(seen.getByRole('group', { name: 'Встреча 2' }).getByText('1 : 1')).toBeVisible();
-  await expect(seen.getByRole('textbox')).toHaveCount(0);
+  const seen = maria.getByRole('group', { name: /^Матч \d+: / });
+  const goals = (name: string) => maria.getByRole('group', { name }).getByTestId('match-goals');
+  await expect(goals('Матч 1: Синие — Розовые')).toHaveText(['2', '1']);
+  await expect(goals('Матч 4: Синие — Розовые')).toHaveText(['1', '1']);
+  await expect(maria.locator('.results').getByRole('textbox')).toHaveCount(0);
+  await expect(maria.getByTestId('match-dragger')).toHaveCount(0);
 
   // организатор стирает первую встречу: у участника обновляется без перезагрузки
   await first.getByRole('button', { name: 'Стереть', exact: true }).click();
-  await expect(seen.getByRole('group', { name: 'Встреча 1' }).getByText('– : –')).toBeVisible();
+  await expect(goals('Матч 1: Синие — Розовые')).toHaveText(['–', '–']);
+
+  // организатор перетаскивает первый матч на третье место: порядок меняется и у участника
+  const dragger = org.getByTestId('match-dragger').first();
+  const from = (await dragger.boundingBox())!;
+  const target = (await org.getByRole('group', { name: 'Матч 3: Розовые — Салатовые' }).boundingBox())!;
+  await org.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
+  await org.mouse.down();
+  await org.mouse.move(from.x + from.width / 2, target.y + target.height * 0.75, { steps: 15 });
+  await org.mouse.up();
+  await expect(org.getByRole('group', { name: 'Матч 3: Синие — Розовые' })).toBeVisible();
+  await expect(org.getByRole('group', { name: 'Матч 1: Синие — Салатовые' })).toBeVisible();
+  await expect(maria.getByRole('group', { name: 'Матч 3: Синие — Розовые' })).toBeVisible();
+  await expect(seen).toHaveCount(9);
+
+  // порядок по умолчанию возвращается одной кнопкой
+  await org.getByRole('button', { name: 'Вернуть порядок по умолчанию', exact: true }).click();
+  await expect(maria.getByRole('group', { name: 'Матч 1: Синие — Розовые' })).toBeVisible();
+  await expect(org.getByRole('button', { name: 'Вернуть порядок по умолчанию', exact: true })).toHaveCount(0);
 });
 
 test('главная: вкладки «Сборы» и «Рейтинг», рейтинг считается по сохранённому счёту', async ({ browser }) => {
@@ -416,7 +440,7 @@ test('главная: вкладки «Сборы» и «Рейтинг», ре�
     await expect(page.getByText(/Вы записаны/)).toBeVisible();
   }
   await org.getByRole('tab', { name: 'Результаты' }).click();
-  const leg = org.getByRole('region', { name: 'Синие — Розовые' }).getByRole('group', { name: 'Встреча 1' });
+  const leg = org.getByRole('group', { name: 'Матч 1: Синие — Розовые' });
   await leg.getByLabel('Голы Синие', { exact: true }).fill('2');
   await leg.getByLabel('Голы Розовые', { exact: true }).fill('0');
   await leg.getByRole('button', { name: 'Сохранить', exact: true }).click();

@@ -211,33 +211,6 @@
   font-size: 13px;
   color: var(--vkui--color_text_secondary);
 }
-.pair {
-  border: 1px solid var(--vkui--color_separator_primary);
-  border-radius: 12px;
-  padding: 8px 12px;
-}
-.pair__header {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
-  align-items: center;
-  gap: 8px;
-  font-weight: 600;
-  padding-bottom: 4px;
-}
-.pair__vs {
-  color: var(--vkui--color_text_secondary);
-}
-.leg {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
-  align-items: center;
-  gap: 8px;
-  padding: 4px 0;
-}
-.leg__title {
-  font-size: 13px;
-  color: var(--vkui--color_text_secondary);
-}
 .leg__actions {
   display: flex;
   justify-content: flex-end;
@@ -248,24 +221,23 @@
   gap: 6px;
   min-width: 0;
 }
-.match__team--right {
-  justify-content: flex-end;
-}
 .match__team-name {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.match__score {
+.match__side {
   display: flex;
   align-items: center;
-  gap: 4px;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 32px;
   font-weight: 600;
-  font-variant-numeric: tabular-nums;
 }
 .match__score--text {
-  min-width: 48px;
-  justify-content: center;
+  min-width: 36px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
 }
 .match__goals {
   width: 36px;
@@ -441,4 +413,56 @@
   margin: 4px 16px 8px;
   font-size: 14px;
   color: var(--vkui--color_text_tertiary);
+}
+/* Матчи на вкладке «Результаты»: один список в порядке проведения */
+.matches {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.matches__item,
+.matches__cell {
+  border: 1px solid var(--vkui--color_separator_primary);
+  border-radius: 12px;
+  background: var(--vkui--color_background_content);
+}
+.matches__item {
+  padding: 8px 12px;
+}
+/* ячейка VKUI с перетаскиванием: свои отступы меньше, чтобы названия команд помещались на телефоне */
+.matches__cell .vkuiSimpleCell__host {
+  padding-inline: 8px 12px;
+}
+.matches__cell .vkuiSimpleCell__before {
+  padding-inline-end: 8px;
+}
+.matches__cell .vkuiSimpleCell__middle {
+  padding-block: 8px;
+}
+.matches__cell .vkuiSimpleCell__after {
+  display: none;
+}
+.matches__cell .vkuiSimpleCell__children {
+  display: block;
+  width: 100%;
+}
+.matches__cell .match {
+  white-space: normal;
+}
+.match {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.match__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 24px;
+  gap: 8px;
+}
+.match__no {
+  font-size: 13px;
+  color: var(--vkui--color_text_secondary);
 }

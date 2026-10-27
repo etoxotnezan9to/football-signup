@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { Button } from '@vkontakte/vkui';
-import { MAX_GOALS, matchKey, matchPairs, standings, type GameDetails, type Team } from '@football/shared';
+import { Button, Cell, List } from '@vkontakte/vkui';
+import { MAX_GOALS, matchKey, moveItem, standings, type GameDetails, type Team } from '@football/shared';
 import { api, type ApiError } from '../api.ts';
 import { BestPlayerPicker } from './BestPlayerPicker.tsx';
 import { Empty } from './Empty.tsx';
@@ -19,18 +19,18 @@ function parseGoals(s: string): number | null {
   return n <= MAX_GOALS ? n : null;
 }
 
-function TeamName({ team, align = 'left' }: { team: Team; align?: 'left' | 'right' }) {
+function TeamName({ team }: { team: Team }) {
   return (
-    <span className={`match__team match__team--${align}`}>
-      {align === 'left' && <span className="team-dot" style={{ backgroundColor: team.color }} aria-hidden="true" />}
+    <span className="match__team">
+      <span className="team-dot" style={{ backgroundColor: team.color }} aria-hidden="true" />
       <span className="match__team-name">{team.name}</span>
-      {align === 'right' && <span className="team-dot" style={{ backgroundColor: team.color }} aria-hidden="true" />}
     </span>
   );
 }
 
 /**
- * Вкладка «Результаты»: каждая пара команд с meetings встречами, счёт каждой встречи (вводит организатор)
+ * Вкладка «Результаты»: все встречи одним списком в порядке проведения (по умолчанию — без долгих серий игр
+ * и ожиданий у команд, организатор меняет порядок перетаскиванием), счёт каждой встречи (вводит организатор)
  * и турнирная таблица, где каждая встреча — отдельный матч.
  */
 export function ResultsTab({
@@ -45,16 +45,19 @@ export function ResultsTab({
   const { showToast } = useApp();
   const [drafts, setDrafts] = useState<Record<string, Draft>>({});
   const [busy, setBusy] = useState<string | null>(null);
+  // новый порядок показывается сразу, пока сервер его сохраняет
+  const [pendingOrder, setPendingOrder] = useState<string[] | null>(null);
   const teams = new Map(game.teams.map((t) => [t.no, t]));
   const saved = new Map(game.results.map((r) => [matchKey(r.teamA, r.teamB, r.leg), r]));
-  const pairs = matchPairs(game.teams.length);
-  const legs = Array.from({ length: game.meetings }, (_, i) => i + 1);
+  const byKey = new Map(game.matches.map((m) => [matchKey(m.teamA, m.teamB, m.leg), m]));
+  const order = pendingOrder ?? [...byKey.keys()];
+  const matches = order.map((k) => byKey.get(k)).filter((m) => m !== undefined);
   const table = standings(
     game.teams.map((t) => t.no),
     game.results,
   );
 
-  if (pairs.length === 0) return <Empty>Для матчей нужно хотя бы две команды</Empty>;
+  if (game.matches.length === 0) return <Empty>Для матчей нужно хотя бы две команды</Empty>;
 
   const dropDraft = (key: string) =>
     setDrafts((d) => {
@@ -73,93 +76,128 @@ export function ResultsTab({
       .finally(() => setBusy(null));
   };
 
+  const saveOrder = (next: string[] | null) => {
+    setPendingOrder(next);
+    api
+      .setMatchOrder(game.id, next)
+      .then(onUpdate)
+      .catch((e: ApiError) => showToast(e.message))
+      .finally(() => setPendingOrder(null));
+  };
+
+  const onDragFinish = ({ from, to }: { from: number; to: number }) => {
+    if (from === to) return;
+    saveOrder(moveItem(order, from, to));
+  };
+
   return (
     <div className="results">
       <div className="results__hint">
-        Каждая пара команд играет {game.meetings} {plural(game.meetings, ['раз', 'раза', 'раз'])}
+        Каждая пара команд играет {game.meetings} {plural(game.meetings, ['раз', 'раза', 'раз'])}. Матчи идут по
+        порядку списка{editable ? '; чтобы изменить порядок, перетащите матч за значок слева' : ''}.
       </div>
-      {pairs.map(({ teamA, teamB }) => {
-        const a = teams.get(teamA)!;
-        const b = teams.get(teamB)!;
-        return (
-          <section key={`${teamA}-${teamB}`} className="pair" aria-label={`${a.name} — ${b.name}`}>
-            <div className="pair__header">
-              <TeamName team={a} />
-              <span className="pair__vs" aria-hidden="true">
-                —
-              </span>
-              <TeamName team={b} align="right" />
-            </div>
-            {legs.map((leg) => {
-              const key = matchKey(teamA, teamB, leg);
-              const result = saved.get(key);
-              const draft = drafts[key];
-              const value: Draft = draft ?? {
-                a: result ? String(result.goalsA) : '',
-                b: result ? String(result.goalsB) : '',
-              };
-              const ga = parseGoals(value.a);
-              const gb = parseGoals(value.b);
-              const dirty = draft !== undefined && (ga !== result?.goalsA || gb !== result?.goalsB);
-              const setValue = (side: 'a' | 'b', v: string) =>
-                setDrafts((d) => ({ ...d, [key]: { ...value, [side]: v } }));
-              return (
-                <div key={leg} className="leg" role="group" aria-label={`Встреча ${leg}`}>
-                  <span className="leg__title">Встреча {leg}</span>
+      {editable && game.matchOrderCustom && (
+        <div>
+          <Button size="s" mode="link" disabled={pendingOrder !== null} onClick={() => saveOrder(null)}>
+            Вернуть порядок по умолчанию
+          </Button>
+        </div>
+      )}
+      <List className="matches" aria-label="Матчи по порядку">
+        {matches.map((m, index) => {
+          const { teamA, teamB, leg } = m;
+          const a = teams.get(teamA);
+          const b = teams.get(teamB);
+          if (!a || !b) return null;
+          const key = matchKey(teamA, teamB, leg);
+          const result = saved.get(key);
+          const draft = drafts[key];
+          const value: Draft = draft ?? {
+            a: result ? String(result.goalsA) : '',
+            b: result ? String(result.goalsB) : '',
+          };
+          const ga = parseGoals(value.a);
+          const gb = parseGoals(value.b);
+          const dirty = draft !== undefined && (ga !== result?.goalsA || gb !== result?.goalsB);
+          const setValue = (side: 'a' | 'b', v: string) =>
+            setDrafts((d) => ({ ...d, [key]: { ...value, [side]: v } }));
+          const label = `Матч ${index + 1}: ${a.name} — ${b.name}`;
+          const row = (
+            <div className="match" role="group" aria-label={label} data-testid="match">
+              <div className="match__head">
+                <span className="match__no">
+                  Матч {index + 1}
+                  {game.meetings > 1 && ` · встреча ${leg}`}
+                </span>
+                <span className="leg__actions">
+                  {editable && dirty && (
+                    <Button
+                      size="s"
+                      loading={busy === key}
+                      disabled={ga === null || gb === null}
+                      onClick={() =>
+                        ga !== null && gb !== null && run(key, api.setMatchScore(game.id, teamA, teamB, leg, ga, gb))
+                      }
+                    >
+                      Сохранить
+                    </Button>
+                  )}
+                  {editable && !dirty && result && (
+                    <Button
+                      size="s"
+                      mode="tertiary"
+                      appearance="negative"
+                      loading={busy === key}
+                      onClick={() => run(key, api.clearMatchScore(game.id, teamA, teamB, leg))}
+                    >
+                      Стереть
+                    </Button>
+                  )}
+                </span>
+              </div>
+              {[
+                { team: a, side: 'a' as const, goals: result?.goalsA },
+                { team: b, side: 'b' as const, goals: result?.goalsB },
+              ].map(({ team, side, goals }) => (
+                <div key={side} className="match__side">
+                  <TeamName team={team} />
                   {editable ? (
-                    <span className="match__score">
-                      <input
-                        className="match__goals"
-                        inputMode="numeric"
-                        aria-label={`Голы ${a.name}`}
-                        value={value.a}
-                        onChange={(e) => setValue('a', e.target.value)}
-                      />
-                      <span aria-hidden="true">:</span>
-                      <input
-                        className="match__goals"
-                        inputMode="numeric"
-                        aria-label={`Голы ${b.name}`}
-                        value={value.b}
-                        onChange={(e) => setValue('b', e.target.value)}
-                      />
-                    </span>
+                    <input
+                      className="match__goals"
+                      inputMode="numeric"
+                      aria-label={`Голы ${team.name}`}
+                      value={value[side]}
+                      onChange={(e) => setValue(side, e.target.value)}
+                    />
                   ) : (
-                    <span className="match__score match__score--text">
-                      {result ? `${result.goalsA} : ${result.goalsB}` : '– : –'}
+                    <span className="match__score--text" data-testid="match-goals">
+                      {goals ?? '–'}
                     </span>
                   )}
-                  <span className="leg__actions">
-                    {editable && dirty && (
-                      <Button
-                        size="s"
-                        loading={busy === key}
-                        disabled={ga === null || gb === null}
-                        onClick={() =>
-                          ga !== null && gb !== null && run(key, api.setMatchScore(game.id, teamA, teamB, leg, ga, gb))
-                        }
-                      >
-                        Сохранить
-                      </Button>
-                    )}
-                    {editable && !dirty && result && (
-                      <Button
-                        size="s"
-                        mode="tertiary"
-                        appearance="negative"
-                        loading={busy === key}
-                        onClick={() => run(key, api.clearMatchScore(game.id, teamA, teamB, leg))}
-                      >
-                        Стереть
-                      </Button>
-                    )}
-                  </span>
                 </div>
-              );
-            })}
-          </section>
-        );
-      })}
+              ))}
+            </div>
+          );
+          return editable ? (
+            <Cell
+              key={key}
+              className="matches__cell"
+              draggable
+              draggerLabel={`Перетащить: ${label}`}
+              draggerTestId="match-dragger"
+              hasHover={false}
+              hasActive={false}
+              onDragFinish={onDragFinish}
+            >
+              {row}
+            </Cell>
+          ) : (
+            <div key={key} className="matches__item">
+              {row}
+            </div>
+          );
+        })}
+      </List>
 
       <BestPlayerPicker game={game} editable={editable} onUpdate={onUpdate} />
 
