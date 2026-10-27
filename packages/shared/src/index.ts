@@ -5,5 +5,6 @@ export * from './roster-text.ts';
 export * from './validation.ts';
 export * from './teams.ts';
 export * from './matches.ts';
+export * from './schedule.ts';
 export * from './rating.ts';
 export * from './types.ts';
