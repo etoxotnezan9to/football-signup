@@ -104,10 +104,11 @@ describe('создание и список игр', () => {
     assert.equal(page2.nextCursor, null);
   });
 
-  it('завершённые и отменённые игры не попадают в список', () => {
+  it('отменённые без фильтра «показывать отменённые» в список не попадают', () => {
     const g = svc.createGame(ORG, gameBody());
     svc.cancelGame(g.id, ORG);
-    assert.equal(svc.listGames(U1).items.length, 0);
+    assert.equal(svc.listGames(U1, { includeCancelled: false }).items.length, 0);
+    assert.equal(svc.listGames(U1).items.length, 1);
   });
 });
 
@@ -618,13 +619,17 @@ describe('мои сборы для копирования', () => {
 });
 
 describe('отменённые сборы в списке', () => {
-  it('видят организатор и записавшиеся, остальные — нет', () => {
+  it('видны всем, включая чужих; includeCancelled: false прячет их', () => {
     const g = svc.createGame(ORG, gameBody());
     svc.putSignup(g.id, U1, 1);
     svc.cancelGame(g.id, ORG);
-    const ids = (viewer: number) => svc.listGames(viewer).items.map((x) => [x.id, x.status, x.mySeats]);
+    const ids = (viewer: number, includeCancelled?: boolean) =>
+      svc
+        .listGames(viewer, includeCancelled === undefined ? {} : { includeCancelled })
+        .items.map((x) => [x.id, x.status, x.mySeats]);
     assert.deepEqual(ids(ORG), [[g.id, 'cancelled', 0]]);
     assert.deepEqual(ids(U1), [[g.id, 'cancelled', 1]]);
-    assert.deepEqual(ids(U2), []);
+    assert.deepEqual(ids(U2), [[g.id, 'cancelled', 0]], 'чужой отменённый сбор тоже виден');
+    assert.deepEqual(ids(U1, false), []);
   });
 });

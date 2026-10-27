@@ -141,13 +141,13 @@ paths:
   /games:
     get:
       description: >-
-        Сборы для главной. Активные видят все; отменённые — только организатор и записавшиеся
-        (запись после отмены сохраняется). Без includePast — только предстоящие. Порядок: предстоящие
+        Сборы для главной. Отменённые видны всем (свои и чужие), кроме includeCancelled=0.
+        Без includePast — только предстоящие. Порядок: предстоящие
         по возрастанию времени, затем прошедшие от новых к старым.
       summary: Список сборов (фильтры главной)
       parameters:
         - { name: includePast, in: query, schema: { type: string, enum: ['0', '1'], default: '0' }, description: 'Показывать прошедшие сборы' }
-        - { name: includeCancelled, in: query, schema: { type: string, enum: ['0', '1'], default: '1' }, description: 'Показывать отменённые (свои и те, куда был записан)' }
+        - { name: includeCancelled, in: query, schema: { type: string, enum: ['0', '1'], default: '1' }, description: 'Показывать отменённые сборы (свои и чужие)' }
         - { name: placeId, in: query, schema: { type: integer, minimum: 1 }, description: 'Только сборы этой арены' }
         - { name: cursor, in: query, schema: { type: string } }
         - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 50, default: 20 } }

@@ -6,7 +6,7 @@ export interface ListFilters {
   placeId: number | null;
   /** Показывать прошедшие сборы */
   showPast: boolean;
-  /** Показывать отменённые сборы (свои и те, куда был записан) */
+  /** Показывать отменённые сборы (свои и чужие) */
   showCancelled: boolean;
 }
 

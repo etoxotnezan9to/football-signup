@@ -604,7 +604,7 @@ test('«Скопировать список» копирует всю инфор
   ]);
 });
 
-test('отменённый сбор остаётся в списке у организатора и записавшихся', async ({ browser }) => {
+test('отменённый сбор виден в списке всем, пока включён флажок «Показывать отменённые сборы»', async ({ browser }) => {
   const org = await openAs(browser, DMITRY);
   await org.getByRole('button', { name: 'Создать сбор', exact: true }).last().click();
   await choosePlace(org, 'Арена отмены', 'ул. Отменная, 6');
@@ -624,11 +624,13 @@ test('отменённый сбор остаётся в списке у орга
   await org.getByRole('button', { name: 'Отменить сбор', exact: true }).last().click();
   await expect(org.getByText('Сбор отменён').first()).toBeVisible();
 
-  // записавшаяся видит отмену у себя в списке без перезагрузки, посторонний — нет
+  // отмена видна у всех без перезагрузки: и у записавшейся, и у постороннего
   const card = maria.locator('.card', { hasText: 'Арена отмены' });
   await expect(card.getByText('Сбор отменён')).toBeVisible();
   await expect(card.getByRole('button')).toHaveCount(0);
-  await expect(alexey.getByText(/· Арена отмены$/)).toHaveCount(0);
+  await expect(alexey.locator('.card', { hasText: 'Арена отмены' }).getByText('Сбор отменён')).toBeVisible();
+  await alexey.reload();
+  await expect(alexey.locator('.card', { hasText: 'Арена отмены' }).getByText('Сбор отменён')).toBeVisible();
   // организатор видит его в списке и после перезагрузки
   await org.goto('/');
   await expect(org.locator('.card', { hasText: 'Арена отмены' }).getByText('Сбор отменён')).toBeVisible();

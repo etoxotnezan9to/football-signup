@@ -91,19 +91,16 @@ export function meetingsLabel(n: number): string {
 
 /**
  * Показывать ли сбор в списке на главной при живом обновлении — те же правила, что у сервера (GET /games):
- * прошедшие — только с фильтром showPast; отменённые — с фильтром showCancelled и только организатору
- * и тем, кто записан (mySeats > 0); арена — по фильтру placeId.
+ * прошедшие — только с фильтром showPast; отменённые (свои и чужие) — только с фильтром showCancelled;
+ * арена — по фильтру placeId.
  */
 export function visibleInList(
-  game: { status: 'active' | 'cancelled'; isFinished: boolean; placeId: number; organizer: { vkId: number } },
-  viewerId: number,
-  mySeats: number,
+  game: { status: 'active' | 'cancelled'; isFinished: boolean; placeId: number },
   filters: { placeId: number | null; showPast: boolean; showCancelled: boolean },
 ): boolean {
   if (game.isFinished && !filters.showPast) return false;
   if (filters.placeId !== null && game.placeId !== filters.placeId) return false;
-  if (game.status === 'active') return true;
-  return filters.showCancelled && (game.organizer.vkId === viewerId || mySeats > 0);
+  return game.status === 'active' || filters.showCancelled;
 }
 
 /** Подпись состояния заполненности: «занято 18/24, в очереди 3». */

@@ -576,8 +576,8 @@ export function createService(db: DatabaseSync, options: ServiceOptions = {}) {
     },
 
     /**
-     * Список сборов для главной. Активные видят все; отменённые — только организатор и те, кто был записан
-     * (includeCancelled: false — не показывать их вовсе). Прошедшие — только с includePast. placeId — одна арена.
+     * Список сборов для главной. Отменённые видны всем, кроме includeCancelled: false — тогда их нет вовсе.
+     * Прошедшие — только с includePast. placeId — одна арена.
      * Порядок: предстоящие по возрастанию времени, затем прошедшие от новых к старым.
      */
     listGames(
@@ -593,13 +593,7 @@ export function createService(db: DatabaseSync, options: ServiceOptions = {}) {
         where.push('g.starts_at > ?');
         params.push(since);
       }
-      if (opts.includeCancelled === false) {
-        where.push("g.status = 'active'");
-      } else {
-        where.push(`(g.status = 'active' OR g.organizer_id = ?
-                     OR EXISTS (SELECT 1 FROM signups s WHERE s.game_id = g.id AND s.user_id = ?))`);
-        params.push(viewerId, viewerId);
-      }
+      if (opts.includeCancelled === false) where.push("g.status = 'active'");
       if (opts.placeId !== undefined) {
         where.push('g.place_id = ?');
         params.push(opts.placeId);

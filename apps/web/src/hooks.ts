@@ -26,8 +26,7 @@ function sortByStart(list: GameSummary[]): GameSummary[] {
  * перезагрузка при переподключении и при смене фильтров.
  */
 export function useGames(): Loadable<GameSummary[]> {
-  const { realtime, session } = useApp();
-  const me = session.user.id;
+  const { realtime } = useApp();
   const filters = useListFilters();
   const query = filtersQuery(filters);
   const [data, setData] = useState<GameSummary[] | null>(null);
@@ -57,7 +56,7 @@ export function useGames(): Loadable<GameSummary[]> {
         const rest = prev.filter((x) => x.id !== g.id);
         // в событии нет mySeats (зависит от получателя): сохраняем известное значение
         const mySeats = old?.mySeats ?? 0;
-        if (!visibleInList(g, me, mySeats, filters)) return rest;
+        if (!visibleInList(g, filters)) return rest;
         return sortByStart([...rest, { ...g, mySeats }]);
       });
     });
@@ -67,7 +66,7 @@ export function useGames(): Loadable<GameSummary[]> {
       unsubEvent();
       unsubRefresh();
     };
-  }, [realtime, reload, me, filters]);
+  }, [realtime, reload, filters]);
 
   return { data, error, loading, reload };
 }
