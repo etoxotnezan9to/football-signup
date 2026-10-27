@@ -385,7 +385,8 @@ paths:
       description: >-
         order — ключи всех встреч сбора «teamA-teamB-leg» (teamA < teamB), каждая по одному разу; иначе
         VALIDATION_ERROR с details.order. order null возвращает порядок по умолчанию: как можно меньше матчей подряд
-        у любой команды, затем как можно меньше ожиданий подряд (defaultMatchOrder в packages/shared).
+        у любой команды, затем как можно меньше ожиданий подряд, затем как можно ровнее между командами
+        (defaultMatchOrder в packages/shared, готовые порядки в match-orders.generated.ts).
         Если потом меняется число команд или встреч, сохранённый порядок не подходит и действует порядок по умолчанию.
       requestBody:
         required: true

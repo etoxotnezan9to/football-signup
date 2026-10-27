@@ -11,8 +11,12 @@ import {
   matchOrder,
   moveItem,
   scheduleStats,
+  scheduleFairness,
+  encodeMatchOrder,
+  decodeMatchOrder,
   type MatchSlot,
 } from '../src/index.ts';
+import { MATCH_ORDERS } from '../src/match-orders.generated.ts';
 
 const keys = (order: readonly MatchSlot[]) => order.map((m) => matchKey(m.teamA, m.teamB, m.leg));
 const pairs = (order: readonly MatchSlot[]) => order.map((m) => `${m.teamA}${m.teamB}`).join(' ');
@@ -39,8 +43,9 @@ describe('порядок встреч по умолчанию', () => {
   });
 
   it('4 команды: 2 подряд и 2 ожидания (меньше нельзя: тогда играли бы только 1–2 и 3–4)', () => {
-    assert.equal(pairs(defaultMatchOrder(4, 1)), '12 34 13 24 14 23');
-    assert.deepEqual(scheduleStats(defaultMatchOrder(4, 2), 4), { maxPlayStreak: 2, maxWaitStreak: 2 });
+    for (let m = 1; m <= MAX_MEETINGS; m++) {
+      assert.deepEqual(scheduleStats(defaultMatchOrder(4, m), 4), { maxPlayStreak: 2, maxWaitStreak: 2 }, `${m} встреч`);
+    }
   });
 
   it('5 и больше команд: никто не играет два матча подряд, ожидание не больше нижней границы + 1', () => {
@@ -62,6 +67,53 @@ describe('порядок встреч по умолчанию', () => {
       order.slice(0, 6).map((x) => x.leg),
       [1, 1, 1, 1, 1, 1],
     );
+  });
+});
+
+describe('равенство команд', () => {
+  it('таблица готовых порядков есть для всех сочетаний команд и встреч', () => {
+    for (let n = 3; n <= MAX_TEAMS; n++) {
+      for (let m = 1; m <= MAX_MEETINGS; m++) assert.ok(MATCH_ORDERS[`${n}:${m}`], `${n}:${m}`);
+    }
+  });
+
+  it('4 команды от 2 встреч: у всех команд одинаковые серии игр и перерывы', () => {
+    for (let m = 2; m <= MAX_MEETINGS; m++) {
+      assert.deepEqual(scheduleFairness(defaultMatchOrder(4, m), 4), { streakSpread: 0, waitSpread: 0, profiles: 0 }, `${m} встреч`);
+    }
+  });
+
+  it('5 и больше команд: у всех одинаковое число матчей подряд и перерывов между матчами', () => {
+    for (let n = 5; n <= MAX_TEAMS; n++) {
+      for (let m = 1; m <= MAX_MEETINGS; m++) {
+        assert.equal(scheduleFairness(defaultMatchOrder(n, m), n).streakSpread, 0, `${n} команд, ${m} встреч`);
+      }
+    }
+  });
+
+  it('3 команды и 4 команды с одной встречей: без ухудшения серий разница не больше одной серии', () => {
+    for (let m = 1; m <= MAX_MEETINGS; m++) assert.ok(scheduleFairness(defaultMatchOrder(3, m), 3).streakSpread <= 1);
+    assert.ok(scheduleFairness(defaultMatchOrder(4, 1), 4).streakSpread <= 1);
+  });
+
+  it('scheduleFairness: серии, перерывы и наборы длин', () => {
+    const order: MatchSlot[] = [
+      { teamA: 1, teamB: 2, leg: 1 },
+      { teamA: 1, teamB: 3, leg: 1 },
+      { teamA: 2, teamB: 3, leg: 1 },
+    ];
+    // 1: серия из двух; 2: две серии с перерывом 1; 3: серия из двух
+    assert.deepEqual(scheduleFairness(order, 3), { streakSpread: 1, waitSpread: 1, profiles: 1 });
+  });
+
+  it('кодирование таблицы: номера команд до 10, встречи пары по порядку', () => {
+    const order: MatchSlot[] = [
+      { teamA: 1, teamB: 10, leg: 1 },
+      { teamA: 2, teamB: 3, leg: 1 },
+      { teamA: 1, teamB: 10, leg: 2 },
+    ];
+    assert.equal(encodeMatchOrder(order), '1a231a');
+    assert.deepEqual(decodeMatchOrder('1a231a'), order);
   });
 });
 
