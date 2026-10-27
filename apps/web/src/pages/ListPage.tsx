@@ -69,7 +69,7 @@ function GamesTab() {
         {/* правая часть шапки в VK занята системными кнопками, поэтому «+» в правом верхнем углу под шапкой */}
         <IconButton
           className="actions__add"
-          label="Создать игру"
+          label="Создать сбор"
           onClick={() => navigate(routeToHash({ name: 'create' }))}
         >
           <Icon28AddOutline />
