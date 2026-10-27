@@ -15,7 +15,7 @@ import { RatingTab } from '../components/RatingTab.tsx';
 import { useApp } from '../context.ts';
 import { activeFiltersCount, useListFilters } from '../filters.ts';
 import { routeToHash } from '../format.ts';
-import { useGames } from '../hooks.ts';
+import { useGames, useNearestGame } from '../hooks.ts';
 import { useSignupFlow } from '../signup.ts';
 import {
   addDays,
@@ -64,13 +64,35 @@ export function ListPage() {
   );
 }
 
+/** Вперёд можно листать не дальше, чем на столько недель от текущей */
+const MAX_WEEKS_AHEAD = 52;
+
 /** Сборы по дням недели: «+» прямо в карточке, обновление в реальном времени; фильтры — на отдельной странице. */
 function GamesTab() {
   const { navigate } = useApp();
-  const { data, error, loading, reload } = useGames();
-  const openSignup = useSignupFlow(() => reload());
   const filters = useListFilters();
   const active = activeFiltersCount(filters);
+  // пока неделю не выбрали стрелками, открывается неделя ближайшего сбора (он может появиться в реальном времени)
+  const [chosen, setChosen] = useState<string | null>(readWeek);
+  const now = new Date();
+  const current = startOfWeek(now);
+  const parsed = chosen !== null ? parseDayKey(chosen) : null;
+  const chosenStart = parsed && startOfWeek(parsed);
+  const nearest = useNearestGame(chosenStart === null);
+  let weekStart: Date | null =
+    chosenStart ?? (nearest === undefined ? null : initialWeekStart(nearest ? [nearest] : [], now));
+  // без «прошедших» раньше текущей недели смотреть нечего
+  if (weekStart && !filters.showPast && weekStart.getTime() < current.getTime()) weekStart = current;
+  const range = weekStart ? { from: weekStart.toISOString(), to: addDays(weekStart, 7).toISOString() } : null;
+  const { data, error, loading, reload } = useGames(range);
+  const openSignup = useSignupFlow(() => reload());
+
+  const go = (weeks: number) => {
+    if (!weekStart) return;
+    const key = dayKey(addDays(weekStart, weeks * 7));
+    setChosen(key);
+    saveWeek(key);
+  };
 
   return (
     <>
@@ -94,68 +116,68 @@ function GamesTab() {
       </div>
       <MockBar />
       <NotificationsPrompt />
-      {loading && <Empty loading />}
-      {!loading && error && !data && <Empty error={error} onRetry={reload} />}
-      {data && data.length === 0 && (
-        <Empty>{active > 0 ? 'Нет сборов по выбранным фильтрам' : 'Пока нет предстоящих сборов. Создайте первый!'}</Empty>
-      )}
-      {data && data.length > 0 && (
-        <WeekView
-          games={data}
-          showPast={filters.showPast}
-          onOpen={(g) => navigate(routeToHash({ name: 'game', id: g.id }))}
-          onPlus={(g) => openSignup(g.id, g.mySeats ?? 0)}
-        />
+      {weekStart === null ? (
+        <Empty loading />
+      ) : (
+        <div className="week">
+          <div className="week__nav">
+            <IconButton
+              label="Предыдущая неделя"
+              disabled={!filters.showPast && weekStart.getTime() <= current.getTime()}
+              onClick={() => go(-1)}
+            >
+              <Icon24ChevronLeftOutline />
+            </IconButton>
+            <div className="week__range" data-testid="week-range">
+              {weekRangeLabel(weekStart, now)}
+            </div>
+            <IconButton
+              label="Следующая неделя"
+              disabled={weekStart.getTime() >= addDays(current, 7 * MAX_WEEKS_AHEAD).getTime()}
+              onClick={() => go(1)}
+            >
+              <Icon24ChevronRightOutline />
+            </IconButton>
+          </div>
+          {loading && <Empty loading />}
+          {!loading && error && !data && <Empty error={error} onRetry={reload} />}
+          {data && data.length === 0 && nearest === null ? (
+            <Empty>{active > 0 ? 'Нет сборов по выбранным фильтрам' : 'Пока нет предстоящих сборов. Создайте первый!'}</Empty>
+          ) : (
+            data && (
+              <WeekDays
+                weekStart={weekStart}
+                games={data}
+                now={now}
+                onOpen={(g) => navigate(routeToHash({ name: 'game', id: g.id }))}
+                onPlus={(g) => openSignup(g.id, g.mySeats ?? 0)}
+              />
+            )
+          )}
+        </div>
       )}
     </>
   );
 }
 
-/**
- * Неделя Пн–Вс: у каждого дня его сборы или «Нет сборов». Стрелки листают недели;
- * назад от текущей — только с фильтром «прошедшие», вперёд — до недели последнего загруженного сбора.
- */
-function WeekView({
+/** Дни недели Пн–Вс: у каждого дня его сборы или «Нет сборов». */
+function WeekDays({
+  weekStart,
   games,
-  showPast,
+  now,
   onOpen,
   onPlus,
 }: {
+  weekStart: Date;
   games: GameSummary[];
-  showPast: boolean;
+  now: Date;
   onOpen: (g: GameSummary) => void;
   onPlus: (g: GameSummary) => void;
 }) {
-  // пока неделю не выбрали стрелками, она подстраивается под сборы (новый сбор может появиться в реальном времени)
-  const [chosen, setChosen] = useState<string | null>(readWeek);
-  const now = new Date();
-  const current = startOfWeek(now);
-  const weekStart = (chosen !== null ? parseDayKey(chosen) : null) ?? initialWeekStart(games, now);
-  const lastGame = games.reduce((max, g) => Math.max(max, Date.parse(g.startsAt)), 0);
-  const lastWeek = Math.max(current.getTime(), startOfWeek(new Date(lastGame)).getTime());
-  const canPrev = showPast || weekStart.getTime() > current.getTime();
-  const canNext = weekStart.getTime() < lastWeek;
-  const go = (weeks: number) => {
-    const key = dayKey(addDays(weekStart, weeks * 7));
-    setChosen(key);
-    saveWeek(key);
-  };
   const byDay = groupByDay(games);
   const today = dayKey(now);
-
   return (
-    <div className="week">
-      <div className="week__nav">
-        <IconButton label="Предыдущая неделя" disabled={!canPrev} onClick={() => go(-1)}>
-          <Icon24ChevronLeftOutline />
-        </IconButton>
-        <div className="week__range" data-testid="week-range">
-          {weekRangeLabel(weekStart, now)}
-        </div>
-        <IconButton label="Следующая неделя" disabled={!canNext} onClick={() => go(1)}>
-          <Icon24ChevronRightOutline />
-        </IconButton>
-      </div>
+    <>
       {weekDays(weekStart).map((day) => {
         const key = dayKey(day);
         const dayGames = byDay.get(key) ?? [];
@@ -172,7 +194,7 @@ function WeekView({
           </section>
         );
       })}
-    </div>
+    </>
   );
 }
 

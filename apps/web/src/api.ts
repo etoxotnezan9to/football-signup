@@ -76,8 +76,8 @@ export const api = {
   rating: () => request<{ items: RatingRow[] }>('GET', '/rating'),
   listPlaces: () => request<{ items: Place[] }>('GET', '/places'),
   createPlace: (body: { name: string; address: string }) => request<Place>('POST', '/places', body),
-  /** query — параметры фильтров вида `&includePast=1` (filtersQuery) */
-  listGames: (query = '') => request<GamesPage>('GET', `/games?limit=50${query}`),
+  /** query — параметры фильтров вида `&includePast=1` (filtersQuery) и периода `&from=…&to=…` */
+  listGames: (query = '', limit = 50) => request<GamesPage>('GET', `/games?limit=${limit}${query}`),
   myGames: () => request<{ organized: GameSummary[]; joined: GameSummary[] }>('GET', '/me/games'),
   myOrganized: () => request<{ items: GameSummary[] }>('GET', '/me/organized'),
   getGame: (id: number) => request<GameDetails>('GET', `/games/${id}`),
