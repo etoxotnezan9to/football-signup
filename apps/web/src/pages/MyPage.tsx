@@ -23,14 +23,14 @@ export function MyPage() {
   return (
     <>
       <PanelHeader before={<PanelHeaderBack onClick={() => navigate(routeToHash({ name: 'list' }))} />}>
-        Мои игры
+        Мои сборы
       </PanelHeader>
       {loading && <Empty loading />}
       {!loading && error && !data && <Empty error={error} onRetry={reload} />}
       {data && (
         <>
           <Group header={<Header>Организую</Header>}>
-            {list(data.organized, 'Вы пока не создавали игр')}
+            {list(data.organized, 'Вы пока не создавали сборов')}
           </Group>
           <Group header={<Header>Записан</Header>}>{list(data.joined, 'Вы пока никуда не записаны')}</Group>
         </>

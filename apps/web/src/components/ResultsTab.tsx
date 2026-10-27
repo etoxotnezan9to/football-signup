@@ -172,7 +172,7 @@ export function ResultsTab({
               <th scope="col" className="standings__team">
                 Команда
               </th>
-              <th scope="col" title="Игры">
+              <th scope="col" title="Сыграно матчей">
                 И
               </th>
               <th scope="col" title="Победы">

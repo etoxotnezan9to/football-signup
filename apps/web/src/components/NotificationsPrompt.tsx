@@ -53,7 +53,7 @@ export function NotificationsPrompt() {
   return (
     <div className="notify-prompt">
       <Text>
-        Включите уведомления: сообщим, если вас переведут из очереди в состав или игру отменят, и напомним об игре за
+        Включите уведомления: сообщим, если вас переведут из очереди в состав или сбор отменят, и напомним о сборе за
         сутки.
       </Text>
       <div className="notify-prompt__actions">

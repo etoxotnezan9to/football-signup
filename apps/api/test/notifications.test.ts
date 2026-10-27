@@ -137,7 +137,7 @@ describe('уведомления об изменении и отмене игр�
     svc.updateGame(g.id, ORG, { startsAt: '2026-10-22T19:00:00.000Z' });
     assert.equal(sent.length, 1);
     assert.deepEqual([...sent[0]!.userIds].sort(), [A, B]);
-    assert.match(sent[0]!.message, /изменена/);
+    assert.match(sent[0]!.message, /Сбор .* изменён/);
     assert.match(sent[0]!.message, /22:00/);
   });
 
@@ -161,7 +161,7 @@ describe('уведомления об изменении и отмене игр�
     assert.match(toB[0]!.message, /Вы в составе/);
     const toA = sent.filter((n) => n.userIds.includes(A));
     assert.equal(toA.length, 1);
-    assert.match(toA[0]!.message, /изменена/);
+    assert.match(toA[0]!.message, /Сбор .* изменён/);
   });
 
   it('отмена игры уведомляет всех записавшихся, повторная отмена нет', () => {
@@ -172,7 +172,7 @@ describe('уведомления об изменении и отмене игр�
     svc.cancelGame(g.id, ORG);
     assert.equal(sent.length, 1);
     assert.deepEqual([...sent[0]!.userIds].sort(), [A, B]);
-    assert.match(sent[0]!.message, /отменена/);
+    assert.match(sent[0]!.message, /Сбор .* отменён организатором/);
     tick();
     svc.cancelGame(g.id, ORG);
     assert.equal(sent.length, 1);
@@ -206,7 +206,7 @@ describe('напоминания за сутки', () => {
     assert.equal(svc.sendDueReminders(), 1);
     assert.equal(sent.length, 1);
     assert.deepEqual(sent[0]!.userIds, [A]);
-    assert.match(sent[0]!.message, /Напоминание/);
+    assert.match(sent[0]!.message, /Напоминание: сбор/);
     assert.match(sent[0]!.message, /Мест у вас в составе: 2/);
     assert.equal(sent[0]!.fragment, `/game/${g.id}`);
 

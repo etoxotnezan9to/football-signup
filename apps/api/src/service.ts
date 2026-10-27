@@ -158,7 +158,7 @@ export function createService(db: DatabaseSync, options: ServiceOptions = {}) {
 
   function getGameRow(gameId: number): GameRow {
     const row = db.prepare(`${GAME_SELECT} WHERE g.id = ?`).get(gameId) as unknown as GameRow | undefined;
-    if (!row) throw new AppError('NOT_FOUND', 'Игра не найдена');
+    if (!row) throw new AppError('NOT_FOUND', 'Сбор не найден');
     return row;
   }
 
@@ -388,7 +388,7 @@ export function createService(db: DatabaseSync, options: ServiceOptions = {}) {
 
   function requireOpen(game: GameRow): void {
     if (game.status !== 'active' || isFinished(game.starts_at)) {
-      throw new AppError('GAME_NOT_ACTIVE', 'Игра отменена или уже прошла');
+      throw new AppError('GAME_NOT_ACTIVE', 'Сбор отменён или уже прошёл');
     }
   }
 
@@ -526,7 +526,7 @@ export function createService(db: DatabaseSync, options: ServiceOptions = {}) {
 
     createGame(organizerId: number, body: unknown): GameDetails {
       const parsed = parseGameInput(body);
-      if (!parsed.ok) throw new AppError('VALIDATION_ERROR', 'Неверные данные игры', parsed.errors);
+      if (!parsed.ok) throw new AppError('VALIDATION_ERROR', 'Неверные данные сбора', parsed.errors);
       const input: GameInput = parsed.value;
       if (Date.parse(input.startsAt) <= now().getTime()) {
         throw new AppError('STARTS_AT_IN_PAST', 'Время начала должно быть в будущем');
@@ -545,7 +545,7 @@ export function createService(db: DatabaseSync, options: ServiceOptions = {}) {
           n: number;
         };
         if (active.n >= MAX_ACTIVE_GAMES_PER_ORGANIZER) {
-          throw new AppError('ACTIVE_GAMES_LIMIT', 'Слишком много активных игр');
+          throw new AppError('ACTIVE_GAMES_LIMIT', 'Слишком много активных сборов');
         }
         const ts = now().toISOString();
         const res = db
@@ -624,7 +624,7 @@ export function createService(db: DatabaseSync, options: ServiceOptions = {}) {
 
     updateGame(gameId: number, userId: number, body: unknown): GameDetails {
       const parsed = parseGameUpdate(body);
-      if (!parsed.ok) throw new AppError('VALIDATION_ERROR', 'Неверные данные игры', parsed.errors);
+      if (!parsed.ok) throw new AppError('VALIDATION_ERROR', 'Неверные данные сбора', parsed.errors);
       const patch = parsed.value;
       const before = snapshot(gameId);
       const seatsBefore = mainSeatKeys(gameId);
@@ -640,7 +640,7 @@ export function createService(db: DatabaseSync, options: ServiceOptions = {}) {
         const teams = patch.teamsMax ?? game.teams_max;
         const players = patch.playersPerTeam ?? game.players_per_team;
         const tooBig = capacityError(teams, players);
-        if (tooBig) throw new AppError('VALIDATION_ERROR', 'Неверные данные игры', { playersPerTeam: tooBig });
+        if (tooBig) throw new AppError('VALIDATION_ERROR', 'Неверные данные сбора', { playersPerTeam: tooBig });
         const columns: Record<keyof GameInput, string> = {
           startsAt: 'starts_at',
           placeId: 'place_id',
@@ -680,7 +680,7 @@ export function createService(db: DatabaseSync, options: ServiceOptions = {}) {
           notify({
             userIds: recipients,
             message: clipMessage(
-              `Игра ${whenText(old.starts_at)}, ${old.venue} изменена. Теперь: ${whenText(current.starts_at)}, ${current.venue}, ${current.address}.`,
+              `Сбор ${whenText(old.starts_at)}, ${old.venue} изменён. Теперь: ${whenText(current.starts_at)}, ${current.venue}, ${current.address}.`,
             ),
             fragment: gameFragment(gameId),
           });
@@ -707,7 +707,7 @@ export function createService(db: DatabaseSync, options: ServiceOptions = {}) {
         const g = cancelled;
         notify({
           userIds: recipients,
-          message: clipMessage(`Игра ${whenText(g.starts_at)}, ${g.venue} отменена организатором.`),
+          message: clipMessage(`Сбор ${whenText(g.starts_at)}, ${g.venue} отменён организатором.`),
           fragment: gameFragment(gameId),
         });
       }
@@ -765,7 +765,7 @@ export function createService(db: DatabaseSync, options: ServiceOptions = {}) {
         const game = getGameRow(gameId);
         requireOpen(game);
         const res = db.prepare('DELETE FROM signups WHERE game_id = ? AND user_id = ?').run(gameId, userId);
-        if (Number(res.changes) === 0) throw new AppError('NOT_FOUND', 'Вы не записаны на эту игру');
+        if (Number(res.changes) === 0) throw new AppError('NOT_FOUND', 'Вы не записаны на этот сбор');
       });
       emitGameChanged(gameId, 'roster', seatsBefore);
       notifyPromotions(gameId, before, userId);
@@ -987,7 +987,7 @@ export function createService(db: DatabaseSync, options: ServiceOptions = {}) {
           notify({
             userIds,
             message: clipMessage(
-              `Напоминание: игра ${whenText(game.starts_at)}, ${game.venue}. Мест у вас в составе: ${seats}.`,
+              `Напоминание: сбор ${whenText(game.starts_at)}, ${game.venue}. Мест у вас в составе: ${seats}.`,
             ),
             fragment: gameFragment(game.id),
           });

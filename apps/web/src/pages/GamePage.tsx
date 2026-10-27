@@ -91,7 +91,7 @@ function GameView({ id }: { id: number }) {
   const back = () => navigate(routeToHash({ name: 'list' }));
 
   const header = (
-    <PanelHeader before={<PanelHeaderBack onClick={back} />}>{game ? gameLabel(game) : 'Игра'}</PanelHeader>
+    <PanelHeader before={<PanelHeaderBack onClick={back} />}>{game ? gameLabel(game) : 'Сбор'}</PanelHeader>
   );
 
   if (loading) {
@@ -106,7 +106,7 @@ function GameView({ id }: { id: number }) {
     return (
       <>
         {header}
-        <Empty error={error ?? 'Игра не найдена'} onRetry={reload} />
+        <Empty error={error ?? 'Сбор не найден'} onRetry={reload} />
       </>
     );
   }
@@ -121,7 +121,7 @@ function GameView({ id }: { id: number }) {
 
   const share = async () => {
     const r = await shareLink(gameLink(VK_APP_ID, game.id));
-    if (r === 'copied') showToast('Ссылка на игру скопирована');
+    if (r === 'copied') showToast('Ссылка на сбор скопирована');
     if (r === 'failed') showToast('Не удалось поделиться ссылкой');
   };
 
@@ -135,7 +135,7 @@ function GameView({ id }: { id: number }) {
         ...(game.status === 'cancelled'
           ? { statusLabel: 'Сбор отменён' }
           : game.isFinished
-            ? { statusLabel: 'Игра прошла' }
+            ? { statusLabel: 'Сбор прошёл' }
             : {}),
         formatLabel: `${teamsLabel(game.teamsMax, game.playersPerTeam)}, ${meetingsLabel(game.meetings)}`,
         organizerName: fullName(game.organizer),
@@ -240,7 +240,7 @@ function GameView({ id }: { id: number }) {
           )}
           {game.isFinished && game.status === 'active' && (
             <Row icon="⚠" label="Статус">
-              Игра прошла
+              Сбор прошёл
             </Row>
           )}
           <Row icon="📅" label="Когда">

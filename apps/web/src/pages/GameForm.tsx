@@ -322,7 +322,7 @@ function EditGameView({ id }: { id: number }) {
   const back = () => navigate(routeToHash({ name: 'game', id }));
 
   if (loading) return <Empty loading />;
-  if (!game) return <Empty error={error ?? 'Игра не найдена'} onRetry={reload} />;
+  if (!game) return <Empty error={error ?? 'Сбор не найден'} onRetry={reload} />;
   if (game.organizer.vkId !== session.user.id || game.status !== 'active') {
     return (
       <>

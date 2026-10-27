@@ -80,7 +80,7 @@ function GamesTab() {
       {loading && <Empty loading />}
       {!loading && error && !data && <Empty error={error} onRetry={reload} />}
       {data && data.length === 0 && (
-        <Empty>{active > 0 ? 'Нет сборов по выбранным фильтрам' : 'Пока нет предстоящих игр. Создайте первую!'}</Empty>
+        <Empty>{active > 0 ? 'Нет сборов по выбранным фильтрам' : 'Пока нет предстоящих сборов. Создайте первый!'}</Empty>
       )}
       {data?.map((g) => (
         <GameCard

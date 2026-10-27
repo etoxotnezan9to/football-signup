@@ -474,7 +474,7 @@ paths:
         '401': { $ref: '#/components/responses/Error' }
   /me/games:
     get:
-      summary: Мои игры (созданные и те, куда я записан)
+      summary: Мои сборы (созданные и те, куда я записан)
       responses:
         '200':
           description: OK
