@@ -89,6 +89,19 @@ export function meetingsLabel(n: number): string {
   return `${n} ${plural(n, ['встреча', 'встречи', 'встреч'])}`;
 }
 
+/**
+ * Показывать ли сбор в списке на главной: прошедшие — нет; отменённые — только организатору и тем,
+ * кто записан (mySeats > 0), как отдаёт сервер; активные — всем.
+ */
+export function visibleInList(
+  game: { status: 'active' | 'cancelled'; isFinished: boolean; organizer: { vkId: number } },
+  viewerId: number,
+  mySeats: number,
+): boolean {
+  if (game.isFinished) return false;
+  return game.status === 'active' || game.organizer.vkId === viewerId || mySeats > 0;
+}
+
 /** Подпись состояния заполненности: «занято 18/24, в очереди 3». */
 /** Формат игры для экрана игры: «до 4 команд по 6 игроков». */
 export function teamsLabel(teamsMax: number, playersPerTeam: number): string {

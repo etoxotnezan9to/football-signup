@@ -592,3 +592,35 @@ test('«Скопировать список» копирует всю инфор
     '1,2) Мария Сидорова (2)',
   ]);
 });
+
+test('отменённый сбор остаётся в списке у организатора и записавшихся', async ({ browser }) => {
+  const org = await openAs(browser, DMITRY);
+  await org.getByRole('button', { name: 'Создать сбор', exact: true }).last().click();
+  await choosePlace(org, 'Арена отмены', 'ул. Отменная, 6');
+  await org.getByLabel('Взнос, ₽', { exact: true }).fill('0');
+  await org.getByRole('button', { name: 'Создать сбор', exact: true }).last().click();
+  await expect(org).toHaveURL(/#\/game\/\d+$/);
+  const gamePath = `/${new URL(org.url()).hash}`;
+  const maria = await openAs(browser, MARIA, gamePath);
+  await maria.getByRole('button', { name: '+ Записаться', exact: true }).click();
+  await maria.getByRole('button', { name: '+1', exact: true }).click();
+  await expect(maria.getByText(/Вы записаны/)).toBeVisible();
+  await maria.goto('/');
+  const alexey = await openAs(browser, ALEXEY);
+  await expect(alexey.getByText(/· Арена отмены$/)).toBeVisible();
+
+  await org.getByRole('button', { name: 'Отменить сбор', exact: true }).click();
+  await org.getByRole('button', { name: 'Отменить сбор', exact: true }).last().click();
+  await expect(org.getByText('Сбор отменён').first()).toBeVisible();
+
+  // записавшаяся видит отмену у себя в списке без перезагрузки, посторонний — нет
+  const card = maria.locator('.card', { hasText: 'Арена отмены' });
+  await expect(card.getByText('Сбор отменён')).toBeVisible();
+  await expect(card.getByRole('button')).toHaveCount(0);
+  await expect(alexey.getByText(/· Арена отмены$/)).toHaveCount(0);
+  // организатор видит его в списке и после перезагрузки
+  await org.goto('/');
+  await expect(org.locator('.card', { hasText: 'Арена отмены' }).getByText('Сбор отменён')).toBeVisible();
+  await maria.reload();
+  await expect(maria.locator('.card', { hasText: 'Арена отмены' }).getByText('Сбор отменён')).toBeVisible();
+});

@@ -575,16 +575,22 @@ export function createService(db: DatabaseSync, options: ServiceOptions = {}) {
       return details(getGameRow(id), organizerId);
     },
 
+    /**
+     * Список предстоящих сборов: активные всем; отменённые — только организатору и тем, кто был записан,
+     * чтобы они видели отмену у себя в списке.
+     */
     listGames(viewerId: number, opts: { cursor?: string; limit?: number } = {}) {
       const limit = Math.min(Math.max(opts.limit ?? 20, 1), 50);
       const offset = opts.cursor && /^\d+$/.test(opts.cursor) ? Number(opts.cursor) : 0;
       const since = new Date(now().getTime() - FINISH_GRACE_MIN * 60_000).toISOString();
       const rows = db
         .prepare(
-          `${GAME_SELECT} WHERE g.status = 'active' AND g.starts_at > ?
+          `${GAME_SELECT} WHERE g.starts_at > ?
+              AND (g.status = 'active' OR g.organizer_id = ?
+                   OR EXISTS (SELECT 1 FROM signups s WHERE s.game_id = g.id AND s.user_id = ?))
             ORDER BY g.starts_at, g.id LIMIT ? OFFSET ?`,
         )
-        .all(since, limit + 1, offset) as unknown as GameRow[];
+        .all(since, viewerId, viewerId, limit + 1, offset) as unknown as GameRow[];
       const page = rows.slice(0, limit);
       return {
         items: page.map((g) => summary(g, viewerId)),

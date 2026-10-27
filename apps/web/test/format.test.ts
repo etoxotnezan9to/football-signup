@@ -15,6 +15,7 @@ import {
   seatName,
   meetingsLabel,
   nextWeekOf,
+  visibleInList,
   profileUrl,
   signupResultText,
   defaultStartsAt,
@@ -83,6 +84,17 @@ describe('meetingsLabel', () => {
     assert.equal(meetingsLabel(1), '1 встреча');
     assert.equal(meetingsLabel(2), '2 встречи');
     assert.equal(meetingsLabel(5), '5 встреч');
+  });
+});
+
+describe('visibleInList', () => {
+  const game = (status: 'active' | 'cancelled', isFinished = false) => ({ status, isFinished, organizer: { vkId: 1 } });
+  it('отменённый сбор видят только организатор и записавшиеся, прошедший — никто', () => {
+    assert.equal(visibleInList(game('active'), 5, 0), true);
+    assert.equal(visibleInList(game('cancelled'), 5, 0), false);
+    assert.equal(visibleInList(game('cancelled'), 1, 0), true, 'организатор');
+    assert.equal(visibleInList(game('cancelled'), 5, 2), true, 'записан');
+    assert.equal(visibleInList(game('active', true), 1, 2), false);
   });
 });
 

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { GameDetails, GameSummary } from '@football/shared';
 import { api, type ApiError } from './api.ts';
 import { useApp } from './context.ts';
+import { visibleInList } from './format.ts';
 
 interface Loadable<T> {
   data: T | null;
@@ -16,7 +17,8 @@ function sortByStart(list: GameSummary[]): GameSummary[] {
 
 /** Список предстоящих игр: REST + события game.created / game.updated + перезагрузка при переподключении. */
 export function useGames(): Loadable<GameSummary[]> {
-  const { realtime } = useApp();
+  const { realtime, session } = useApp();
+  const me = session.user.id;
   const [data, setData] = useState<GameSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -42,9 +44,10 @@ export function useGames(): Loadable<GameSummary[]> {
         if (!prev) return prev;
         const old = prev.find((x) => x.id === g.id);
         const rest = prev.filter((x) => x.id !== g.id);
-        if (g.status !== 'active' || g.isFinished) return rest;
         // в событии нет mySeats (зависит от получателя): сохраняем известное значение
-        return sortByStart([...rest, { ...g, mySeats: old?.mySeats ?? 0 }]);
+        const mySeats = old?.mySeats ?? 0;
+        if (!visibleInList(g, me, mySeats)) return rest;
+        return sortByStart([...rest, { ...g, mySeats }]);
       });
     });
     const unsubRefresh = realtime.onRefresh(reload);
@@ -53,7 +56,7 @@ export function useGames(): Loadable<GameSummary[]> {
       unsubEvent();
       unsubRefresh();
     };
-  }, [realtime, reload]);
+  }, [realtime, reload, me]);
 
   return { data, error, loading, reload };
 }

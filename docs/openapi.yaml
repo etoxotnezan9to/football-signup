@@ -140,7 +140,10 @@ paths:
         '401': { $ref: '#/components/responses/Error' }
   /games:
     get:
-      summary: Список предстоящих активных игр
+      description: >-
+        Предстоящие сборы: активные — всем; отменённые — только организатору и записавшимся
+        (запись после отмены сохраняется).
+      summary: Список предстоящих сборов
       parameters:
         - { name: cursor, in: query, schema: { type: string } }
         - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 50, default: 20 } }

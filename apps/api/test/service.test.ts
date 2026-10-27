@@ -616,3 +616,15 @@ describe('мои сборы для копирования', () => {
     assert.deepEqual(svc.myGames(ORG).organized, [], 'в «моих играх» прошедших нет');
   });
 });
+
+describe('отменённые сборы в списке', () => {
+  it('видят организатор и записавшиеся, остальные — нет', () => {
+    const g = svc.createGame(ORG, gameBody());
+    svc.putSignup(g.id, U1, 1);
+    svc.cancelGame(g.id, ORG);
+    const ids = (viewer: number) => svc.listGames(viewer).items.map((x) => [x.id, x.status, x.mySeats]);
+    assert.deepEqual(ids(ORG), [[g.id, 'cancelled', 0]]);
+    assert.deepEqual(ids(U1), [[g.id, 'cancelled', 1]]);
+    assert.deepEqual(ids(U2), []);
+  });
+});
