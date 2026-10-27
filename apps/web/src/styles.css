@@ -411,3 +411,34 @@
   display: flex;
   gap: 8px;
 }
+/* Главная по неделям */
+.week__nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 4px;
+}
+.week__range {
+  font-weight: 600;
+  font-size: 16px;
+  text-align: center;
+  color: var(--vkui--color_text_primary);
+}
+.week__day {
+  padding: 4px 0;
+}
+.week__day-title {
+  margin: 8px 16px 0;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 18px;
+  color: var(--vkui--color_text_secondary);
+}
+.week__day--today .week__day-title {
+  color: var(--vkui--color_text_accent);
+}
+.week__empty {
+  margin: 4px 16px 8px;
+  font-size: 14px;
+  color: var(--vkui--color_text_tertiary);
+}
