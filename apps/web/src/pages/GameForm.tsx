@@ -136,7 +136,16 @@ export function GameForm({ initial }: { initial?: GameDetails }) {
     let alive = true;
     api
       .listPlaces()
-      .then((r) => alive && setPlaces(r.items))
+      .then((r) => {
+        if (!alive) return;
+        // арена, созданная кнопкой + до ответа, в этом списке ещё нет: не теряем её (и выбор в форме)
+        setPlaces((prev) => {
+          const ids = new Set(r.items.map((p) => p.id));
+          return [...r.items, ...(prev ?? []).filter((p) => !ids.has(p.id))].sort(
+            (a, b) => a.name.localeCompare(b.name, 'ru') || a.address.localeCompare(b.address, 'ru'),
+          );
+        });
+      })
       .catch(() => alive && setPlaces([]));
     return () => {
       alive = false;
