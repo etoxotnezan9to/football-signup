@@ -14,8 +14,11 @@ async function choosePlace(page: Page, name: string, address: string): Promise<v
   await page.getByLabel('Название арены', { exact: true }).fill(name);
   await page.getByLabel('Адрес арены', { exact: true }).fill(address);
   await page.getByRole('button', { name: 'Сохранить арену', exact: true }).click();
+  // форма добавления закрывается только после сохранения; название «Арена» совпадает с подписью поля,
+  // поэтому одной проверки текста мало
+  await expect(page.getByLabel('Название арены', { exact: true })).toBeHidden();
   // новое место сразу выбрано в комбобоксе
-  await expect(page.getByText(name, { exact: true })).toBeVisible();
+  await expect(page.getByText(name, { exact: true }).first()).toBeVisible();
 }
 
 /** Значение поля datetime-local через неделю: «2026-10-22T21:00» → «2026-10-29T21:00». */
@@ -369,13 +372,13 @@ test('результаты: матчи по порядку со счётом к�
   const first = org.getByRole('group', { name: 'Матч 1: Синие — Розовые' });
   await first.getByLabel('Голы Синие', { exact: true }).fill('2');
   await first.getByLabel('Голы Розовые', { exact: true }).fill('1');
-  await first.getByRole('button', { name: 'Сохранить', exact: true }).click();
-  await expect(first.getByRole('button', { name: 'Стереть', exact: true })).toBeVisible();
+  // счёт сохраняется сам, без кнопок; одно заполненное поле или не число не сохраняется
+  await expect(first.getByRole('button')).toHaveCount(0);
   const second = org.getByRole('group', { name: 'Матч 4: Синие — Розовые' });
+  await second.getByLabel('Голы Синие', { exact: true }).fill('x');
+  await expect(second.getByLabel('Голы Синие', { exact: true })).toHaveAttribute('aria-invalid', 'true');
   await second.getByLabel('Голы Синие', { exact: true }).fill('1');
   await second.getByLabel('Голы Розовые', { exact: true }).fill('1');
-  await second.getByRole('button', { name: 'Сохранить', exact: true }).click();
-  await expect(second.getByRole('button', { name: 'Стереть', exact: true })).toBeVisible();
 
   // таблица: Синие — победа и ничья (4 очка), Розовые — ничья и поражение (1 очко)
   const table = org.getByRole('table', { name: 'Турнирная таблица' });
@@ -395,8 +398,9 @@ test('результаты: матчи по порядку со счётом к�
   await expect(maria.locator('.results').getByRole('textbox')).toHaveCount(0);
   await expect(maria.getByTestId('match-dragger')).toHaveCount(0);
 
-  // организатор стирает первую встречу: у участника обновляется без перезагрузки
-  await first.getByRole('button', { name: 'Стереть', exact: true }).click();
+  // организатор очищает оба поля первой встречи — счёт стирается, у участника без перезагрузки
+  await first.getByLabel('Голы Синие', { exact: true }).fill('');
+  await first.getByLabel('Голы Розовые', { exact: true }).fill('');
   await expect(goals('Матч 1: Синие — Розовые')).toHaveText(['–', '–']);
 
   // организатор перетаскивает первый матч на третье место: порядок меняется и у участника
@@ -443,8 +447,10 @@ test('главная: вкладки «Сборы» и «Рейтинг», ре�
   const leg = org.getByRole('group', { name: 'Матч 1: Синие — Розовые' });
   await leg.getByLabel('Голы Синие', { exact: true }).fill('2');
   await leg.getByLabel('Голы Розовые', { exact: true }).fill('0');
-  await leg.getByRole('button', { name: 'Сохранить', exact: true }).click();
-  await expect(leg.getByRole('button', { name: 'Стереть', exact: true })).toBeVisible();
+  // счёт сохранился сам: у Синих 3 очка в таблице
+  const leader = org.getByRole('table', { name: 'Турнирная таблица' }).getByRole('row').nth(1);
+  await expect(leader).toContainText('Синие');
+  await expect(leader.getByRole('cell').last()).toHaveText('3');
 
   // лучший игрок: выбор из списка, сгруппированного по командам; Мария из победившей команды
   await org.getByLabel('Лучший игрок', { exact: true }).click();
