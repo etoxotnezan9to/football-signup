@@ -1,10 +1,12 @@
 import { useState, type ReactNode } from 'react';
+import { Icon28CopyOutline, Icon28ShareOutline } from '@vkontakte/icons';
 import {
   Avatar,
   Button,
   Div,
   Group,
   Header,
+  IconButton,
   PanelHeader,
   PanelHeaderBack,
   SimpleCell,
@@ -281,13 +283,13 @@ function GameView({ id }: { id: number }) {
               {mySeats > 0 ? `Изменить запись (${mySeats})` : '+ Записаться'}
             </Button>
           )}
-          <Button size="l" mode="secondary" onClick={() => void share()}>
-            Поделиться
-          </Button>
+          <IconButton className="actions__add" label="Поделиться" onClick={() => void share()}>
+            <Icon28ShareOutline />
+          </IconButton>
           {isOrganizer && (
-            <Button size="l" mode="secondary" onClick={() => void copyList()}>
-              Скопировать список
-            </Button>
+            <IconButton className="actions__icon" label="Скопировать список" onClick={() => void copyList()}>
+              <Icon28CopyOutline />
+            </IconButton>
           )}
         </div>
         {isOrganizer && active && (
