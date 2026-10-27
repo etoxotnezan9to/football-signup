@@ -198,6 +198,15 @@ describe('HTTP API', () => {
     assert.equal(res.json().items[0].organizer.vkId, 931);
   });
 
+  it('GET /api/games с периодом: неверная дата или from ≥ to — 400', async () => {
+    const get = (q: string) => app.inject({ method: 'GET', url: `/api/games?${q}`, headers: auth(932) });
+    assert.equal((await get('from=2026-10-26T00:00:00Z&to=2026-11-02T00:00:00Z')).statusCode, 200);
+    assert.equal((await get('from=мусор')).statusCode, 400);
+    const reversed = await get('from=2026-11-02T00:00:00Z&to=2026-10-26T00:00:00Z');
+    assert.equal(reversed.statusCode, 400);
+    assert.equal(reversed.json().error.code, 'VALIDATION_ERROR');
+  });
+
   it('GET /api/rating отдаёт список игроков', async () => {
     const res = await app.inject({ method: 'GET', url: '/api/rating', headers: auth(921) });
     assert.equal(res.statusCode, 200);

@@ -111,6 +111,16 @@ describe('создание и список игр', () => {
     assert.equal(svc.listGames(U1).items.length, 1);
   });
 
+  it('период from/to: только сборы, которые начинаются в [from, to)', () => {
+    const a = svc.createGame(ORG, gameBody({ startsAt: '2026-10-26T00:00:00.000Z' }));
+    const b = svc.createGame(ORG, gameBody({ startsAt: '2026-10-29T18:00:00.000Z' }));
+    svc.createGame(ORG, gameBody({ startsAt: '2026-11-02T00:00:00.000Z' }));
+    const ids = svc
+      .listGames(U1, { from: '2026-10-26T00:00:00.000Z', to: '2026-11-02T00:00:00.000Z' })
+      .items.map((g) => g.id);
+    assert.deepEqual(ids, [a.id, b.id]);
+  });
+
   it('прошедшие сборы с отменёнными без фильтра по арене: без ошибки, после предстоящих', () => {
     const past = svc.createGame(U1, gameBody({ startsAt: '2026-10-21T18:00:00.000Z' }));
     const future = svc.createGame(ORG, gameBody({ startsAt: '2026-10-25T18:00:00.000Z' }));

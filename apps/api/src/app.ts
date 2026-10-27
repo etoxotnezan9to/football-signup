@@ -164,7 +164,10 @@ export function buildApp(deps: AppDeps): FastifyInstance {
             includePast?: string;
             includeCancelled?: string;
             placeId?: string;
+            from?: string;
+            to?: string;
           };
+          const range = parseRange(q.from, q.to);
           const limit = q.limit !== undefined ? Number(q.limit) : undefined;
           const placeId = q.placeId !== undefined ? Number(q.placeId) : undefined;
           return service.listGames(req.vkId, {
@@ -173,6 +176,7 @@ export function buildApp(deps: AppDeps): FastifyInstance {
             includePast: q.includePast === '1',
             includeCancelled: q.includeCancelled !== '0',
             ...(placeId !== undefined && Number.isInteger(placeId) && placeId > 0 ? { placeId } : {}),
+            ...range,
           });
         });
         secured.post('/games', async (req, reply) => {
@@ -277,4 +281,19 @@ export function buildApp(deps: AppDeps): FastifyInstance {
   });
 
   return app;
+}
+
+/** Период from/to для GET /games: даты ISO-8601, приводятся к UTC; неверная дата или from ≥ to — ошибка. */
+function parseRange(from?: string, to?: string): { from?: string; to?: string } {
+  const out: { from?: string; to?: string } = {};
+  const errors: Record<string, string> = {};
+  for (const [key, value] of [['from', from], ['to', to]] as const) {
+    if (value === undefined) continue;
+    const t = Date.parse(value);
+    if (typeof value !== 'string' || Number.isNaN(t)) errors[key] = 'дата в формате ISO-8601';
+    else out[key] = new Date(t).toISOString();
+  }
+  if (out.from !== undefined && out.to !== undefined && out.from >= out.to) errors.to = 'должно быть позже from';
+  if (Object.keys(errors).length > 0) throw new AppError('VALIDATION_ERROR', 'Неверный период', errors);
+  return out;
 }

@@ -577,12 +577,20 @@ export function createService(db: DatabaseSync, options: ServiceOptions = {}) {
 
     /**
      * Список сборов для главной. Отменённые видны всем, кроме includeCancelled: false — тогда их нет вовсе.
-     * Прошедшие — только с includePast. placeId — одна арена.
+     * Прошедшие — только с includePast. placeId — одна арена. from/to (ISO) — начало в [from, to), для недели на главной.
      * Порядок: предстоящие по возрастанию времени, затем прошедшие от новых к старым.
      */
     listGames(
       viewerId: number,
-      opts: { cursor?: string; limit?: number; includePast?: boolean; includeCancelled?: boolean; placeId?: number } = {},
+      opts: {
+        cursor?: string;
+        limit?: number;
+        includePast?: boolean;
+        includeCancelled?: boolean;
+        placeId?: number;
+        from?: string;
+        to?: string;
+      } = {},
     ) {
       const limit = Math.min(Math.max(opts.limit ?? 20, 1), 50);
       const offset = opts.cursor && /^\d+$/.test(opts.cursor) ? Number(opts.cursor) : 0;
@@ -597,6 +605,14 @@ export function createService(db: DatabaseSync, options: ServiceOptions = {}) {
       if (opts.placeId !== undefined) {
         where.push('g.place_id = ?');
         params.push(opts.placeId);
+      }
+      if (opts.from !== undefined) {
+        where.push('g.starts_at >= ?');
+        params.push(opts.from);
+      }
+      if (opts.to !== undefined) {
+        where.push('g.starts_at < ?');
+        params.push(opts.to);
       }
       const rows = db
         .prepare(
