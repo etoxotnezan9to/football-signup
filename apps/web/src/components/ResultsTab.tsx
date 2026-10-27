@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Button, Cell, List } from '@vkontakte/vkui';
-import { MAX_GOALS, matchKey, moveItem, standings, type GameDetails, type Team } from '@football/shared';
+import { MAX_GOALS, defaultMatchOrder, matchKey, moveItem, standings, type GameDetails, type Team } from '@football/shared';
 import { api, type ApiError } from '../api.ts';
 import { BestPlayerPicker } from './BestPlayerPicker.tsx';
 import { Empty } from './Empty.tsx';
@@ -49,7 +49,10 @@ export function ResultsTab({
   const [pendingOrder, setPendingOrder] = useState<string[] | null>(null);
   const teams = new Map(game.teams.map((t) => [t.no, t]));
   const saved = new Map(game.results.map((r) => [matchKey(r.teamA, r.teamB, r.leg), r]));
-  const byKey = new Map(game.matches.map((m) => [matchKey(m.teamA, m.teamB, m.leg), m]));
+  // сервер старой версии (например, пока идёт выкладка) не присылает matches: тогда порядок по умолчанию
+  const gameMatches =
+    (game.matches as GameDetails['matches'] | undefined) ?? defaultMatchOrder(game.teams.length, game.meetings);
+  const byKey = new Map(gameMatches.map((m) => [matchKey(m.teamA, m.teamB, m.leg), m]));
   const order = pendingOrder ?? [...byKey.keys()];
   const matches = order.map((k) => byKey.get(k)).filter((m) => m !== undefined);
   const table = standings(
@@ -57,7 +60,7 @@ export function ResultsTab({
     game.results,
   );
 
-  if (game.matches.length === 0) return <Empty>Для матчей нужно хотя бы две команды</Empty>;
+  if (gameMatches.length === 0) return <Empty>Для матчей нужно хотя бы две команды</Empty>;
 
   const dropDraft = (key: string) =>
     setDrafts((d) => {
