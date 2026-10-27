@@ -155,18 +155,29 @@ test('место: создаётся кнопкой + в форме игры и 
   await expect(org.getByText('Манеж E2E, пр. Спортивный, 3')).toBeVisible();
 });
 
-test('фильтр игр по месту на главной', async ({ browser }) => {
+test('фильтры на отдельной странице: арена запоминается, кнопка показывает число фильтров', async ({ browser }) => {
   // к этому моменту есть игры в «Тест-арене», «Арене» и «Манеже E2E» (предыдущие тесты)
   const page = await openAs(browser, MARIA);
   await expect(page.getByText(/· Тест-арена$/).first()).toBeVisible();
+  await expect(page.getByLabel('Арена', { exact: true })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Фильтры', exact: true }).click();
+  await expect(page).toHaveURL(/#\/filters$/);
   await page.getByLabel('Арена', { exact: true }).click();
-  await page.getByRole('option', { name: 'Манеж E2E' }).click();
+  await page.getByRole('option', { name: /Манеж E2E/ }).click();
+  await page.getByRole('button', { name: 'Готово', exact: true }).click();
   await expect(page.getByText(/· Манеж E2E$/).first()).toBeVisible();
   await expect(page.getByText(/· Тест-арена$/)).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Фильтры (включено: 1)', exact: true })).toBeVisible();
   // выбор запоминается после перезагрузки
   await page.reload();
   await expect(page.getByText(/· Манеж E2E$/).first()).toBeVisible();
   await expect(page.getByText(/· Тест-арена$/)).toHaveCount(0);
+  // сброс возвращает все арены
+  await page.getByRole('button', { name: 'Фильтры (включено: 1)', exact: true }).click();
+  await page.getByRole('button', { name: 'Сбросить', exact: true }).click();
+  await page.getByRole('button', { name: 'Готово', exact: true }).click();
+  await expect(page.getByText(/· Тест-арена$/).first()).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Фильтры', exact: true })).toBeVisible();
 });
 
 test('тестовый режим: организатор добавляет много игроков и убирает их', async ({ browser }) => {
@@ -623,4 +634,9 @@ test('отменённый сбор остаётся в списке у орга
   await expect(org.locator('.card', { hasText: 'Арена отмены' }).getByText('Сбор отменён')).toBeVisible();
   await maria.reload();
   await expect(maria.locator('.card', { hasText: 'Арена отмены' }).getByText('Сбор отменён')).toBeVisible();
+  // флажок «Показывать отменённые сборы» прячет его
+  await maria.getByRole('button', { name: 'Фильтры', exact: true }).click();
+  await maria.getByText('Показывать отменённые сборы', { exact: true }).click();
+  await maria.getByRole('button', { name: 'Готово', exact: true }).click();
+  await expect(maria.locator('.card', { hasText: 'Арена отмены' })).toHaveCount(0);
 });

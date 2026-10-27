@@ -19,6 +19,7 @@ export function GameCard({ game, onOpen, onPlus }: Props) {
           {fillLabel(game.taken, game.capacity, game.queued)} · {game.feeRub} ₽
         </div>
         {cancelled && <div className="card__meta">Сбор отменён</div>}
+        {!cancelled && game.isFinished && <div className="card__meta">Сбор прошёл</div>}
       </div>
       {onPlus && !cancelled && !game.isFinished && (
         <div className="card__side">

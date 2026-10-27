@@ -385,3 +385,29 @@
 .multiline-text {
   white-space: pre-line;
 }
+
+/* Кнопка фильтров на главной: число включённых фильтров в углу значка */
+.list-filter {
+  position: relative;
+}
+.actions__icon {
+  color: var(--vkui--color_icon_accent);
+}
+.list-filter__badge {
+  position: absolute;
+  top: 0;
+  right: 0;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
+  font-size: 11px;
+  line-height: 16px;
+  text-align: center;
+  color: #fff;
+  background: var(--vkui--color_background_accent);
+}
+.filters__actions {
+  display: flex;
+  gap: 8px;
+}

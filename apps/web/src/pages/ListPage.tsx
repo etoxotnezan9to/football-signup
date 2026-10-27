@@ -1,13 +1,14 @@
-import { Icon28AddOutline } from '@vkontakte/icons';
+import { Icon28AddOutline, Icon28SlidersOutline } from '@vkontakte/icons';
 import { useState } from 'react';
-import { CustomSelect, FormItem, IconButton, PanelHeader, Tabs, TabsItem } from '@vkontakte/vkui';
+import { IconButton, PanelHeader, Tabs, TabsItem } from '@vkontakte/vkui';
 import { Empty } from '../components/Empty.tsx';
 import { GameCard } from '../components/GameCard.tsx';
 import { MockBar } from '../components/MockBar.tsx';
 import { NotificationsPrompt } from '../components/NotificationsPrompt.tsx';
 import { RatingTab } from '../components/RatingTab.tsx';
 import { useApp } from '../context.ts';
-import { placeOptions, routeToHash } from '../format.ts';
+import { activeFiltersCount, useListFilters } from '../filters.ts';
+import { routeToHash } from '../format.ts';
 import { useGames } from '../hooks.ts';
 import { useSignupFlow } from '../signup.ts';
 
@@ -46,54 +47,42 @@ export function ListPage() {
   );
 }
 
-/** Список предстоящих игр: «+» прямо в карточке, обновление в реальном времени. */
+/** Список сборов: «+» прямо в карточке, обновление в реальном времени; фильтры — на отдельной странице. */
 function GamesTab() {
   const { navigate } = useApp();
   const { data, error, loading, reload } = useGames();
   const openSignup = useSignupFlow(() => reload());
-  const [placeFilter, setPlaceFilter] = useState<number | null>(readPlaceFilter);
-
-  const places = placeOptions(data ?? []);
-  // если в выбранном месте игр не осталось, фильтр не применяется
-  const activeFilter = placeFilter !== null && places.some((p) => p.id === placeFilter) ? placeFilter : null;
-  const games = activeFilter === null ? data : data?.filter((g) => g.placeId === activeFilter);
-
-  const changeFilter = (value: number | null) => {
-    setPlaceFilter(value);
-    savePlaceFilter(value);
-  };
+  const filters = useListFilters();
+  const active = activeFiltersCount(filters);
 
   return (
     <>
       <div className="actions">
-        {/* правая часть шапки в VK занята системными кнопками, поэтому «+» в правом верхнем углу под шапкой */}
+        {/* правая часть шапки в VK занята системными кнопками, поэтому кнопки в правом верхнем углу под шапкой */}
         <IconButton
-          className="actions__add"
-          label="Создать сбор"
-          onClick={() => navigate(routeToHash({ name: 'create' }))}
+          className="actions__add list-filter"
+          label={active > 0 ? `Фильтры (включено: ${active})` : 'Фильтры'}
+          onClick={() => navigate(routeToHash({ name: 'filters' }))}
         >
+          <Icon28SlidersOutline />
+          {active > 0 && (
+            <span className="list-filter__badge" aria-hidden="true">
+              {active}
+            </span>
+          )}
+        </IconButton>
+        <IconButton className="actions__icon" label="Создать сбор" onClick={() => navigate(routeToHash({ name: 'create' }))}>
           <Icon28AddOutline />
         </IconButton>
       </div>
       <MockBar />
       <NotificationsPrompt />
-      {places.length > 1 && (
-        <FormItem htmlFor="placeFilter" top="Арена">
-          <CustomSelect
-            id="placeFilter"
-            searchable
-            placeholder="Все арены"
-            allowClearButton
-            options={places.map((p) => ({ value: String(p.id), label: p.name }))}
-            value={activeFilter === null ? null : String(activeFilter)}
-            onChange={(_e, value) => changeFilter(value === null || value === '' ? null : Number(value))}
-          />
-        </FormItem>
-      )}
       {loading && <Empty loading />}
       {!loading && error && !data && <Empty error={error} onRetry={reload} />}
-      {data && data.length === 0 && <Empty>Пока нет предстоящих игр. Создайте первую!</Empty>}
-      {games?.map((g) => (
+      {data && data.length === 0 && (
+        <Empty>{active > 0 ? 'Нет сборов по выбранным фильтрам' : 'Пока нет предстоящих игр. Создайте первую!'}</Empty>
+      )}
+      {data?.map((g) => (
         <GameCard
           key={g.id}
           game={g}
@@ -119,27 +108,6 @@ function readMainTab(): MainTab {
 function saveMainTab(value: MainTab): void {
   try {
     sessionStorage.setItem(TAB_KEY, value);
-  } catch {
-    // ignore
-  }
-}
-
-// Выбранное место запоминается в браузере пользователя; при недоступном хранилище фильтр просто не сохраняется
-const FILTER_KEY = 'placeFilter';
-
-function readPlaceFilter(): number | null {
-  try {
-    const v = Number(localStorage.getItem(FILTER_KEY));
-    return Number.isInteger(v) && v > 0 ? v : null;
-  } catch {
-    return null;
-  }
-}
-
-function savePlaceFilter(value: number | null): void {
-  try {
-    if (value === null) localStorage.removeItem(FILTER_KEY);
-    else localStorage.setItem(FILTER_KEY, String(value));
   } catch {
     // ignore
   }

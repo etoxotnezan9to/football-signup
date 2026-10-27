@@ -15,6 +15,7 @@ import { AppContext, type AppContextValue } from './context.ts';
 import { parseRoute } from './format.ts';
 import { GameForm, EditGamePage } from './pages/GameForm.tsx';
 import { GamePage } from './pages/GamePage.tsx';
+import { FiltersPage } from './pages/FiltersPage.tsx';
 import { ListPage } from './pages/ListPage.tsx';
 import { MyPage } from './pages/MyPage.tsx';
 import type { Realtime } from './realtime.ts';
@@ -87,6 +88,9 @@ export function App({ session, realtime }: Props) {
                 <View activePanel={route.name}>
                   <Panel id="list">
                     <ListPage />
+                  </Panel>
+                  <Panel id="filters">
+                    <FiltersPage />
                   </Panel>
                   <Panel id="my">
                     <MyPage />

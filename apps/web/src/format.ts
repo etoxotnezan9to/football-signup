@@ -90,16 +90,20 @@ export function meetingsLabel(n: number): string {
 }
 
 /**
- * Показывать ли сбор в списке на главной: прошедшие — нет; отменённые — только организатору и тем,
- * кто записан (mySeats > 0), как отдаёт сервер; активные — всем.
+ * Показывать ли сбор в списке на главной при живом обновлении — те же правила, что у сервера (GET /games):
+ * прошедшие — только с фильтром showPast; отменённые — с фильтром showCancelled и только организатору
+ * и тем, кто записан (mySeats > 0); арена — по фильтру placeId.
  */
 export function visibleInList(
-  game: { status: 'active' | 'cancelled'; isFinished: boolean; organizer: { vkId: number } },
+  game: { status: 'active' | 'cancelled'; isFinished: boolean; placeId: number; organizer: { vkId: number } },
   viewerId: number,
   mySeats: number,
+  filters: { placeId: number | null; showPast: boolean; showCancelled: boolean },
 ): boolean {
-  if (game.isFinished) return false;
-  return game.status === 'active' || game.organizer.vkId === viewerId || mySeats > 0;
+  if (game.isFinished && !filters.showPast) return false;
+  if (filters.placeId !== null && game.placeId !== filters.placeId) return false;
+  if (game.status === 'active') return true;
+  return filters.showCancelled && (game.organizer.vkId === viewerId || mySeats > 0);
 }
 
 /** Подпись состояния заполненности: «занято 18/24, в очереди 3». */
@@ -145,15 +149,17 @@ export function gameLink(appId: number, gameId: number): string {
 
 export type Route =
   | { name: 'list' }
+  | { name: 'filters' }
   | { name: 'my' }
   | { name: 'create' }
   | { name: 'game'; id: number }
   | { name: 'edit'; id: number };
 
-/** Разбор hash: `#/`, `#/my`, `#/create`, `#/game/12`, `#/game/12/edit` (допускается и `#game/12`). */
+/** Разбор hash: `#/`, `#/filters`, `#/my`, `#/create`, `#/game/12`, `#/game/12/edit` (допускается и `#game/12`). */
 export function parseRoute(hash: string): Route {
   const path = hash.replace(/^#\/?/, '');
   const parts = path.split('/').filter(Boolean);
+  if (parts[0] === 'filters') return { name: 'filters' };
   if (parts[0] === 'my') return { name: 'my' };
   if (parts[0] === 'create') return { name: 'create' };
   if (parts[0] === 'game' && /^\d+$/.test(parts[1] ?? '')) {
@@ -167,6 +173,8 @@ export function routeToHash(r: Route): string {
   switch (r.name) {
     case 'list':
       return '#/';
+    case 'filters':
+      return '#/filters';
     case 'my':
       return '#/my';
     case 'create':

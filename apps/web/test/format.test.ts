@@ -88,13 +88,32 @@ describe('meetingsLabel', () => {
 });
 
 describe('visibleInList', () => {
-  const game = (status: 'active' | 'cancelled', isFinished = false) => ({ status, isFinished, organizer: { vkId: 1 } });
-  it('отменённый сбор видят только организатор и записавшиеся, прошедший — никто', () => {
-    assert.equal(visibleInList(game('active'), 5, 0), true);
-    assert.equal(visibleInList(game('cancelled'), 5, 0), false);
-    assert.equal(visibleInList(game('cancelled'), 1, 0), true, 'организатор');
-    assert.equal(visibleInList(game('cancelled'), 5, 2), true, 'записан');
-    assert.equal(visibleInList(game('active', true), 1, 2), false);
+  const game = (status: 'active' | 'cancelled', isFinished = false, placeId = 7) => ({
+    status,
+    isFinished,
+    placeId,
+    organizer: { vkId: 1 },
+  });
+  const f = (over: Partial<{ placeId: number | null; showPast: boolean; showCancelled: boolean }> = {}) => ({
+    placeId: null,
+    showPast: false,
+    showCancelled: true,
+    ...over,
+  });
+
+  it('по умолчанию: отменённый — организатору и записавшимся, прошедший — никому', () => {
+    assert.equal(visibleInList(game('active'), 5, 0, f()), true);
+    assert.equal(visibleInList(game('cancelled'), 5, 0, f()), false);
+    assert.equal(visibleInList(game('cancelled'), 1, 0, f()), true, 'организатор');
+    assert.equal(visibleInList(game('cancelled'), 5, 2, f()), true, 'записан');
+    assert.equal(visibleInList(game('active', true), 1, 2, f()), false);
+  });
+
+  it('фильтры: прошедшие, без отменённых, одна арена', () => {
+    assert.equal(visibleInList(game('active', true), 5, 0, f({ showPast: true })), true);
+    assert.equal(visibleInList(game('cancelled'), 1, 0, f({ showCancelled: false })), false);
+    assert.equal(visibleInList(game('active'), 5, 0, f({ placeId: 7 })), true);
+    assert.equal(visibleInList(game('active'), 5, 0, f({ placeId: 8 })), false);
   });
 });
 

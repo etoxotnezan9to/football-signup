@@ -576,21 +576,41 @@ export function createService(db: DatabaseSync, options: ServiceOptions = {}) {
     },
 
     /**
-     * Список предстоящих сборов: активные всем; отменённые — только организатору и тем, кто был записан,
-     * чтобы они видели отмену у себя в списке.
+     * Список сборов для главной. Активные видят все; отменённые — только организатор и те, кто был записан
+     * (includeCancelled: false — не показывать их вовсе). Прошедшие — только с includePast. placeId — одна арена.
+     * Порядок: предстоящие по возрастанию времени, затем прошедшие от новых к старым.
      */
-    listGames(viewerId: number, opts: { cursor?: string; limit?: number } = {}) {
+    listGames(
+      viewerId: number,
+      opts: { cursor?: string; limit?: number; includePast?: boolean; includeCancelled?: boolean; placeId?: number } = {},
+    ) {
       const limit = Math.min(Math.max(opts.limit ?? 20, 1), 50);
       const offset = opts.cursor && /^\d+$/.test(opts.cursor) ? Number(opts.cursor) : 0;
       const since = new Date(now().getTime() - FINISH_GRACE_MIN * 60_000).toISOString();
+      const where: string[] = [];
+      const params: (string | number)[] = [];
+      if (!opts.includePast) {
+        where.push('g.starts_at > ?');
+        params.push(since);
+      }
+      if (opts.includeCancelled === false) {
+        where.push("g.status = 'active'");
+      } else {
+        where.push(`(g.status = 'active' OR g.organizer_id = ?
+                     OR EXISTS (SELECT 1 FROM signups s WHERE s.game_id = g.id AND s.user_id = ?))`);
+        params.push(viewerId, viewerId);
+      }
+      if (opts.placeId !== undefined) {
+        where.push('g.place_id = ?');
+        params.push(opts.placeId);
+      }
       const rows = db
         .prepare(
-          `${GAME_SELECT} WHERE g.starts_at > ?
-              AND (g.status = 'active' OR g.organizer_id = ?
-                   OR EXISTS (SELECT 1 FROM signups s WHERE s.game_id = g.id AND s.user_id = ?))
-            ORDER BY g.starts_at, g.id LIMIT ? OFFSET ?`,
+          `${GAME_SELECT} WHERE ${where.join(' AND ')}
+            ORDER BY g.starts_at <= ?, CASE WHEN g.starts_at > ? THEN g.starts_at END, g.starts_at DESC, g.id
+            LIMIT ? OFFSET ?`,
         )
-        .all(since, viewerId, viewerId, limit + 1, offset) as unknown as GameRow[];
+        .all(...params, since, since, limit + 1, offset) as unknown as GameRow[];
       const page = rows.slice(0, limit);
       return {
         items: page.map((g) => summary(g, viewerId)),

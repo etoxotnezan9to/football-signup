@@ -158,11 +158,21 @@ export function buildApp(deps: AppDeps): FastifyInstance {
         });
 
         secured.get('/games', async (req) => {
-          const q = req.query as { cursor?: string; limit?: string };
+          const q = req.query as {
+            cursor?: string;
+            limit?: string;
+            includePast?: string;
+            includeCancelled?: string;
+            placeId?: string;
+          };
           const limit = q.limit !== undefined ? Number(q.limit) : undefined;
+          const placeId = q.placeId !== undefined ? Number(q.placeId) : undefined;
           return service.listGames(req.vkId, {
             ...(q.cursor !== undefined ? { cursor: q.cursor } : {}),
             ...(limit !== undefined && Number.isInteger(limit) ? { limit } : {}),
+            includePast: q.includePast === '1',
+            includeCancelled: q.includeCancelled !== '0',
+            ...(placeId !== undefined && Number.isInteger(placeId) && placeId > 0 ? { placeId } : {}),
           });
         });
         secured.post('/games', async (req, reply) => {
