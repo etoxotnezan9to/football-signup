@@ -600,7 +600,7 @@ export function createService(db: DatabaseSync, options: ServiceOptions = {}) {
       }
       const rows = db
         .prepare(
-          `${GAME_SELECT} WHERE ${where.join(' AND ')}
+          `${GAME_SELECT} ${where.length > 0 ? `WHERE ${where.join(' AND ')}` : ''}
             ORDER BY g.starts_at <= ?, CASE WHEN g.starts_at > ? THEN g.starts_at END, g.starts_at DESC, g.id
             LIMIT ? OFFSET ?`,
         )

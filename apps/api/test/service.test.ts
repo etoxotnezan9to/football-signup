@@ -110,6 +110,17 @@ describe('создание и список игр', () => {
     assert.equal(svc.listGames(U1, { includeCancelled: false }).items.length, 0);
     assert.equal(svc.listGames(U1).items.length, 1);
   });
+
+  it('прошедшие сборы с отменёнными без фильтра по арене: без ошибки, после предстоящих', () => {
+    const past = svc.createGame(U1, gameBody({ startsAt: '2026-10-21T18:00:00.000Z' }));
+    const future = svc.createGame(ORG, gameBody({ startsAt: '2026-10-25T18:00:00.000Z' }));
+    clock = new Date('2026-10-23T10:00:00.000Z');
+    assert.deepEqual(svc.listGames(ORG).items.map((g) => g.id), [future.id]);
+    assert.deepEqual(
+      svc.listGames(ORG, { includePast: true }).items.map((g) => g.id),
+      [future.id, past.id],
+    );
+  });
 });
 
 describe('запись на игру', () => {
