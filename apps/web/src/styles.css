@@ -211,10 +211,6 @@
   font-size: 13px;
   color: var(--vkui--color_text_secondary);
 }
-.leg__actions {
-  display: flex;
-  justify-content: flex-end;
-}
 .match__team {
   display: flex;
   align-items: center;
@@ -226,22 +222,14 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.match__side {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  min-height: 32px;
-  font-weight: 600;
-}
 .match__score--text {
-  min-width: 36px;
+  min-width: 18px;
   text-align: center;
-  font-variant-numeric: tabular-nums;
 }
 .match__goals {
-  width: 36px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
+  padding: 0;
   text-align: center;
   font: inherit;
   border: 1px solid var(--vkui--color_field_border_alpha);
@@ -418,7 +406,7 @@
 .matches {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 4px;
 }
 .matches__item,
 .matches__cell {
@@ -427,17 +415,18 @@
   background: var(--vkui--color_background_content);
 }
 .matches__item {
-  padding: 8px 12px;
+  padding: 6px 12px;
 }
 /* ячейка VKUI с перетаскиванием: свои отступы меньше, чтобы названия команд помещались на телефоне */
 .matches__cell .vkuiSimpleCell__host {
-  padding-inline: 8px 12px;
+  min-height: 0;
+  padding-inline: 2px 6px;
 }
 .matches__cell .vkuiSimpleCell__before {
-  padding-inline-end: 8px;
+  padding-inline-end: 4px;
 }
 .matches__cell .vkuiSimpleCell__middle {
-  padding-block: 8px;
+  padding-block: 4px;
 }
 .matches__cell .vkuiSimpleCell__after {
   display: none;
@@ -450,19 +439,37 @@
   white-space: normal;
 }
 .match {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
   gap: 4px;
   min-width: 0;
+  font-size: 14px;
+  font-weight: 600;
 }
-.match__head {
+.match .match__team {
+  gap: 4px;
+}
+.match .team-dot {
+  width: 10px;
+  height: 10px;
+}
+.match__team--a {
+  justify-content: flex-end;
+  text-align: right;
+}
+.match__score {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  min-height: 24px;
-  gap: 8px;
+  gap: 2px;
+  font-variant-numeric: tabular-nums;
 }
 .match__no {
+  min-width: 14px;
   font-size: 13px;
+  font-weight: 400;
   color: var(--vkui--color_text_secondary);
+}
+.match__goals--invalid {
+  border-color: var(--vkui--color_stroke_negative);
 }
