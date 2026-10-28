@@ -2,10 +2,14 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
   MAX_TEAMS,
+  TEAM_COLORS,
   TEAM_PRESETS,
   autoAssign,
   buildTeams,
+  parseTeamColor,
+  parseTeamColors,
   parseTeamName,
+  resolveTeamColors,
   type TeamAssignment,
 } from '../src/index.ts';
 
@@ -85,6 +89,57 @@ describe('buildTeams', () => {
   it('названий и цветов хватает на MAX_TEAMS команд', () => {
     assert.ok(TEAM_PRESETS.length >= MAX_TEAMS);
     assert.equal(new Set(TEAM_PRESETS.map((p) => p.color)).size, TEAM_PRESETS.length);
+  });
+});
+
+describe('цвета команд', () => {
+  it('в наборе есть чёрные, белые и красные; ключи и цвета без повторов', () => {
+    const names = TEAM_COLORS.map((c) => c.name);
+    for (const n of ['Чёрные', 'Белые', 'Красные']) assert.ok(names.includes(n), n);
+    assert.equal(new Set(TEAM_COLORS.map((c) => c.key)).size, TEAM_COLORS.length);
+    assert.equal(new Set(TEAM_COLORS.map((c) => c.color)).size, TEAM_COLORS.length);
+  });
+
+  it('по умолчанию цвет по номеру; выбранный цвет не повторяется у других команд', () => {
+    assert.deepEqual(resolveTeamColors(3, new Map()), ['blue', 'pink', 'lime']);
+    // команда 1 взяла розовый: команде 2 достаётся первый свободный цвет набора
+    assert.deepEqual(resolveTeamColors(3, new Map([[1, 'pink']])), ['pink', 'blue', 'lime']);
+    assert.deepEqual(resolveTeamColors(2, new Map([[2, 'black']])), ['blue', 'black']);
+    // повтор у команды с большим номером не учитывается, неизвестный ключ — тоже
+    assert.deepEqual(resolveTeamColors(2, new Map([[1, 'red'], [2, 'red']])), ['red', 'pink']);
+    assert.deepEqual(resolveTeamColors(1, new Map([[1, 'nope']])), ['blue']);
+    // на MAX_TEAMS команд цветов хватает всегда
+    const all = resolveTeamColors(MAX_TEAMS, new Map([[1, 'black']]));
+    assert.equal(new Set(all).size, MAX_TEAMS);
+  });
+
+  it('название команды без своего названия — название её цвета', () => {
+    const r = buildTeams({
+      teamsMax: 2,
+      playersPerTeam: 2,
+      names: new Map([[2, 'Ветераны']]),
+      colors: new Map([[1, 'black']]),
+      roster: [],
+      assignments: [],
+    });
+    assert.deepEqual(
+      r.teams.map((t) => [t.name, t.colorKey, t.color]),
+      [
+        ['Чёрные', 'black', '#212121'],
+        ['Ветераны', 'pink', '#f06bb3'],
+      ],
+    );
+  });
+
+  it('разбор цвета и списка цветов', () => {
+    assert.equal(parseTeamColor('black'), 'black');
+    assert.equal(parseTeamColor('#000000'), null);
+    assert.equal(parseTeamColors(undefined), undefined);
+    assert.deepEqual(parseTeamColors(['red', 'white']), ['red', 'white']);
+    assert.equal(parseTeamColors(['red', 'red']), null);
+    assert.equal(parseTeamColors(['red', 'x']), null);
+    assert.equal(parseTeamColors('red'), null);
+    assert.equal(parseTeamColors(new Array(MAX_TEAMS + 1).fill('red')), null);
   });
 });
 

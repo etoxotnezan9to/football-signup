@@ -441,6 +441,43 @@ describe('тестовые игроки', () => {
 });
 
 describe('команды', () => {
+  it('цвет команды: выбор из набора, не занятый другой командой; название меняется на название цвета', () => {
+    const g = svc.createGame(ORG, gameBody({ teamsMax: 3, playersPerTeam: 2 }));
+    const colors = (d: { teams: { name: string; colorKey: string }[] }) => d.teams.map((t) => `${t.name}:${t.colorKey}`);
+    assert.deepEqual(colors(svc.getGame(g.id, ORG)), ['Синие:blue', 'Розовые:pink', 'Салатовые:lime']);
+
+    expectCode(() => svc.setTeamColor(g.id, U1, 1, { color: 'black' }), 'FORBIDDEN');
+    expectCode(() => svc.setTeamColor(g.id, ORG, 1, { color: '#000' }), 'VALIDATION_ERROR');
+    expectCode(() => svc.setTeamColor(g.id, ORG, 1, { color: 'pink' }), 'VALIDATION_ERROR'); // у команды 2
+    expectCode(() => svc.setTeamColor(g.id, ORG, 4, { color: 'black' }), 'NOT_FOUND');
+
+    svc.setTeamName(g.id, ORG, 3, { name: 'Ветераны' });
+    let r = svc.setTeamColor(g.id, ORG, 1, { color: 'black' });
+    assert.deepEqual(colors(r), ['Чёрные:black', 'Розовые:pink', 'Ветераны:lime']);
+    assert.equal(events.at(-1)?.type, 'roster.updated');
+
+    // освободившийся синий не сдвигает цвета других команд; переименованная команда при смене цвета получает его название
+    r = svc.setTeamColor(g.id, ORG, 3, { color: 'blue' });
+    assert.deepEqual(colors(r), ['Чёрные:black', 'Розовые:pink', 'Синие:blue']);
+
+    // новая команда получает свой цвет по умолчанию, если он свободен
+    svc.updateGame(g.id, ORG, { teamsMax: 4 });
+    assert.deepEqual(colors(svc.getGame(g.id, ORG)).at(-1), 'Оранжевые:orange');
+  });
+
+  it('цвета команд при создании сбора (копирование): по номерам, названия — по цветам', () => {
+    const g = svc.createGame(ORG, { ...gameBody({ teamsMax: 2, playersPerTeam: 2 }), teamColors: ['black', 'white'] });
+    assert.deepEqual(
+      g.teams.map((t) => [t.name, t.colorKey]),
+      [
+        ['Чёрные', 'black'],
+        ['Белые', 'white'],
+      ],
+    );
+    expectCode(() => svc.createGame(ORG, { ...gameBody(), teamColors: ['red', 'red'] }), 'VALIDATION_ERROR');
+    expectCode(() => svc.createGame(ORG, { ...gameBody(), teamColors: ['nope'] }), 'VALIDATION_ERROR');
+  });
+
   it('по умолчанию 4 команды с цветами, переименовать может только организатор', () => {
     const g = svc.createGame(ORG, gameBody({ teamsMax: 4, playersPerTeam: 6 }));
     assert.deepEqual(

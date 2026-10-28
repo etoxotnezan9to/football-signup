@@ -1,21 +1,84 @@
 // Распределение игроков состава по командам (чистые функции, используются сервером).
 import { MAX_TEAMS } from './constants.ts';
 
-/** Название и цвет команды по умолчанию по её номеру (1..MAX_TEAMS). Цвет не меняется, название — может. */
-export const TEAM_PRESETS: readonly { name: string; color: string }[] = [
-  { name: 'Синие', color: '#2f6fed' },
-  { name: 'Розовые', color: '#f06bb3' },
-  { name: 'Салатовые', color: '#9bdb4d' },
-  { name: 'Оранжевые', color: '#f7941d' },
-  { name: 'Жёлтые', color: '#f5d02f' },
-  { name: 'Фиолетовые', color: '#9b51e0' },
-  { name: 'Красные', color: '#e53935' },
-  { name: 'Голубые', color: '#56ccf2' },
-  { name: 'Белые', color: '#ffffff' },
-  { name: 'Серые', color: '#9e9e9e' },
+/** Цвет команды из набора: постоянный ключ (хранится в сборе), название команды этого цвета и цвет кружка. */
+export interface TeamColor {
+  key: string;
+  name: string;
+  color: string;
+}
+
+/**
+ * Набор цветов команд. Первые MAX_TEAMS — цвета по умолчанию по номеру команды; организатор может выбрать
+ * любой цвет набора, которого нет у других команд сбора.
+ */
+export const TEAM_COLORS: readonly TeamColor[] = [
+  { key: 'blue', name: 'Синие', color: '#2f6fed' },
+  { key: 'pink', name: 'Розовые', color: '#f06bb3' },
+  { key: 'lime', name: 'Салатовые', color: '#9bdb4d' },
+  { key: 'orange', name: 'Оранжевые', color: '#f7941d' },
+  { key: 'yellow', name: 'Жёлтые', color: '#f5d02f' },
+  { key: 'purple', name: 'Фиолетовые', color: '#9b51e0' },
+  { key: 'red', name: 'Красные', color: '#e53935' },
+  { key: 'lightblue', name: 'Голубые', color: '#56ccf2' },
+  { key: 'white', name: 'Белые', color: '#ffffff' },
+  { key: 'gray', name: 'Серые', color: '#9e9e9e' },
+  { key: 'black', name: 'Чёрные', color: '#212121' },
 ];
 
-if (TEAM_PRESETS.length < MAX_TEAMS) throw new Error('TEAM_PRESETS короче MAX_TEAMS');
+/** Название и цвет команды по умолчанию по её номеру (1..MAX_TEAMS). */
+export const TEAM_PRESETS: readonly TeamColor[] = TEAM_COLORS.slice(0, MAX_TEAMS);
+
+if (TEAM_PRESETS.length < MAX_TEAMS) throw new Error('TEAM_COLORS короче MAX_TEAMS');
+
+const COLOR_BY_KEY = new Map(TEAM_COLORS.map((c) => [c.key, c]));
+
+export function teamColor(key: string): TeamColor | undefined {
+  return COLOR_BY_KEY.get(key);
+}
+
+/**
+ * Цвета команд 1..teamsMax (ключи по порядку номеров). Выбранные организатором (explicit) остаются как есть
+ * (повтор цвета у команды с большим номером не учитывается); остальные получают цвет по умолчанию для своего номера,
+ * а если он уже занят — первый свободный цвет набора.
+ */
+export function resolveTeamColors(teamsMax: number, explicit: ReadonlyMap<number, string>): string[] {
+  const out: (string | undefined)[] = [];
+  const used = new Set<string>();
+  for (let no = 1; no <= teamsMax; no++) {
+    const key = explicit.get(no);
+    if (key !== undefined && COLOR_BY_KEY.has(key) && !used.has(key)) {
+      out[no - 1] = key;
+      used.add(key);
+    }
+  }
+  for (let no = 1; no <= teamsMax; no++) {
+    if (out[no - 1] !== undefined) continue;
+    const preset = TEAM_PRESETS[no - 1]?.key;
+    const key =
+      preset !== undefined && !used.has(preset) ? preset : TEAM_COLORS.find((c) => !used.has(c.key))!.key;
+    out[no - 1] = key;
+    used.add(key);
+  }
+  return out as string[];
+}
+
+/** Ключ цвета из набора или null. */
+export function parseTeamColor(value: unknown): string | null {
+  return typeof value === 'string' && COLOR_BY_KEY.has(value) ? value : null;
+}
+
+/**
+ * Цвета команд при создании сбора (например, скопированные из другого сбора): ключи по номерам команд с 1,
+ * без повторов, не больше MAX_TEAMS. undefined — не заданы; null — неверные.
+ */
+export function parseTeamColors(value: unknown): string[] | null | undefined {
+  if (value === undefined) return undefined;
+  if (!Array.isArray(value) || value.length > MAX_TEAMS) return null;
+  const keys = value.map(parseTeamColor);
+  if (keys.some((k) => k === null) || new Set(keys).size !== keys.length) return null;
+  return keys as string[];
+}
 
 export const TEAM_NAME_MAX = 30;
 
@@ -35,6 +98,9 @@ export interface Team {
   /** Номер команды, с 1 */
   no: number;
   name: string;
+  /** Ключ цвета из TEAM_COLORS */
+  colorKey: string;
+  /** Цвет кружка (#rrggbb) */
   color: string;
   /** Игроки команды в порядке распределения */
   members: TeamSeat[];
@@ -57,17 +123,20 @@ export function seatKey(s: TeamSeat): string {
 export function buildTeams(input: {
   teamsMax: number;
   playersPerTeam: number;
-  /** Названия, заданные организатором, по номеру команды */
+  /** Названия, заданные организатором, по номеру команды; без названия — название цвета */
   names: ReadonlyMap<number, string>;
+  /** Цвета, заданные организатором (ключи TEAM_COLORS), по номеру команды; см. resolveTeamColors */
+  colors?: ReadonlyMap<number, string>;
   /** Состав в порядке очереди: сколько мест записи в составе */
   roster: readonly { signupId: number; mainSeats: number }[];
   assignments: readonly TeamAssignment[];
 }): TeamsView {
   const mainSeats = new Map(input.roster.map((r) => [r.signupId, r.mainSeats]));
   const teams: Team[] = [];
+  const colors = resolveTeamColors(input.teamsMax, input.colors ?? new Map());
   for (let no = 1; no <= input.teamsMax; no++) {
-    const preset = TEAM_PRESETS[no - 1]!;
-    teams.push({ no, name: input.names.get(no) ?? preset.name, color: preset.color, members: [] });
+    const color = teamColor(colors[no - 1]!)!;
+    teams.push({ no, name: input.names.get(no) ?? color.name, colorKey: color.key, color: color.color, members: [] });
   }
   const placed = new Set<string>();
   const ordered = [...input.assignments].sort(

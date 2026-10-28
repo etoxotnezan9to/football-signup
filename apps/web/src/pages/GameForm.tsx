@@ -99,8 +99,8 @@ function toForm(g?: GameDetails): FormState {
 
 /**
  * Настройки сбора, который копируют: базовые поля. Дата нового сбора — через неделю после копируемого;
- * при редактировании дата остаётся прежней, чтобы назначенный сбор не сдвинулся. Состав, команды,
- * результаты и лучший игрок в форму не входят и не копируются.
+ * при редактировании дата остаётся прежней, чтобы назначенный сбор не сдвинулся. Состав, распределение по командам,
+ * результаты и лучший игрок не копируются; цвета команд переносятся при создании (см. copiedColors).
  */
 function copyForm(current: FormState, g: GameDetails, editing: boolean): FormState {
   return { ...toForm(g), startsAt: editing ? current.startsAt : nextWeekOf(g.startsAt, new Date()) };
@@ -131,6 +131,8 @@ export function GameForm({ initial }: { initial?: GameDetails }) {
   const [places, setPlaces] = useState<Place[] | null>(null);
   const [addingPlace, setAddingPlace] = useState(false);
   const [copying, setCopying] = useState(false);
+  // цвета команд скопированного сбора: при создании новый сбор получает тот же набор цветов
+  const [copiedColors, setCopiedColors] = useState<string[] | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -229,7 +231,9 @@ export function GameForm({ initial }: { initial?: GameDetails }) {
     setBusy(true);
     try {
       if (!initial) {
-        const created = await api.createGame(parsed.value);
+        const created = await api.createGame(
+          copiedColors ? { ...parsed.value, teamColors: copiedColors } : parsed.value,
+        );
         showToast('Сбор создан');
         navigate(routeToHash({ name: 'game', id: created.id }));
         return;
@@ -277,6 +281,9 @@ export function GameForm({ initial }: { initial?: GameDetails }) {
             {...(initial ? { excludeId: initial.id } : {})}
             onPick={(g) => {
               setForm((f) => copyForm(f, g, initial !== undefined));
+              // сервер старой версии не присылает colorKey: тогда цвета не переносятся
+              const colors = g.teams.map((t) => (t as { colorKey?: string }).colorKey);
+              setCopiedColors(colors.every((k) => typeof k === 'string') ? (colors as string[]) : null);
               setErrors({});
             }}
             onClose={() => setCopying(false)}

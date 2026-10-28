@@ -63,6 +63,9 @@ export const api = {
   addTestPlayers: (id: number, count: number, seats: number) =>
     request<GameDetails>('POST', `/games/${id}/test-players`, { count, seats }),
   removeTestPlayers: (id: number) => request<GameDetails>('DELETE', `/games/${id}/test-players`),
+  /** color — ключ из TEAM_COLORS */
+  setTeamColor: (id: number, teamNo: number, color: string) =>
+    request<GameDetails>('PUT', `/games/${id}/teams/${teamNo}/color`, { color }),
   setTeamName: (id: number, teamNo: number, name: string) =>
     request<GameDetails>('PUT', `/games/${id}/teams/${teamNo}`, { name }),
   setMatchScore: (id: number, teamA: number, teamB: number, leg: number, goalsA: number, goalsB: number) =>

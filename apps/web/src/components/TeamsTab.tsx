@@ -1,6 +1,6 @@
 import { useState, type DragEvent, type KeyboardEvent } from 'react';
 import { Alert, Avatar, Input } from '@vkontakte/vkui';
-import { TEAM_NAME_MAX, type GameDetails, type Team, type TeamSeat } from '@football/shared';
+import { TEAM_COLORS, TEAM_NAME_MAX, type GameDetails, type Team, type TeamSeat } from '@football/shared';
 import { api, type ApiError } from '../api.ts';
 import { Empty } from './Empty.tsx';
 import { useApp } from '../context.ts';
@@ -28,6 +28,8 @@ export function TeamsTab({
   const [dragging, setDragging] = useState<TeamSeat | null>(null);
   const [over, setOver] = useState<Target | undefined>(undefined);
   const [renaming, setRenaming] = useState<{ no: number; value: string } | null>(null);
+  // команда, у которой открыт выбор цвета
+  const [picking, setPicking] = useState<number | null>(null);
   const bySignup = new Map(game.roster.map((r) => [r.signupId, r]));
   const isFull = (t: Team) => t.members.length >= game.playersPerTeam;
   const fail = (e: ApiError) => showToast(e.message);
@@ -42,6 +44,18 @@ export function TeamsTab({
     const name = renaming.value.trim();
     if (!team || name === team.name) return;
     api.setTeamName(game.id, team.no, name).then(onUpdate).catch(fail);
+  };
+
+  const chooseColor = (team: Team, key: string) => {
+    setPicking(null);
+    if (key === team.colorKey) return;
+    api.setTeamColor(game.id, team.no, key).then(onUpdate).catch(fail);
+  };
+
+  /** Свободные цвета для команды: её текущий и те, которых нет у других команд сбора. */
+  const colorChoices = (team: Team) => {
+    const taken = new Set(game.teams.filter((t) => t.no !== team.no).map((t) => t.colorKey));
+    return TEAM_COLORS.filter((c) => !taken.has(c.key));
   };
 
   const openMenu = (s: TeamSeat, current: Target) => {
@@ -161,12 +175,24 @@ export function TeamsTab({
           {...dropZone(t.no, !isFull(t))}
         >
           <div className="team-box__header">
-            <span
-              className="team-dot"
-              style={{ backgroundColor: t.color }}
-              aria-hidden="true"
-              data-testid="team-dot"
-            />
+            {editable ? (
+              <button
+                type="button"
+                className="team-dot team-dot--button"
+                style={{ backgroundColor: t.color }}
+                aria-label={`Цвет команды ${t.name}`}
+                aria-expanded={picking === t.no}
+                data-testid="team-dot"
+                onClick={() => setPicking((p) => (p === t.no ? null : t.no))}
+              />
+            ) : (
+              <span
+                className="team-dot"
+                style={{ backgroundColor: t.color }}
+                aria-hidden="true"
+                data-testid="team-dot"
+              />
+            )}
             {renaming?.no === t.no ? (
               <Input
                 className="team-box__input"
@@ -197,6 +223,22 @@ export function TeamsTab({
               {t.members.length}/{game.playersPerTeam}
             </span>
           </div>
+          {editable && picking === t.no && (
+            <div className="team-colors" role="group" aria-label={`Выбор цвета команды ${t.name}`}>
+              {colorChoices(t).map((c) => (
+                <button
+                  key={c.key}
+                  type="button"
+                  className={`team-dot team-dot--choice${c.key === t.colorKey ? ' team-dot--current' : ''}`}
+                  style={{ backgroundColor: c.color }}
+                  aria-label={c.name}
+                  aria-pressed={c.key === t.colorKey}
+                  title={c.name}
+                  onClick={() => chooseColor(t, c.key)}
+                />
+              ))}
+            </div>
+          )}
           {t.members.length === 0 ? (
             <div className="team-box__empty">{editable ? 'Перетащите сюда игроков' : 'Пока никого'}</div>
           ) : (

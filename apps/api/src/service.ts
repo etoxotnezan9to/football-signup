@@ -27,6 +27,9 @@ import {
   checkSeats,
   TEAM_NAME_MAX,
   allMatches,
+  parseTeamColor,
+  parseTeamColors,
+  teamColor,
   isMatchPermutation,
   matchOrder,
 } from '@football/shared';
@@ -286,8 +289,8 @@ export function createService(db: DatabaseSync, options: ServiceOptions = {}) {
   /** Команды игры по текущему составу; см. buildTeams в packages/shared. */
   function teamsOf(game: GameRow, entries: readonly RosterEntry[]): TeamsView {
     const names = db
-      .prepare('SELECT team_no, name FROM game_teams WHERE game_id = ?')
-      .all(game.id) as unknown as { team_no: number; name: string }[];
+      .prepare('SELECT team_no, name, color FROM game_teams WHERE game_id = ?')
+      .all(game.id) as unknown as { team_no: number; name: string; color: string | null }[];
     const assignments = db
       .prepare('SELECT signup_id, seat_no, team_no, created_at FROM team_assignments WHERE game_id = ?')
       .all(game.id) as unknown as { signup_id: number; seat_no: number; team_no: number; created_at: string }[];
@@ -295,6 +298,7 @@ export function createService(db: DatabaseSync, options: ServiceOptions = {}) {
       teamsMax: game.teams_max,
       playersPerTeam: game.players_per_team,
       names: new Map(names.map((n) => [n.team_no, n.name])),
+      colors: new Map(names.flatMap((n) => (n.color === null ? [] : [[n.team_no, n.color] as const]))),
       roster: entries,
       assignments: assignments.map((a) => ({
         signupId: a.signup_id,
@@ -592,6 +596,13 @@ export function createService(db: DatabaseSync, options: ServiceOptions = {}) {
       const parsed = parseGameInput(body);
       if (!parsed.ok) throw new AppError('VALIDATION_ERROR', 'Неверные данные сбора', parsed.errors);
       const input: GameInput = parsed.value;
+      // цвета команд, например скопированные из другого сбора: ключи по номерам команд с 1
+      const teamColors = parseTeamColors((body as { teamColors?: unknown }).teamColors);
+      if (teamColors === null) {
+        throw new AppError('VALIDATION_ERROR', 'Неверные данные сбора', {
+          teamColors: 'цвета из набора, без повторов',
+        });
+      }
       if (Date.parse(input.startsAt) <= now().getTime()) {
         throw new AppError('STARTS_AT_IN_PAST', 'Время начала должно быть в будущем');
       }
@@ -633,7 +644,10 @@ export function createService(db: DatabaseSync, options: ServiceOptions = {}) {
             ts,
             ts,
           );
-        return Number(res.lastInsertRowid);
+        const gameId = Number(res.lastInsertRowid);
+        const insertTeam = db.prepare('INSERT INTO game_teams (game_id, team_no, name, color) VALUES (?, ?, ?, ?)');
+        (teamColors ?? []).forEach((key, i) => insertTeam.run(gameId, i + 1, teamColor(key)!.name, key));
+        return gameId;
       });
       emitGameChanged(id, 'created');
       return details(getGameRow(id), organizerId);
@@ -890,6 +904,41 @@ export function createService(db: DatabaseSync, options: ServiceOptions = {}) {
           `INSERT INTO game_teams (game_id, team_no, name) VALUES (?, ?, ?)
              ON CONFLICT (game_id, team_no) DO UPDATE SET name = excluded.name`,
         ).run(gameId, teamNo, name);
+      });
+      emitGameChanged(gameId, 'roster');
+      return details(getGameRow(gameId), organizerId);
+    },
+
+    /**
+     * Организатор выбирает цвет команды из TEAM_COLORS (body.color — ключ). Цвет другой команды сбора выбрать нельзя.
+     * Название команды становится названием цвета. Цвета остальных команд при этом закрепляются как есть,
+     * чтобы цвет по умолчанию у них не сдвинулся.
+     */
+    setTeamColor(gameId: number, organizerId: number, teamNo: number, body: unknown): GameDetails {
+      const key = parseTeamColor((body as { color?: unknown } | null)?.color);
+      if (key === null) throw new AppError('VALIDATION_ERROR', 'Неверный цвет команды', { color: 'цвет из набора' });
+      inTransaction(db, () => {
+        const game = getGameRow(gameId);
+        requireOrganizer(game, organizerId);
+        if (game.status !== 'active') throw new AppError('GAME_NOT_ACTIVE', 'Сбор отменён');
+        if (teamNo > game.teams_max) throw new AppError('NOT_FOUND', 'Команда не найдена');
+        const { entries } = buildRoster(game);
+        const { teams } = teamsOf(game, entries);
+        if (teams.some((t) => t.no !== teamNo && t.colorKey === key)) {
+          throw new AppError('VALIDATION_ERROR', 'Этот цвет уже у другой команды', { color: 'цвет занят' });
+        }
+        const upsert = db.prepare(
+          `INSERT INTO game_teams (game_id, team_no, name, color) VALUES (?, ?, ?, ?)
+             ON CONFLICT (game_id, team_no) DO UPDATE SET name = excluded.name, color = excluded.color`,
+        );
+        const pin = db.prepare(
+          `INSERT INTO game_teams (game_id, team_no, name, color) VALUES (?, ?, ?, ?)
+             ON CONFLICT (game_id, team_no) DO UPDATE SET color = excluded.color`,
+        );
+        for (const t of teams) {
+          if (t.no === teamNo) upsert.run(gameId, teamNo, teamColor(key)!.name, key);
+          else pin.run(gameId, t.no, t.name, t.colorKey);
+        }
       });
       emitGameChanged(gameId, 'roster');
       return details(getGameRow(gameId), organizerId);

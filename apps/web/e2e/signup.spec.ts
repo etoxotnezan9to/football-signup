@@ -330,7 +330,7 @@ test('команды: организатор перераспределяет и
   await expect(none.getByText('Все игроки состава в командах')).toBeVisible();
 
   // переименование
-  await pink.getByRole('button', { name: /Розовые/ }).click();
+  await pink.getByRole('button', { name: 'Розовые ✎', exact: true }).click();
   await org.getByLabel('Название команды', { exact: true }).fill('Ветераны');
   await org.getByLabel('Название команды', { exact: true }).press('Enter');
   await expect(org.getByRole('region', { name: 'Команда Ветераны' })).toBeVisible();
@@ -692,4 +692,43 @@ test('номер телефона в реквизитах предоплаты �
   await maria.getByRole('button', { name: 'Скопировать номер 8-900-123-45-67', exact: true }).click();
   await expect(maria.getByText('Номер скопирован')).toBeVisible();
   expect((await maria.evaluate(() => navigator.clipboard.readText())).trim()).toBe('+79001234567');
+});
+
+test('цвет команды: выбор по кружку из свободных цветов, название по цвету, перенос при копировании сбора', async ({ browser }) => {
+  const org = await openAs(browser, MARIA);
+  await org.getByRole('button', { name: 'Создать сбор', exact: true }).last().click();
+  await choosePlace(org, 'Арена цветов', 'ул. Радужная, 3');
+  await org.getByLabel('Взнос, ₽', { exact: true }).fill('300');
+  await org.getByLabel('Количество команд (макс)', { exact: true }).fill('2');
+  await org.getByRole('button', { name: 'Создать сбор', exact: true }).last().click();
+  await expect(org).toHaveURL(/#\/game\/\d+$/);
+  // вкладка «Команды» появляется, когда в составе есть игроки
+  await org.getByRole('button', { name: '+ Записаться', exact: true }).click();
+  await org.getByRole('button', { name: '+1', exact: true }).click();
+  await org.getByRole('tab', { name: 'Команды' }).click();
+
+  await org.getByRole('button', { name: 'Цвет команды Синие', exact: true }).click();
+  const choices = org.getByRole('group', { name: 'Выбор цвета команды Синие' });
+  // розовый у второй команды — его нет среди вариантов; чёрные, белые и красные есть
+  await expect(choices.getByRole('button', { name: 'Розовые', exact: true })).toHaveCount(0);
+  for (const name of ['Чёрные', 'Белые', 'Красные']) {
+    await expect(choices.getByRole('button', { name, exact: true })).toBeVisible();
+  }
+  await choices.getByRole('button', { name: 'Чёрные', exact: true }).click();
+  await expect(org.getByRole('region', { name: 'Команда Чёрные' })).toBeVisible();
+  await expect(org.getByRole('region', { name: 'Команда Синие' })).toHaveCount(0);
+
+  // копия сбора получает тот же набор цветов
+  await org.getByRole('button', { name: 'Назад' }).first().click();
+  await org.getByRole('button', { name: 'Создать сбор', exact: true }).last().click();
+  await org.getByRole('button', { name: 'Копировать сбор', exact: true }).click();
+  await org.getByLabel('Копировать сбор', { exact: true }).click();
+  await org.getByRole('option', { name: /Арена цветов/ }).click();
+  await org.getByRole('button', { name: 'Создать сбор', exact: true }).last().click();
+  await expect(org).toHaveURL(/#\/game\/\d+$/);
+  await org.getByRole('button', { name: '+ Записаться', exact: true }).click();
+  await org.getByRole('button', { name: '+1', exact: true }).click();
+  await org.getByRole('tab', { name: 'Команды' }).click();
+  await expect(org.getByRole('region', { name: 'Команда Чёрные' })).toBeVisible();
+  await expect(org.getByRole('region', { name: 'Команда Розовые' })).toBeVisible();
 });

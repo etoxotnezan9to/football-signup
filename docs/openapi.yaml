@@ -335,6 +335,36 @@ paths:
         '403': { $ref: '#/components/responses/Error' }
         '404': { $ref: '#/components/responses/Error' }
         '409': { $ref: '#/components/responses/Error' }
+  /games/{gameId}/teams/{teamNo}/color:
+    parameters:
+      - { $ref: '#/components/parameters/GameId' }
+      - { name: teamNo, in: path, required: true, schema: { type: integer, minimum: 1 }, description: Номер команды, от 1 до teamsMax }
+    put:
+      summary: Выбрать цвет команды (только организатор)
+      description: >-
+        color — ключ из набора TEAM_COLORS (packages/shared). Цвет другой команды сбора выбрать нельзя
+        (VALIDATION_ERROR с details.color). Название команды становится названием цвета; цвета остальных команд
+        закрепляются как есть.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [color]
+              properties:
+                color: { type: string, example: black }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GameDetails' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
   /games/{gameId}/matches/{teamA}/{teamB}/{leg}:
     parameters:
       - { $ref: '#/components/parameters/GameId' }
@@ -607,6 +637,13 @@ components:
         description: { type: string, maxLength: 1000, default: '' }
         paymentInfo: { type: string, maxLength: 300, default: '' }
         organizerContact: { type: string, maxLength: 120, default: '' }
+        teamColors:
+          type: array
+          maxItems: 10
+          items: { type: string }
+          description: >-
+            Только при создании: цвета команд по номерам с 1 (ключи TEAM_COLORS, без повторов), например скопированные
+            из другого сбора; названия команд — названия цветов. Иначе VALIDATION_ERROR с details.teamColors
     GameUpdate:
       type: object
       description: Любое подмножество полей GameInput; при изменении teamsMax или playersPerTeam сервер пересчитывает capacity
@@ -685,11 +722,12 @@ components:
         leg: { type: integer, minimum: 1 }
     Team:
       type: object
-      required: [no, name, color, members]
+      required: [no, name, colorKey, color, members]
       properties:
         no: { type: integer, minimum: 1 }
-        name: { type: string, description: 'По умолчанию «Синие», «Розовые», «Салатовые», «Оранжевые», …' }
-        color: { type: string, description: 'Цвет команды, #rrggbb; не меняется' }
+        name: { type: string, description: 'Заданное организатором или название цвета: «Синие», «Розовые», «Чёрные», …' }
+        colorKey: { type: string, description: 'Ключ цвета из TEAM_COLORS (packages/shared)' }
+        color: { type: string, description: 'Цвет команды, #rrggbb' }
         members:
           type: array
           items: { $ref: '#/components/schemas/TeamSeat' }
