@@ -20,6 +20,7 @@ import { ListPage } from './pages/ListPage.tsx';
 import { MyPage } from './pages/MyPage.tsx';
 import type { Realtime } from './realtime.ts';
 import type { Session } from './session.ts';
+import { requestVkAppearance, useAppearance } from './theme.ts';
 
 const TOAST_MS = 3500;
 
@@ -32,7 +33,7 @@ export function App({ session, realtime }: Props) {
   const [route, setRoute] = useState(() => parseRoute(window.location.hash));
   const [popout, setPopout] = useState<ReactNode | null>(null);
   const [toast, setToast] = useState<string | null>(null);
-  const [appearance, setAppearance] = useState<'light' | 'dark'>('light');
+  const appearance = useAppearance();
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -50,15 +51,14 @@ export function App({ session, realtime }: Props) {
     bridge.subscribe((e) => {
       const detail = e.detail;
       if (detail.type === 'VKWebAppViewRestore') realtime.reconnectNow();
-      if (detail.type === 'VKWebAppUpdateConfig') {
-        const next = (detail.data as { appearance?: string }).appearance;
-        if (next === 'light' || next === 'dark') setAppearance(next);
-      }
     });
     return () => document.removeEventListener('visibilitychange', onVisible);
   }, [realtime]);
 
   useEffect(() => () => realtime.close(), [realtime]);
+
+  // тема могла прийти до подписки (её ловит theme.ts), но на всякий случай спрашиваем VK явно
+  useEffect(() => requestVkAppearance(), []);
 
   const navigate = useCallback((hash: string) => {
     if (window.location.hash !== hash) window.location.hash = hash;

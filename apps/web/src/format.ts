@@ -207,3 +207,20 @@ export function splitPhones(text: string): TextPart[] {
   if (last < text.length) parts.push({ text: text.slice(last) });
   return parts;
 }
+
+export type Appearance = 'light' | 'dark';
+
+/**
+ * Тема из данных VK (VKWebAppGetConfig / VKWebAppUpdateConfig): поле appearance, а если его нет — по названию схемы
+ * (например, vkcom_dark, space_gray — тёмные). null — тему определить нельзя.
+ */
+export function appearanceFromVkConfig(data: unknown): Appearance | null {
+  if (typeof data !== 'object' || data === null) return null;
+  const d = data as { appearance?: unknown; scheme?: unknown };
+  if (d.appearance === 'light' || d.appearance === 'dark') return d.appearance;
+  if (typeof d.scheme === 'string') {
+    if (/dark|space_gray/.test(d.scheme)) return 'dark';
+    if (/light/.test(d.scheme)) return 'light';
+  }
+  return null;
+}

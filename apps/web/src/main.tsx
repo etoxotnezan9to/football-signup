@@ -6,6 +6,8 @@ import { api, setAuthHeader } from './api.ts';
 import { App } from './App.tsx';
 import { createRealtime } from './realtime.ts';
 import { initSession } from './session.ts';
+// подписка на тему VK до VKWebAppInit: первое событие с темой приходит сразу после него
+import './theme.ts';
 
 const container = document.getElementById('root');
 if (!container) throw new Error('Элемент #root не найден');

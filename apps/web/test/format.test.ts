@@ -20,8 +20,22 @@ import {
   signupResultText,
   defaultStartsAt,
   splitPhones,
+  appearanceFromVkConfig,
   type Route,
 } from '../src/format.ts';
+
+describe('appearanceFromVkConfig', () => {
+  it('берёт appearance, иначе определяет по схеме', () => {
+    assert.equal(appearanceFromVkConfig({ appearance: 'dark' }), 'dark');
+    assert.equal(appearanceFromVkConfig({ appearance: 'light', scheme: 'space_gray' }), 'light');
+    assert.equal(appearanceFromVkConfig({ scheme: 'vkcom_dark' }), 'dark');
+    assert.equal(appearanceFromVkConfig({ scheme: 'space_gray' }), 'dark');
+    assert.equal(appearanceFromVkConfig({ scheme: 'bright_light' }), 'light');
+    assert.equal(appearanceFromVkConfig({ scheme: 'client_light' }), 'light');
+    assert.equal(appearanceFromVkConfig({}), null);
+    assert.equal(appearanceFromVkConfig(null), null);
+  });
+});
 
 describe('splitPhones', () => {
   it('находит номера в разных записях и приводит к +7XXXXXXXXXX', () => {
