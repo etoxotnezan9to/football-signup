@@ -13,7 +13,7 @@ import {
   Tabs,
   TabsItem,
 } from '@vkontakte/vkui';
-import { formatRosterText, numberLabel, type GameDetails, type RosterEntry } from '@football/shared';
+import { formatRosterText, numberLabel, queueOrder, type GameDetails, type RosterEntry } from '@football/shared';
 import { api, type ApiError } from '../api.ts';
 import { Empty } from '../components/Empty.tsx';
 import { MockFill } from '../components/MockFill.tsx';
@@ -146,7 +146,7 @@ function GameView({ id }: { id: number }) {
   const active = game.status === 'active' && !game.isFinished;
   const mySeats = game.roster.find((r) => r.user.vkId === session.user.id)?.seats ?? 0;
   const mainRows = numbered(game.roster, (e) => e.mainSeats);
-  const queueRows = numbered(game.roster, (e) => e.queueSeats);
+  const queueRows = numbered(queueOrder(game.roster), (e) => e.queueSeats);
   const fail = (e: ApiError) => showToast(e.message);
   const close = () => setPopout(null);
 
@@ -180,6 +180,7 @@ function GameView({ id }: { id: number }) {
         seats: r.seats,
         mainSeats: r.mainSeats,
         queueSeats: r.queueSeats,
+        queuePosition: r.queuePosition,
         paidSeats: r.paidSeats,
       })),
     );

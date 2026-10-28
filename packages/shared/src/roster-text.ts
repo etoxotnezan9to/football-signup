@@ -1,4 +1,5 @@
 // Текстовый список для кнопки «Скопировать список» (docs/spec.md, раздел 10).
+import { queueOrder } from './roster.ts';
 
 export interface TextGameInfo {
   /** Уже отформатированная дата и время, чтобы функция не зависела от часового пояса */
@@ -24,6 +25,8 @@ export interface TextRosterEntry {
   seats: number;
   mainSeats: number;
   queueSeats: number;
+  /** Место в очереди (с 0), по нему упорядочена очередь; без него — порядок записей */
+  queuePosition?: number | null;
   paidSeats: number;
 }
 
@@ -78,7 +81,7 @@ export function formatRosterText(game: TextGameInfo, entries: readonly TextRoste
     n += e.mainSeats;
   }
 
-  const queued = entries.filter((e) => e.queueSeats > 0);
+  const queued = queueOrder(entries);
   if (queued.length > 0) {
     lines.push('', '⚠ Мест нет! В очереди:');
     let q = 1;

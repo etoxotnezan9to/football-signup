@@ -162,6 +162,35 @@ describe('запись на игру', () => {
     assert.equal(r.game.taken, 4);
   });
 
+  it('пример 7: добавленные к записи места встают в конец и не вытесняют записавшихся позже', () => {
+    const g = svc.createGame(ORG, gameBody({ teamsMax: 2, playersPerTeam: 2 })); // 4 места
+    svc.putSignup(g.id, U1, 1);
+    svc.putSignup(g.id, U2, 2);
+    svc.putSignup(g.id, U3, 2); // 1 в составе, 1 в очереди
+    let r = svc.putSignup(g.id, U1, 3); // +2 места U1 — в конец очереди, за U3
+    const seats = (vkId: number) => {
+      const e = r.game.roster.find((x) => x.user.vkId === vkId)!;
+      return [e.mainSeats, e.queueSeats, e.queuePosition];
+    };
+    assert.deepEqual(seats(U1), [1, 2, 1]);
+    assert.deepEqual(seats(U2), [2, 0, null]);
+    assert.deepEqual(seats(U3), [1, 1, 0]);
+
+    // U2 уходит: освободившиеся 2 места получают по порядку очереди сначала U3, потом U1
+    svc.deleteSignup(g.id, U2);
+    r = { ...r, game: svc.getGame(g.id, U1) };
+    assert.deepEqual(seats(U3), [2, 0, null]);
+    assert.deepEqual(seats(U1), [2, 1, 0]);
+
+    // уменьшение снимает последние добавленные места, повторное увеличение снова встаёт в конец
+    r = svc.putSignup(g.id, U1, 1);
+    assert.deepEqual(seats(U1), [1, 0, null]);
+    svc.putSignup(g.id, U2, 1);
+    r = svc.putSignup(g.id, U1, 2);
+    assert.deepEqual(seats(U1), [1, 1, 0]);
+    assert.deepEqual(seats(U2), [1, 0, null]);
+  });
+
   it('пример 13: повторная запись с тем же числом идемпотентна и не меняет порядок', () => {
     const g = svc.createGame(ORG, gameBody());
     svc.putSignup(g.id, U1, 2);

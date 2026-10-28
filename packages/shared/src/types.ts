@@ -45,6 +45,8 @@ export interface RosterEntry {
   seats: number;
   mainSeats: number;
   queueSeats: number;
+  /** С какого места очереди (с 0) начинаются места записи в очереди; null — в очереди мест нет */
+  queuePosition: number | null;
   paidSeats: number;
   createdAt: string;
 }

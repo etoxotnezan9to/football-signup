@@ -695,13 +695,19 @@ components:
           items: { $ref: '#/components/schemas/TeamSeat' }
     RosterEntry:
       type: object
-      required: [signupId, user, seats, mainSeats, queueSeats, paidSeats, createdAt]
+      required: [signupId, user, seats, mainSeats, queueSeats, queuePosition, paidSeats, createdAt]
       properties:
         signupId: { type: integer }
         user: { $ref: '#/components/schemas/User' }
         seats: { type: integer }
         mainSeats: { type: integer, description: Мест в составе }
         queueSeats: { type: integer, description: Мест в очереди }
+        queuePosition:
+          type: integer
+          nullable: true
+          description: >-
+            С какого места очереди (с 0) начинаются места записи в очереди; null — в очереди мест нет.
+            Очередь показывается в порядке queuePosition (места, добавленные к записи позже, стоят в конце)
         paidSeats: { type: integer }
         createdAt: { type: string, format: date-time }
     GameDetails:

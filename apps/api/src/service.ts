@@ -17,6 +17,7 @@ import {
   clampPaidSeats,
   clipMessage,
   computeRoster,
+  resizeParts,
   groupUsersBy,
   promotionsBetween,
   parseGameInput,
@@ -36,6 +37,7 @@ import type {
   MainSeats,
   Place,
   RosterEntry,
+  SignupPart,
   MatchResult,
   MatchSlot,
   RatingGame,
@@ -193,12 +195,51 @@ export function createService(db: DatabaseSync, options: ServiceOptions = {}) {
       .all(gameId) as unknown as SignupRow[];
   }
 
+  /** Части записей игры (места, добавленные одним действием) по порядку добавления. */
+  function signupParts(gameId: number): Map<number, SignupPart[]> {
+    const rows = db
+      .prepare(
+        `SELECT p.signup_id, p.seats, p.created_at FROM signup_parts p JOIN signups s ON s.id = p.signup_id
+          WHERE s.game_id = ? ORDER BY p.created_at, p.id`,
+      )
+      .all(gameId) as unknown as { signup_id: number; seats: number; created_at: string }[];
+    const out = new Map<number, SignupPart[]>();
+    for (const r of rows) {
+      const list = out.get(r.signup_id) ?? [];
+      list.push({ seats: r.seats, createdAt: r.created_at });
+      out.set(r.signup_id, list);
+    }
+    return out;
+  }
+
+  /** Новые части записи после изменения числа мест (resizeParts): увеличение — в конец, уменьшение — с последних. */
+  function writeParts(signupId: number, seats: number, ts: string): void {
+    const current = db
+      .prepare('SELECT seats, created_at FROM signup_parts WHERE signup_id = ? ORDER BY created_at, id')
+      .all(signupId) as unknown as { seats: number; created_at: string }[];
+    const next = resizeParts(
+      current.map((r) => ({ seats: r.seats, createdAt: r.created_at })),
+      seats,
+      ts,
+    );
+    db.prepare('DELETE FROM signup_parts WHERE signup_id = ?').run(signupId);
+    const insert = db.prepare('INSERT INTO signup_parts (signup_id, seats, created_at) VALUES (?, ?, ?)');
+    for (const part of next) insert.run(signupId, part.seats, part.createdAt);
+  }
+
   function buildRoster(game: GameRow): { entries: RosterEntry[]; taken: number; queued: number } {
     const rows = signupRows(game.id);
     const byId = new Map(rows.map((r) => [r.id, r]));
+    const parts = signupParts(game.id);
     const computed = computeRoster(
       game.capacity,
-      rows.map((r) => ({ id: r.id, userId: r.user_id, seats: r.seats, createdAt: r.created_at })),
+      rows.map((r) => ({
+        id: r.id,
+        userId: r.user_id,
+        seats: r.seats,
+        createdAt: r.created_at,
+        ...(parts.has(r.id) ? { parts: parts.get(r.id)! } : {}),
+      })),
     );
     const entries: RosterEntry[] = computed.map((c) => {
       const r = byId.get(c.signupId)!;
@@ -213,6 +254,7 @@ export function createService(db: DatabaseSync, options: ServiceOptions = {}) {
         seats: c.seats,
         mainSeats: c.mainSeats,
         queueSeats: c.queueSeats,
+        queuePosition: c.queuePosition,
         paidSeats: r.paid_seats,
         createdAt: c.createdAt,
       };
@@ -777,10 +819,15 @@ export function createService(db: DatabaseSync, options: ServiceOptions = {}) {
             ts,
             existing.id,
           );
+          // добавленные места — новая часть записи в конце состава/очереди; убранные — с последних частей
+          writeParts(existing.id, check.seats, ts);
         } else {
-          db.prepare(
-            'INSERT INTO signups (game_id, user_id, seats, paid_seats, created_at, updated_at) VALUES (?, ?, ?, 0, ?, ?)',
-          ).run(gameId, userId, check.seats, ts, ts);
+          const res = db
+            .prepare(
+              'INSERT INTO signups (game_id, user_id, seats, paid_seats, created_at, updated_at) VALUES (?, ?, ?, 0, ?, ?)',
+            )
+            .run(gameId, userId, check.seats, ts, ts);
+          writeParts(Number(res.lastInsertRowid), check.seats, ts);
         }
       });
       emitGameChanged(gameId, 'roster', seatsBefore);
@@ -1170,7 +1217,8 @@ export function createService(db: DatabaseSync, options: ServiceOptions = {}) {
           const name = `${TEST_FIRST_NAMES[(n - 1) % TEST_FIRST_NAMES.length]} ${n}`;
           const ts = now().toISOString();
           insertUser.run(nextId, name, '(тест)', ts, ts);
-          insertSignup.run(gameId, nextId, seats.seats, ts, ts);
+          const res = insertSignup.run(gameId, nextId, seats.seats, ts, ts);
+          writeParts(Number(res.lastInsertRowid), seats.seats, ts);
           nextId -= 1;
         }
       });
