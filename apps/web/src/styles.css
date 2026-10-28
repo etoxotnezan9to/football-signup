@@ -429,7 +429,15 @@
   padding-block: 4px;
 }
 .matches__cell .vkuiSimpleCell__after {
+  padding-inline-start: 4px;
+}
+/* значок перетаскивания на Android и в браузере слева, на iOS справа: пустую сторону убираем */
+.matches__cell .vkuiSimpleCell__before:empty,
+.matches__cell .vkuiSimpleCell__after:empty {
   display: none;
+}
+.matches__cell.vkuiCell__ios .vkuiSimpleCell__host {
+  padding-inline: 8px 2px;
 }
 .matches__cell .vkuiSimpleCell__children {
   display: block;

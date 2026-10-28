@@ -150,7 +150,7 @@ export function ResultsTab({
     <div className="results">
       <div className="results__hint">
         Каждая пара команд играет {game.meetings} {plural(game.meetings, ['раз', 'раза', 'раз'])}. Матчи идут по
-        порядку списка{editable ? '; чтобы изменить порядок, перетащите матч за значок слева' : ''}.
+        порядку списка{editable ? '; чтобы изменить порядок, перетащите матч за значок ☰' : ''}.
       </div>
       {editable && game.matchOrderCustom && (
         <div>
