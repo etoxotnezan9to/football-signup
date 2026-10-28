@@ -672,3 +672,24 @@ test('отменённый сбор виден в списке всем, пок�
   await maria.getByRole('button', { name: 'Готово', exact: true }).click();
   await expect(maria.locator('.card', { hasText: 'Арена отмены' })).toHaveCount(0);
 });
+
+test('номер телефона в реквизитах предоплаты копируется нажатием', async ({ browser }) => {
+  const org = await openAs(browser, ALEXEY);
+  await org.getByRole('button', { name: 'Создать сбор', exact: true }).last().click();
+  await choosePlace(org, 'Арена СБП', 'ул. Переводная, 7');
+  await org.getByLabel('Взнос, ₽', { exact: true }).fill('500');
+  await org.getByLabel('Реквизиты для предоплаты', { exact: true }).fill('Т-Банк 8-900-123-45-67');
+  await org.getByRole('button', { name: 'Создать сбор', exact: true }).last().click();
+  await expect(org).toHaveURL(/#\/game\/\d+$/);
+  const gamePath = `/${new URL(org.url()).hash}`;
+
+  // участник с доступом к буферу обмена нажимает на номер
+  const ctx = await browser.newContext({ permissions: ['clipboard-read', 'clipboard-write'] });
+  opened.push(ctx);
+  await ctx.addInitScript((id) => localStorage.setItem('mockUser', String(id)), MARIA);
+  const maria = await ctx.newPage();
+  await maria.goto(gamePath);
+  await maria.getByRole('button', { name: 'Скопировать номер 8-900-123-45-67', exact: true }).click();
+  await expect(maria.getByText('Номер скопирован')).toBeVisible();
+  expect((await maria.evaluate(() => navigator.clipboard.readText())).trim()).toBe('+79001234567');
+});

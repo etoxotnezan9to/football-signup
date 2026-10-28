@@ -19,8 +19,35 @@ import {
   profileUrl,
   signupResultText,
   defaultStartsAt,
+  splitPhones,
   type Route,
 } from '../src/format.ts';
+
+describe('splitPhones', () => {
+  it('находит номера в разных записях и приводит к +7XXXXXXXXXX', () => {
+    const phones = (t: string) => splitPhones(t).flatMap((p) => (p.phone ? [p.phone] : []));
+    assert.deepEqual(phones('Т-Банк 8-900-123-45-67'), ['+79001234567']);
+    assert.deepEqual(phones('+7 (900) 123-45-67, Сбер'), ['+79001234567']);
+    assert.deepEqual(phones('89001234567 или 900 765 43 21'), ['+79001234567', '+79007654321']);
+    assert.deepEqual(phones('+79001234567'), ['+79001234567']);
+  });
+
+  it('не принимает за номер короткие числа и номера карт', () => {
+    const phones = (t: string) => splitPhones(t).filter((p) => p.phone);
+    assert.equal(phones('Т-Банк 8-900').length, 0);
+    assert.equal(phones('карта 2200 7001 2345 6789').length, 0);
+    assert.equal(phones('взнос 650').length, 0);
+  });
+
+  it('сохраняет текст вокруг номера', () => {
+    assert.deepEqual(splitPhones('Т-Банк 8-900-123-45-67, Иван'), [
+      { text: 'Т-Банк ' },
+      { text: '8-900-123-45-67', phone: '+79001234567' },
+      { text: ', Иван' },
+    ]);
+    assert.deepEqual(splitPhones('без номера'), [{ text: 'без номера' }]);
+  });
+});
 
 describe('plural / seatsLabel', () => {
   it('склоняет «место»', () => {

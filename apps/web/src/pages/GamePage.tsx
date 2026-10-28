@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react';
-import { Icon28CopyOutline, Icon28ShareOutline } from '@vkontakte/icons';
+import { Icon16CopyOutline, Icon28CopyOutline, Icon28ShareOutline } from '@vkontakte/icons';
 import {
   Avatar,
   Button,
@@ -32,6 +32,7 @@ import {
   profileUrl,
   routeToHash,
   seatsLabel,
+  splitPhones,
   teamsLabel,
 } from '../format.ts';
 import { useGame } from '../hooks.ts';
@@ -53,6 +54,34 @@ function Row({ icon, label, children }: { icon: string; label: string; children:
       </div>
       <div>{children}</div>
     </div>
+  );
+}
+
+/** Текст, в котором номера телефона копируются нажатием (чтобы вставить в перевод по СБП). */
+function CopyablePhones({ text }: { text: string }) {
+  const { showToast } = useApp();
+  return (
+    <>
+      {splitPhones(text).map((part, i) =>
+        part.phone ? (
+          <button
+            key={i}
+            type="button"
+            className="phone-copy"
+            aria-label={`Скопировать номер ${part.text}`}
+            onClick={() => {
+              const phone = part.phone!;
+              void copyText(phone).then((ok) => showToast(ok ? 'Номер скопирован' : 'Не удалось скопировать номер'));
+            }}
+          >
+            {part.text}
+            <Icon16CopyOutline className="phone-copy__icon" aria-hidden="true" />
+          </button>
+        ) : (
+          <span key={i}>{part.text}</span>
+        ),
+      )}
+    </>
   );
 }
 
@@ -263,7 +292,7 @@ function GameView({ id }: { id: number }) {
           </Row>
           {game.paymentInfo && (
             <Row icon="❗" label="Предоплата">
-              {game.paymentInfo}
+              <CopyablePhones text={game.paymentInfo} />
             </Row>
           )}
           {game.description && (

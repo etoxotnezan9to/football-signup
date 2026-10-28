@@ -481,3 +481,19 @@
 .match__goals--invalid {
   border-color: var(--vkui--color_stroke_negative);
 }
+/* номер телефона в реквизитах: нажатие копирует его */
+.phone-copy {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: var(--vkui--color_text_link);
+  cursor: pointer;
+  text-align: inherit;
+}
+.phone-copy__icon {
+  flex: none;
+}

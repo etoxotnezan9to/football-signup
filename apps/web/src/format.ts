@@ -182,3 +182,28 @@ export function routeToHash(r: Route): string {
       return `#/game/${r.id}/edit`;
   }
 }
+
+/** Кусок текста; у номера телефона — phone в виде +7XXXXXXXXXX для копирования. */
+export interface TextPart {
+  text: string;
+  phone?: string;
+}
+
+// +7 / 8 и 10 цифр, либо 10 цифр с 9 в начале; между группами пробелы, дефисы и скобки
+const PHONE_RE = /(?<![\d+])(?:(?:\+7|8)[\s\-()]*\d|\(?9)\d{2}\)?[\s\-)]*\d{3}[\s-]*\d{2}[\s-]*\d{2}(?!\d)/g;
+
+/** Делит текст на куски, выделяя российские номера телефона (например, в реквизитах для предоплаты). */
+export function splitPhones(text: string): TextPart[] {
+  const parts: TextPart[] = [];
+  let last = 0;
+  for (const m of text.matchAll(PHONE_RE)) {
+    const digits = m[0].replace(/\D/g, '');
+    const ten = digits.length === 11 ? digits.slice(1) : digits;
+    if (ten.length !== 10) continue;
+    if (m.index > last) parts.push({ text: text.slice(last, m.index) });
+    parts.push({ text: m[0], phone: `+7${ten}` });
+    last = m.index + m[0].length;
+  }
+  if (last < text.length) parts.push({ text: text.slice(last) });
+  return parts;
+}
