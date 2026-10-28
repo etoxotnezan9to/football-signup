@@ -40,6 +40,7 @@ function setup(timeZone?: string) {
     ...(timeZone ? { timeZone } : {}),
   });
   for (const id of [ORG, A, B, C]) svc.upsertUser({ vkId: id, firstName: `Имя${id}`, lastName: `Фам${id}` });
+  svc.addGameCreators([ORG]);
   PLACE = svc.createPlace(ORG, { name: 'Орловский', address: 'Суздальское шоссе 62' }).place.id;
 }
 

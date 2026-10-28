@@ -25,7 +25,11 @@ const config: Config = {
   notifyTimeZone: 'Europe/Moscow',
   authDevBypass: false,
   testMode: false,
+  gameCreators: [],
 };
+
+// пользователи тестов, которые создают сборы (создавать могут только перечисленные в game_creators)
+const CREATORS = [1, 501, 601, 602, 611, 612, 621, 701, 702, 801, 802, 803, 901, 902, 911, 912, 921, 931, 932];
 
 function launch(userId: number): string {
   const p = new URLSearchParams({
@@ -60,6 +64,7 @@ before(async () => {
   });
   service = createService(db, { emit: (e) => hub.publish(e) });
   holder.service = service;
+  service.addGameCreators(CREATORS);
   service.ensureUser(1);
   placeId = service.createPlace(1, { name: 'Орловский', address: 'Суздальское шоссе 62' }).place.id;
   app = buildApp({
@@ -242,10 +247,22 @@ describe('HTTP API', () => {
     assert.deepEqual(del.json().results, []);
   });
 
+  it('создавать сборы могут только пользователи из списка; список пользователей — только им', async () => {
+    const outsider = 4242;
+    const cfg = await app.inject({ method: 'GET', url: '/api/config', headers: auth(outsider) });
+    assert.equal(cfg.json().canCreateGames, false);
+    const create = await app.inject({ method: 'POST', url: '/api/games', headers: auth(outsider), payload: gameBody() });
+    assert.equal(create.statusCode, 403);
+    assert.equal((await app.inject({ method: 'GET', url: '/api/users', headers: auth(outsider) })).statusCode, 403);
+    const users = await app.inject({ method: 'GET', url: '/api/users', headers: auth(501) });
+    assert.equal(users.statusCode, 200);
+    assert.ok(users.json().items.some((u: { vkId: number }) => u.vkId === outsider));
+  });
+
   it('конфигурация и тестовые игроки выключены без тестового режима', async () => {
     const cfg = await app.inject({ method: 'GET', url: '/api/config', headers: auth(801) });
     assert.equal(cfg.statusCode, 200);
-    assert.deepEqual(cfg.json(), { testMode: false });
+    assert.deepEqual(cfg.json(), { testMode: false, canCreateGames: true });
     const g = await app.inject({ method: 'POST', url: '/api/games', headers: auth(801), payload: gameBody() });
     const add = await app.inject({
       method: 'POST',

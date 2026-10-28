@@ -6,6 +6,7 @@ import { loadConfig } from './config.ts';
 import { openDatabase } from './db.ts';
 import { createHub } from './hub.ts';
 import { createVkNotifier } from './notifier.ts';
+import { resolveScreenNames } from './vk-users.ts';
 import { createRateLimiter } from './rate-limit.ts';
 import { createService } from './service.ts';
 
@@ -41,6 +42,7 @@ const service = createService(db, {
   testMode: config.testMode,
 });
 holder.service = service;
+service.addGameCreators(config.gameCreators);
 
 const require = createRequire(import.meta.url);
 let version = 'dev';
@@ -65,6 +67,22 @@ app.log.info(
   notifier ? 'личные уведомления включены' : 'личные уведомления выключены (нет VK_SERVICE_KEY)',
 );
 if (config.testMode) app.log.warn('тестовый режим включён: организаторы могут добавлять тестовых игроков');
+
+// Создатели сборов, записанные коротким именем: id ищется через VK API (нужен сервисный ключ)
+const pendingNames = service.pendingCreatorScreenNames();
+if (pendingNames.length > 0) {
+  if (!config.vkServiceKey) {
+    app.log.warn({ names: pendingNames }, 'создатели сборов по короткому имени не найдены: нет VK_SERVICE_KEY');
+  } else {
+    resolveScreenNames(pendingNames, { serviceKey: config.vkServiceKey })
+      .then((found) => {
+        for (const [name, id] of found) service.setCreatorScreenNameId(name, id);
+        const missing = pendingNames.filter((n) => !found.has(n.toLowerCase()));
+        app.log.info({ found: Object.fromEntries(found), missing }, 'создатели сборов: короткие имена');
+      })
+      .catch((err: unknown) => app.log.warn({ err }, 'не удалось найти создателей сборов по коротким именам'));
+  }
+}
 
 // Напоминания: раз в минуту ищем игры, до которых осталось меньше суток
 const REMINDER_TICK_MS = 60_000;

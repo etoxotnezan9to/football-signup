@@ -45,10 +45,46 @@ beforeEach(() => {
   });
   for (const id of [ORG, U1, U2, U3])
     svc.upsertUser({ vkId: id, firstName: `Имя${id}`, lastName: `Фам${id}` });
+  svc.addGameCreators([ORG, U1]);
   PLACE = svc.createPlace(ORG, { name: 'Орловский', address: 'Суздальское шоссе 62' }).place.id;
 });
 
 describe('создание и список игр', () => {
+  it('создатель из списка назначает организатором другого; управлять могут оба, создатель не нужен в интерфейсе', () => {
+    expectCode(() => svc.createGame(U2, gameBody()), 'FORBIDDEN'); // U2 нет в списке создателей
+    expectCode(() => svc.createGame(ORG, { ...gameBody(), organizerId: 999 }), 'VALIDATION_ERROR'); // не открывал приложение
+    const g = svc.createGame(ORG, { ...gameBody(), organizerId: U2 });
+    assert.equal(g.organizer.vkId, U2);
+    assert.equal(g.creatorId, ORG);
+    // организатор (не из списка создателей) и создатель управляют сбором, остальные — нет
+    svc.updateGame(g.id, U2, { feeRub: 700 });
+    svc.updateGame(g.id, ORG, { feeRub: 800 });
+    expectCode(() => svc.updateGame(g.id, U3, { feeRub: 1 }), 'FORBIDDEN');
+    // смена организатора отдельно от остальных полей
+    const r = svc.updateGame(g.id, ORG, { organizerId: U3 });
+    assert.equal(r.organizer.vkId, U3);
+    assert.equal(r.feeRub, 800);
+    expectCode(() => svc.updateGame(g.id, U2, { feeRub: 1 }), 'FORBIDDEN'); // U2 больше не организатор
+    // сбор в «моих» у организатора и у создателя
+    assert.ok(svc.myOrganized(ORG).some((x) => x.id === g.id));
+    assert.ok(svc.myOrganized(U3).some((x) => x.id === g.id));
+    assert.equal(svc.myOrganized(U2).length, 0);
+  });
+
+  it('список создателей: id, короткие имена и ссылки; id для имени находится позже', () => {
+    svc.addGameCreators(['@LFProject', 'vk.com/id555', '777', 'https://vk.com/somebody']);
+    assert.equal(svc.canCreateGames(555), true);
+    assert.equal(svc.canCreateGames(777), true);
+    assert.deepEqual(svc.pendingCreatorScreenNames().sort(), ['lfproject', 'somebody']);
+    svc.setCreatorScreenNameId('lfproject', 4321);
+    assert.equal(svc.canCreateGames(4321), true);
+    // id уже в списке: строка с именем просто убирается
+    svc.setCreatorScreenNameId('somebody', 555);
+    assert.deepEqual(svc.pendingCreatorScreenNames(), []);
+    // из миграции: 74073332 уже может создавать сборы
+    assert.equal(svc.canCreateGames(74073332), true);
+  });
+
   it('создаёт игру и рассылает game.created', () => {
     const g = svc.createGame(ORG, gameBody());
     assert.equal(g.organizer.vkId, ORG);
@@ -407,6 +443,7 @@ describe('тестовые игроки', () => {
     const notified: number[][] = [];
     const db = openDatabase(':memory:', MIGRATIONS);
     const t = createService(db, { now: () => clock, testMode: true, notify: (n) => void notified.push(n.userIds) });
+    t.addGameCreators([ORG]);
     t.upsertUser({ vkId: ORG, firstName: 'Орг', lastName: '' });
     t.upsertUser({ vkId: U1, firstName: 'Игрок', lastName: '' });
     const place = t.createPlace(ORG, { name: 'Зал', address: 'ул. 1' }).place.id;

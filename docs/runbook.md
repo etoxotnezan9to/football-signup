@@ -53,6 +53,28 @@ Settings → Secrets and variables → Actions → вкладка Variables → 
 
 В `/opt/football/prod/.env` впишите `TEST_MODE_FORBIDDEN=1`: тогда API на prod не запустится, если туда по ошибке попадёт `TEST_MODE=1`.
 
+## 3в. Кто может создавать сборы
+
+Создавать сборы могут только пользователи из таблицы `game_creators`. Миграция `0014` кладёт туда id `74073332` и короткое имя `lfproject`. Короткое имя сервер при каждом запуске превращает в числовой id через VK API (`users.get`), для этого нужен `VK_SERVICE_KEY` (раздел 3а). В логе при старте будет строка «создатели сборов: короткие имена» с найденными id (`found`) и ненайденными именами (`missing`; например, если это сообщество, а не пользователь).
+
+Добавить создателей проще всего строкой в `/opt/football/<env>/.env`, через запятую id или короткие имена, и пересозданием контейнера (`docker compose up -d --force-recreate api`):
+
+```
+GAME_CREATORS=12345678,@someone
+```
+
+Из переменной создатели только добавляются. Убрать — в базе (сначала сделайте копию, см. «Бэкап сейчас»):
+
+```bash
+docker compose -f /opt/football/<env>/docker-compose.yml exec -T api node -e "
+const { DatabaseSync } = require('node:sqlite');
+const db = new DatabaseSync('/data/football.db');
+console.table(db.prepare('SELECT id, vk_id, screen_name FROM game_creators').all());
+// db.prepare('DELETE FROM game_creators WHERE vk_id = ?').run(12345678);
+db.close();
+"
+```
+
 ## 4. Эксплуатация
 
 | Задача | Команда (в `/opt/football/<env>`) |

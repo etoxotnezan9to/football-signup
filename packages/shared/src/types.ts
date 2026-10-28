@@ -70,6 +70,8 @@ export interface GameDetails extends GameSummary {
   unassigned: TeamSeat[];
   /** Лучший игрок сбора (vkId, выбирает организатор из записавшихся, кто в командах); null — не выбран */
   bestPlayerId: number | null;
+  /** Кто создал сбор (не показывается): управлять сбором могут он и организатор */
+  creatorId: number;
   /** Счёт сыгранных встреч между командами (каждая пара — meetings встреч) */
   results: MatchResult[];
   /** Все встречи в порядке проведения: заданном организатором или по умолчанию (defaultMatchOrder) */

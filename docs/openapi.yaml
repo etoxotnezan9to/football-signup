@@ -59,7 +59,7 @@ paths:
         '401': { $ref: '#/components/responses/Error' }
   /config:
     get:
-      summary: Настройки клиента (включён ли тестовый режим)
+      summary: Настройки клиента для текущего пользователя
       responses:
         '200':
           description: OK
@@ -67,9 +67,28 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [testMode]
+                required: [testMode, canCreateGames]
                 properties:
                   testMode: { type: boolean }
+                  canCreateGames: { type: boolean, description: 'Пользователь в списке создателей сборов' }
+  /users:
+    get:
+      summary: Кого можно назначить организатором (пользователи, уже открывавшие приложение)
+      description: Доступно создателям сборов и тем, кто уже организует или создал сбор; иначе FORBIDDEN.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/User' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
   /games/{gameId}/test-players:
     parameters:
       - { name: gameId, in: path, required: true, schema: { type: integer } }
@@ -170,6 +189,7 @@ paths:
         '401': { $ref: '#/components/responses/Error' }
     post:
       summary: Создать игру
+      description: Только пользователи из списка создателей сборов (иначе FORBIDDEN). Создатель хранится в сборе, но не показывается.
       requestBody:
         required: true
         content:
@@ -183,6 +203,7 @@ paths:
               schema: { $ref: '#/components/schemas/GameDetails' }
         '400': { $ref: '#/components/responses/Error' }
         '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
         '422': { $ref: '#/components/responses/Error' }
         '429': { $ref: '#/components/responses/Error' }
   /games/{gameId}:
@@ -637,6 +658,11 @@ components:
         description: { type: string, maxLength: 1000, default: '' }
         paymentInfo: { type: string, maxLength: 300, default: '' }
         organizerContact: { type: string, maxLength: 120, default: '' }
+        organizerId:
+          type: integer
+          description: >-
+            Организатор сбора (по умолчанию создатель): пользователь, который уже открывал приложение; иначе
+            VALIDATION_ERROR с details.organizerId. В PATCH тоже можно передать, в том числе без других полей
         teamColors:
           type: array
           maxItems: 10
@@ -648,6 +674,7 @@ components:
       type: object
       description: Любое подмножество полей GameInput; при изменении teamsMax или playersPerTeam сервер пересчитывает capacity
       properties:
+        organizerId: { type: integer, description: 'Новый организатор (пользователь, уже открывавший приложение)' }
         startsAt: { type: string, format: date-time }
         placeId: { type: integer, minimum: 1 }
         teamsMax: { type: integer, minimum: 2, maximum: 10 }
@@ -752,7 +779,7 @@ components:
       allOf:
         - $ref: '#/components/schemas/GameSummary'
         - type: object
-          required: [address, teamsMax, playersPerTeam, meetings, description, paymentInfo, organizerContact, roster, teams, unassigned, bestPlayerId, results, matches, matchOrderCustom]
+          required: [address, teamsMax, playersPerTeam, meetings, description, paymentInfo, organizerContact, roster, teams, unassigned, bestPlayerId, creatorId, results, matches, matchOrderCustom]
           properties:
             address: { type: string, description: Адрес места }
             teamsMax: { type: integer }
@@ -777,6 +804,9 @@ components:
               type: integer
               nullable: true
               description: vkId лучшего игрока сбора; null — не выбран или вышел из команд
+            creatorId:
+              type: integer
+              description: Кто создал сбор (в интерфейсе не показывается); управлять сбором могут он и организатор
             results:
               type: array
               description: >-

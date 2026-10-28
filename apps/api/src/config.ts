@@ -19,6 +19,11 @@ export interface Config {
    * (допустимо на staging) и автоматически вместе с AUTH_DEV_BYPASS. Запрещён при TEST_MODE_FORBIDDEN=1 (prod).
    */
   testMode: boolean;
+  /**
+   * Кто ещё может создавать сборы, кроме записанных в таблицу game_creators: GAME_CREATORS через запятую,
+   * id VK или короткие имена (@name). Добавляются в таблицу при запуске.
+   */
+  gameCreators: string[];
 }
 
 export function loadConfig(env: Record<string, string | undefined> = process.env): Config {
@@ -65,5 +70,9 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     notifyTimeZone,
     authDevBypass,
     testMode,
+    gameCreators: (env.GAME_CREATORS ?? '')
+      .split(',')
+      .map((s) => s.trim())
+      .filter((s) => s !== ''),
   };
 }

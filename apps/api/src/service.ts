@@ -63,6 +63,8 @@ interface UserRow {
 interface GameRow {
   id: number;
   organizer_id: number;
+  /** Создатель сбора; управлять сбором могут он и организатор */
+  created_by: number | null;
   starts_at: string;
   place_id: number;
   /** Название места (из JOIN с places) */
@@ -397,6 +399,7 @@ export function createService(db: DatabaseSync, options: ServiceOptions = {}) {
       roster: entries,
       ...teams,
       bestPlayerId: best,
+      creatorId: game.created_by ?? game.organizer_id,
       results: resultsOf(game),
       ...matchesOf(game),
     };
@@ -450,8 +453,31 @@ export function createService(db: DatabaseSync, options: ServiceOptions = {}) {
     emit({ type: 'roster.updated', game: details(game) });
   }
 
+  /** Управлять сбором могут организатор и создатель. */
   function requireOrganizer(game: GameRow, userId: number): void {
-    if (game.organizer_id !== userId) throw new AppError('FORBIDDEN', 'Только организатор может это сделать');
+    if (game.organizer_id !== userId && game.created_by !== userId) {
+      throw new AppError('FORBIDDEN', 'Только организатор может это сделать');
+    }
+  }
+
+  function canCreateGames(userId: number): boolean {
+    return db.prepare('SELECT 1 FROM game_creators WHERE vk_id = ?').get(userId) !== undefined;
+  }
+
+  /** Организатор из тела запроса: пользователь, который уже открывал приложение. undefined — не передан. */
+  function parseOrganizerId(value: unknown): number | undefined {
+    if (value === undefined) return undefined;
+    const ok =
+      typeof value === 'number' &&
+      Number.isInteger(value) &&
+      value > 0 &&
+      db.prepare('SELECT 1 FROM users WHERE vk_id = ?').get(value) !== undefined;
+    if (!ok) {
+      throw new AppError('VALIDATION_ERROR', 'Неверные данные сбора', {
+        organizerId: 'пользователь не найден: он должен хотя бы раз открыть приложение',
+      });
+    }
+    return value as number;
   }
 
   function requireOpen(game: GameRow): void {
@@ -598,6 +624,10 @@ export function createService(db: DatabaseSync, options: ServiceOptions = {}) {
       const input: GameInput = parsed.value;
       // цвета команд, например скопированные из другого сбора: ключи по номерам команд с 1
       const teamColors = parseTeamColors((body as { teamColors?: unknown }).teamColors);
+      if (!canCreateGames(organizerId)) {
+        throw new AppError('FORBIDDEN', 'Создавать сборы могут только пользователи из списка организаторов');
+      }
+      const chosenOrganizer = parseOrganizerId((body as { organizerId?: unknown }).organizerId) ?? organizerId;
       if (teamColors === null) {
         throw new AppError('VALIDATION_ERROR', 'Неверные данные сбора', {
           teamColors: 'цвета из набора, без повторов',
@@ -611,7 +641,7 @@ export function createService(db: DatabaseSync, options: ServiceOptions = {}) {
         const active = db
           .prepare(
             `SELECT COUNT(*) AS n FROM games
-              WHERE organizer_id = ? AND status = 'active' AND starts_at > ?`,
+              WHERE created_by = ? AND status = 'active' AND starts_at > ?`,
           )
           .get(
             organizerId,
@@ -625,11 +655,12 @@ export function createService(db: DatabaseSync, options: ServiceOptions = {}) {
         const ts = now().toISOString();
         const res = db
           .prepare(
-            `INSERT INTO games (organizer_id, starts_at, place_id, teams_max, players_per_team, meetings, fee_rub,
-                                capacity, description, payment_info, organizer_contact, status, created_at, updated_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?)`,
+            `INSERT INTO games (organizer_id, created_by, starts_at, place_id, teams_max, players_per_team, meetings,
+                                fee_rub, capacity, description, payment_info, organizer_contact, status, created_at, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?)`,
           )
           .run(
+            chosenOrganizer,
             organizerId,
             input.startsAt,
             input.placeId,
@@ -711,9 +742,16 @@ export function createService(db: DatabaseSync, options: ServiceOptions = {}) {
     },
 
     updateGame(gameId: number, userId: number, body: unknown): GameDetails {
-      const parsed = parseGameUpdate(body);
-      if (!parsed.ok) throw new AppError('VALIDATION_ERROR', 'Неверные данные сбора', parsed.errors);
-      const patch = parsed.value;
+      // организатор меняется отдельно от остальных полей: можно прислать только его
+      const { organizerId: rawOrganizer, ...rest } =
+        typeof body === 'object' && body !== null ? (body as Record<string, unknown>) : ({} as Record<string, unknown>);
+      const newOrganizer = parseOrganizerId(rawOrganizer);
+      let patch: Partial<GameInput> = {};
+      if (newOrganizer === undefined || Object.keys(rest).length > 0) {
+        const parsed = parseGameUpdate(rawOrganizer === undefined ? body : rest);
+        if (!parsed.ok) throw new AppError('VALIDATION_ERROR', 'Неверные данные сбора', parsed.errors);
+        patch = parsed.value;
+      }
       const before = snapshot(gameId);
       const seatsBefore = mainSeatKeys(gameId);
       const old = inTransaction(db, () => {
@@ -749,6 +787,10 @@ export function createService(db: DatabaseSync, options: ServiceOptions = {}) {
         if (patch.teamsMax !== undefined || patch.playersPerTeam !== undefined) {
           sets.push('capacity = ?');
           values.push(gameCapacity(teams, players));
+        }
+        if (newOrganizer !== undefined) {
+          sets.push('organizer_id = ?');
+          values.push(newOrganizer);
         }
         sets.push('updated_at = ?');
         values.push(now().toISOString(), gameId);
@@ -1201,16 +1243,79 @@ export function createService(db: DatabaseSync, options: ServiceOptions = {}) {
      */
     myOrganized(userId: number): GameSummary[] {
       const rows = db
-        .prepare(`${GAME_SELECT} WHERE g.organizer_id = ? ORDER BY g.starts_at DESC, g.id DESC LIMIT 50`)
-        .all(userId) as unknown as GameRow[];
+        .prepare(
+          `${GAME_SELECT} WHERE (g.organizer_id = ? OR g.created_by = ?) ORDER BY g.starts_at DESC, g.id DESC LIMIT 50`,
+        )
+        .all(userId, userId) as unknown as GameRow[];
       return rows.map((g) => summary(g, userId));
+    },
+
+    canCreateGames,
+
+    /**
+     * Добавить создателей сборов (повторы не дублируются): числа — id VK, строки — короткие имена
+     * (@name, vk.com/name), id для них ищется отдельно (setCreatorScreenNameId).
+     */
+    addGameCreators(list: readonly (number | string)[]): void {
+      const ts = now().toISOString();
+      const byId = db.prepare('INSERT OR IGNORE INTO game_creators (vk_id, created_at) VALUES (?, ?)');
+      const byName = db.prepare('INSERT OR IGNORE INTO game_creators (screen_name, created_at) VALUES (?, ?)');
+      for (const item of list) {
+        if (typeof item === 'number') {
+          if (Number.isInteger(item) && item > 0) byId.run(item, ts);
+        } else {
+          const name = item.trim().replace(/^https?:\/\//, '').replace(/^(m\.)?vk\.(com|ru)\//, '').replace(/^@/, '');
+          if (/^\d+$/.test(name)) byId.run(Number(name), ts);
+          else if (/^id\d+$/i.test(name)) byId.run(Number(name.slice(2)), ts);
+          else if (name !== '') byName.run(name.toLowerCase(), ts);
+        }
+      }
+    },
+
+    /** Короткие имена создателей, для которых ещё не известен id VK. */
+    pendingCreatorScreenNames(): string[] {
+      return (
+        db.prepare('SELECT screen_name FROM game_creators WHERE vk_id IS NULL').all() as unknown as {
+          screen_name: string;
+        }[]
+      ).map((r) => r.screen_name);
+    },
+
+    /** Записать найденный id для короткого имени (если такой id уже есть в списке, строка с именем удаляется). */
+    setCreatorScreenNameId(screenName: string, vkId: number): void {
+      inTransaction(db, () => {
+        const exists = db.prepare('SELECT 1 FROM game_creators WHERE vk_id = ?').get(vkId) !== undefined;
+        if (exists) db.prepare('DELETE FROM game_creators WHERE screen_name = ? AND vk_id IS NULL').run(screenName);
+        else db.prepare('UPDATE game_creators SET vk_id = ? WHERE screen_name = ? AND vk_id IS NULL').run(vkId, screenName);
+      });
+    },
+
+    /**
+     * Пользователи, которых можно назначить организатором (уже открывали приложение), по имени.
+     * Доступно тем, кто может создавать сборы или уже организует либо создал сбор.
+     */
+    organizerCandidates(userId: number): User[] {
+      const allowed =
+        canCreateGames(userId) ||
+        db.prepare('SELECT 1 FROM games WHERE organizer_id = ? OR created_by = ? LIMIT 1').get(userId, userId) !==
+          undefined;
+      if (!allowed) throw new AppError('FORBIDDEN', 'Недостаточно прав');
+      const rows = db
+        .prepare(
+          `SELECT vk_id, first_name, last_name, photo_url FROM users WHERE vk_id > 0
+            ORDER BY first_name COLLATE NOCASE, last_name COLLATE NOCASE, vk_id LIMIT 500`,
+        )
+        .all() as unknown as { vk_id: number; first_name: string; last_name: string; photo_url: string | null }[];
+      return rows.map(toUser);
     },
 
     myGames(userId: number): { organized: GameSummary[]; joined: GameSummary[] } {
       const since = new Date(now().getTime() - FINISH_GRACE_MIN * 60_000).toISOString();
       const organized = db
-        .prepare(`${GAME_SELECT} WHERE g.organizer_id = ? AND g.starts_at > ? ORDER BY g.starts_at, g.id`)
-        .all(userId, since) as unknown as GameRow[];
+        .prepare(
+          `${GAME_SELECT} WHERE (g.organizer_id = ? OR g.created_by = ?) AND g.starts_at > ? ORDER BY g.starts_at, g.id`,
+        )
+        .all(userId, userId, since) as unknown as GameRow[];
       const joined = db
         .prepare(
           `${GAME_SELECT} JOIN signups s ON s.game_id = g.id

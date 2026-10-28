@@ -131,7 +131,11 @@ export function buildApp(deps: AppDeps): FastifyInstance {
         secured.get('/me/games', async (req) => service.myGames(req.vkId));
         secured.get('/me/organized', async (req) => ({ items: service.myOrganized(req.vkId) }));
 
-        secured.get('/config', async () => ({ testMode: config.testMode }));
+        secured.get('/config', async (req) => ({
+          testMode: config.testMode,
+          canCreateGames: service.canCreateGames(req.vkId),
+        }));
+        secured.get('/users', async (req) => ({ items: service.organizerCandidates(req.vkId) }));
 
         secured.post('/games/:gameId/test-players', async (req) => {
           const body = (typeof req.body === 'object' && req.body !== null ? req.body : {}) as {
