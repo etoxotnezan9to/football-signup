@@ -309,7 +309,11 @@ function GameView({ id }: { id: number }) {
         </Div>
         <div className="actions">
           {active && (
-            <Button size="l" onClick={() => openSignup(game.id, mySeats)}>
+            <Button
+              size="l"
+              appearance={mySeats > 0 ? 'positive' : 'accent'}
+              onClick={() => openSignup(game.id, mySeats)}
+            >
               {mySeats > 0 ? `Изменить запись (${mySeats})` : '+ Записаться'}
             </Button>
           )}
