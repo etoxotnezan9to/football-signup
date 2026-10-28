@@ -45,7 +45,7 @@ jobs:
       - run: ci/run.sh e2e pnpm --filter @football/web test:e2e
       - name: Load test (200 concurrent signups, WebSocket observers)
         run: |
-          (cd apps/api && NODE_ENV=development AUTH_DEV_BYPASS=1 VK_APP_ID=54809461 DATABASE_FILE=:memory: \
+          (cd apps/api && NODE_ENV=development AUTH_DEV_BYPASS=1 GAME_CREATORS=900000 VK_APP_ID=54809461 DATABASE_FILE=:memory: \
             HOST=127.0.0.1 PORT=3200 node src/server.ts > /tmp/api-load.log 2>&1 & echo $! > /tmp/api-load.pid)
           for i in $(seq 1 30); do
             if curl -fsS http://127.0.0.1:3200/api/health > /dev/null; then break; fi
