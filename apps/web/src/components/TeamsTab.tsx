@@ -1,5 +1,6 @@
-import { useState, type DragEvent, type KeyboardEvent } from 'react';
-import { Alert, Avatar, Input } from '@vkontakte/vkui';
+import { useRef, useState, type DragEvent, type KeyboardEvent, type PointerEvent } from 'react';
+import { Icon24Reorder, Icon24ReorderIos } from '@vkontakte/icons';
+import { Alert, Avatar, Input, usePlatform } from '@vkontakte/vkui';
 import { TEAM_COLORS, TEAM_NAME_MAX, type GameDetails, type Team, type TeamSeat } from '@football/shared';
 import { api, type ApiError } from '../api.ts';
 import { Empty } from './Empty.tsx';
@@ -9,6 +10,27 @@ import { PlayerLink } from './PlayerLink.tsx';
 
 /** Куда бросили место: номер команды или null — «не распределены». */
 type Target = number | null;
+
+/** Перетаскивание пальцем за значок ☰: какое место, откуда и где сейчас палец. */
+interface TouchDrag {
+  seat: TeamSeat;
+  from: Target;
+  name: string;
+  photoUrl: string | null;
+  x: number;
+  y: number;
+}
+
+/** Зона под точкой экрана: data-drop у секции команды («none» или номер) и можно ли туда бросить. */
+function dropTargetAt(x: number, y: number): { target: Target; accepts: boolean } | undefined {
+  const el = document.elementFromPoint(x, y)?.closest<HTMLElement>('[data-drop]');
+  if (!el) return undefined;
+  const raw = el.dataset.drop!;
+  return { target: raw === 'none' ? null : Number(raw), accepts: el.dataset.accepts === 'true' };
+}
+
+/** У края экрана во время перетаскивания страница прокручивается сама, чтобы дотянуться до дальней команды. */
+const EDGE = 70;
 
 /**
  * Вкладка «Команды». Новые игроки состава распределяются сервером автоматически; организатор перетаскивает
@@ -25,7 +47,10 @@ export function TeamsTab({
   onUpdate: (g: GameDetails) => void;
 }) {
   const { showToast, setPopout } = useApp();
+  const platform = usePlatform();
   const [dragging, setDragging] = useState<TeamSeat | null>(null);
+  const [touchDrag, setTouchDrag] = useState<TouchDrag | null>(null);
+  const touchRef = useRef<TouchDrag | null>(null);
   const [over, setOver] = useState<Target | undefined>(undefined);
   const [renaming, setRenaming] = useState<{ no: number; value: string } | null>(null);
   // команда, у которой открыт выбор цвета
@@ -83,10 +108,60 @@ export function TeamsTab({
     );
   };
 
+  // перетаскивание пальцем (Pointer Events): мышью работает обычное перетаскивание HTML5 по всей строке
+  const updateTouch = (next: TouchDrag | null) => {
+    touchRef.current = next;
+    setTouchDrag(next);
+  };
+
+  const onHandleDown = (e: PointerEvent<HTMLElement>, s: TeamSeat, current: Target) => {
+    if (e.pointerType === 'mouse') return;
+    const entry = bySignup.get(s.signupId);
+    if (!entry) return;
+    e.preventDefault();
+    e.stopPropagation();
+    e.currentTarget.setPointerCapture(e.pointerId);
+    updateTouch({
+      seat: s,
+      from: current,
+      name: seatName(entry.user, s.seat),
+      photoUrl: entry.user.photoUrl,
+      x: e.clientX,
+      y: e.clientY,
+    });
+  };
+
+  const onHandleMove = (e: PointerEvent<HTMLElement>) => {
+    const drag = touchRef.current;
+    if (!drag) return;
+    e.preventDefault();
+    updateTouch({ ...drag, x: e.clientX, y: e.clientY });
+    if (e.clientY < EDGE) window.scrollBy(0, -12);
+    else if (e.clientY > window.innerHeight - EDGE) window.scrollBy(0, 12);
+    const zone = dropTargetAt(e.clientX, e.clientY);
+    setOver(zone && zone.accepts && zone.target !== drag.from ? zone.target : undefined);
+  };
+
+  const onHandleUp = (e: PointerEvent<HTMLElement>) => {
+    const drag = touchRef.current;
+    if (!drag) return;
+    updateTouch(null);
+    setOver(undefined);
+    const zone = dropTargetAt(e.clientX, e.clientY);
+    if (zone && zone.accepts && zone.target !== drag.from) void move(drag.seat, zone.target);
+  };
+
+  const onHandleCancel = () => {
+    updateTouch(null);
+    setOver(undefined);
+  };
+
   /** Свойства зоны, куда можно бросить место. */
   const dropZone = (target: Target, accepts: boolean) =>
     editable
       ? {
+          'data-drop': target === null ? 'none' : String(target),
+          'data-accepts': String(accepts),
           onDragOver: (e: DragEvent) => {
             if (!dragging || !accepts) return;
             e.preventDefault();
@@ -106,10 +181,27 @@ export function TeamsTab({
     const entry = bySignup.get(s.signupId);
     if (!entry) return null;
     const name = seatName(entry.user, s.seat);
+    const isDragged = touchDrag !== null && touchDrag.seat.signupId === s.signupId && touchDrag.seat.seat === s.seat;
+    // значок для перетаскивания пальцем: как у матчей — на iOS справа, на остальных платформах слева
+    const handle = editable ? (
+      <span
+        className="team-seat__handle"
+        role="button"
+        aria-label={`Перетащить: ${name}`}
+        data-testid="seat-dragger"
+        onPointerDown={(e) => onHandleDown(e, s, current)}
+        onPointerMove={onHandleMove}
+        onPointerUp={onHandleUp}
+        onPointerCancel={onHandleCancel}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {platform === 'ios' ? <Icon24ReorderIos /> : <Icon24Reorder />}
+      </span>
+    ) : null;
     return (
       <div
         key={`${s.signupId}:${s.seat}`}
-        className={`team-seat${editable ? ' team-seat--editable' : ''}`}
+        className={`team-seat${editable ? ' team-seat--editable' : ''}${isDragged ? ' team-seat--dragged' : ''}`}
         data-testid="team-seat"
         {...(editable
           ? {
@@ -136,9 +228,15 @@ export function TeamsTab({
             }
           : {})}
       >
+        {platform !== 'ios' && handle}
         <Avatar size={28} src={entry.user.photoUrl ?? undefined} />
         {/* у организатора нажатие открывает меню с «Страница ВКонтакте»; у остальных имя — ссылка */}
-        {!editable && s.seat === 1 ? <PlayerLink user={entry.user}>{name}</PlayerLink> : <span>{name}</span>}
+        {!editable && s.seat === 1 ? (
+          <PlayerLink user={entry.user}>{name}</PlayerLink>
+        ) : (
+          <span className="team-seat__name">{name}</span>
+        )}
+        {platform === 'ios' && handle}
       </div>
     );
   };
@@ -150,7 +248,15 @@ export function TeamsTab({
   return (
     <div className="teams">
       {editable && (
-        <div className="teams__hint">Перетащите игрока в команду или нажмите на него, чтобы выбрать команду</div>
+        <div className="teams__hint">
+          Перетащите игрока в команду (на телефоне — за значок ☰) или нажмите на него, чтобы выбрать команду
+        </div>
+      )}
+      {touchDrag && (
+        <div className="team-seat team-seat--ghost" style={{ left: touchDrag.x, top: touchDrag.y }} aria-hidden="true">
+          <Avatar size={28} src={touchDrag.photoUrl ?? undefined} />
+          <span>{touchDrag.name}</span>
+        </div>
       )}
       <section
         className={`team-box team-box--none${over === null ? ' team-box--over' : ''}`}

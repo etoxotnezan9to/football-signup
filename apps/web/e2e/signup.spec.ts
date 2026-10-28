@@ -1,4 +1,4 @@
-import { expect, test, type Browser, type BrowserContext, type Page } from '@playwright/test';
+import { devices, expect, test, type Browser, type BrowserContext, type Page } from '@playwright/test';
 
 // Тестовые пользователи режима моков (apps/web/src/session.ts)
 const ORGANIZER = 1001; // Иван Петров
@@ -732,3 +732,53 @@ test('цвет команды: выбор по кружку из свободн�
   await expect(org.getByRole('region', { name: 'Команда Чёрные' })).toBeVisible();
   await expect(org.getByRole('region', { name: 'Команда Розовые' })).toBeVisible();
 });
+
+for (const [platform, device] of [
+  ['iPhone', devices['iPhone 15 Pro Max']],
+  ['Android', devices['Pixel 7']],
+] as const) {
+  test(`команды на телефоне (${platform}): игрок перетаскивается пальцем за значок ☰`, async ({ browser }) => {
+    // эмуляция телефона в Chromium: тип браузера из описания устройства не нужен
+    const { defaultBrowserType: _browser, ...phone } = device;
+    const ctx = await browser.newContext({ ...phone });
+    opened.push(ctx);
+    const organizer = platform === 'iPhone' ? ALEXEY : DMITRY;
+    await ctx.addInitScript((id) => localStorage.setItem('mockUser', String(id)), organizer);
+    const org = await ctx.newPage();
+    await org.goto('/');
+    await org.getByRole('button', { name: 'Создать сбор', exact: true }).last().click();
+    await choosePlace(org, `Зал касаний ${platform}`, 'ул. Сенсорная, 1');
+    await org.getByLabel('Взнос, ₽', { exact: true }).fill('0');
+    await org.getByLabel('Количество команд (макс)', { exact: true }).fill('2');
+    await org.getByLabel('Игроков в команде', { exact: true }).fill('2');
+    await org.getByRole('button', { name: 'Создать сбор', exact: true }).last().click();
+    await expect(org).toHaveURL(/#\/game\/\d+$/);
+    // «+3»: двое в первой команде, третий во второй
+    await org.getByRole('button', { name: '+ Записаться', exact: true }).click();
+    await org.getByRole('button', { name: '+3', exact: true }).click();
+    await org.getByRole('tab', { name: 'Команды' }).click();
+    const blue = org.getByRole('region', { name: 'Команда Синие' });
+    const pink = org.getByRole('region', { name: 'Команда Розовые' });
+    await expect(pink.getByTestId('team-seat')).toHaveCount(1);
+
+    // палец на значке ☰ игрока из «Розовых», ведём в «Не распределены» и отпускаем
+    const none = org.getByRole('region', { name: 'Не распределены' });
+    await none.scrollIntoViewIfNeeded();
+    const handle = pink.getByTestId('seat-dragger');
+    await handle.scrollIntoViewIfNeeded();
+    const from = (await handle.boundingBox())!;
+    const to = (await none.boundingBox())!;
+    const cdp = await ctx.newCDPSession(org);
+    const x = from.x + from.width / 2;
+    const y0 = from.y + from.height / 2;
+    const y1 = to.y + to.height / 2;
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y: y0 }] });
+    for (let i = 1; i <= 12; i++) {
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x, y: y0 + ((y1 - y0) * i) / 12 }] });
+    }
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    await expect(pink.getByTestId('team-seat')).toHaveCount(0);
+    await expect(none.getByTestId('team-seat')).toHaveCount(1);
+    await expect(blue.getByTestId('team-seat')).toHaveCount(2);
+  });
+}
