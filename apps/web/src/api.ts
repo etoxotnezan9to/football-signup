@@ -59,7 +59,9 @@ export interface GamesPage {
 export const api = {
   putMe: (profile: { firstName: string; lastName: string; photoUrl: string | null }) =>
     request<User>('PUT', '/me', profile),
-  getConfig: () => request<{ testMode: boolean }>('GET', '/config'),
+  getConfig: () => request<{ testMode: boolean; canCreateGames?: boolean }>('GET', '/config'),
+  /** Кого можно назначить организатором: пользователи, уже открывавшие приложение */
+  listUsers: () => request<{ items: User[] }>('GET', '/users'),
   addTestPlayers: (id: number, count: number, seats: number) =>
     request<GameDetails>('POST', `/games/${id}/test-players`, { count, seats }),
   removeTestPlayers: (id: number) => request<GameDetails>('DELETE', `/games/${id}/test-players`),

@@ -3,21 +3,12 @@ import { Button, FormItem, Group, Header, Input, Select } from '@vkontakte/vkui'
 import { MAX_SEATS_PER_USER, type GameDetails } from '@football/shared';
 import { api, ApiError } from '../api.ts';
 import { useApp } from '../context.ts';
+import { loadServerConfig } from '../serverConfig.ts';
 
 const MAX_PER_REQUEST = 50;
 
-// Включён ли тестовый режим на сервере: спрашиваем один раз за запуск приложения
-let testModePromise: Promise<boolean> | null = null;
-function loadTestMode(): Promise<boolean> {
-  testModePromise ??= api
-    .getConfig()
-    .then((c) => c.testMode)
-    .catch(() => {
-      testModePromise = null;
-      return false;
-    });
-  return testModePromise;
-}
+// Включён ли тестовый режим на сервере: настройки спрашиваются один раз за запуск приложения
+const loadTestMode = (): Promise<boolean> => loadServerConfig().then((c) => c.testMode);
 
 /** Тестовый режим: организатор добавляет в игру сразу много тестовых игроков и может их убрать. */
 export function TestPlayersPanel({ gameId, onChanged }: { gameId: number; onChanged: (g: GameDetails) => void }) {

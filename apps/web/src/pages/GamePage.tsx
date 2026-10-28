@@ -141,7 +141,8 @@ function GameView({ id }: { id: number }) {
     );
   }
 
-  const isOrganizer = game.organizer.vkId === session.user.id;
+  // управлять сбором могут организатор и создатель (создатель нигде не показывается)
+  const isOrganizer = game.organizer.vkId === session.user.id || game.creatorId === session.user.id;
   const active = game.status === 'active' && !game.isFinished;
   const mySeats = game.roster.find((r) => r.user.vkId === session.user.id)?.seats ?? 0;
   const mainRows = numbered(game.roster, (e) => e.mainSeats);

@@ -27,13 +27,15 @@ import {
   type GameDetails,
   type GameInput,
   type Place,
+  type User,
 } from '@football/shared';
 import { api, ApiError } from '../api.ts';
 import { CopyGatheringButton, CopyGatheringPicker } from '../components/CopyGatheringPicker.tsx';
 import { Empty } from '../components/Empty.tsx';
 import { PlaceForm } from '../components/PlaceForm.tsx';
 import { useApp } from '../context.ts';
-import { defaultStartsAt, fromLocalInput, nextWeekOf, routeToHash, toLocalInput } from '../format.ts';
+import { useServerConfig } from '../serverConfig.ts';
+import { defaultStartsAt, fromLocalInput, fullName, nextWeekOf, routeToHash, toLocalInput } from '../format.ts';
 import { useGame } from '../hooks.ts';
 
 interface FormState {
@@ -124,7 +126,11 @@ function capacityHint(form: FormState): string | undefined {
 
 /** Форма создания (без `initial`) и редактирования сбора. */
 export function GameForm({ initial }: { initial?: GameDetails }) {
-  const { navigate, showToast } = useApp();
+  const { navigate, showToast, session } = useApp();
+  const config = useServerConfig();
+  // организатор сбора: по умолчанию тот, кто создаёт; можно выбрать любого, кто уже открывал приложение
+  const [organizerId, setOrganizerId] = useState(String(initial?.organizer.vkId ?? session.user.id));
+  const [users, setUsers] = useState<User[] | null>(null);
   const [form, setForm] = useState<FormState>(() => toForm(initial));
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
@@ -153,6 +159,52 @@ export function GameForm({ initial }: { initial?: GameDetails }) {
       alive = false;
     };
   }, []);
+
+  useEffect(() => {
+    let alive = true;
+    api
+      .listUsers()
+      .then((r) => alive && setUsers(r.items))
+      .catch(() => alive && setUsers([]));
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  /** Варианты организатора: список с сервера плюс текущий организатор и сам пользователь, если их там нет. */
+  const organizerOptions = () => {
+    const me: User = {
+      vkId: session.user.id,
+      firstName: session.user.firstName,
+      lastName: session.user.lastName,
+      photoUrl: session.user.photoUrl,
+    };
+    const all = new Map<number, User>();
+    for (const u of [me, ...(initial ? [initial.organizer] : []), ...(users ?? [])]) all.set(u.vkId, u);
+    return [...all.values()].map((u) => ({
+      value: String(u.vkId),
+      label: u.vkId === session.user.id ? `${fullName(u)} (вы)` : fullName(u),
+    }));
+  };
+
+  const renderOrganizer = () => (
+    <FormItem
+      key="organizerId"
+      htmlFor="organizerId"
+      top="Организатор"
+      status={errors.organizerId ? 'error' : 'default'}
+      bottom={errors.organizerId ?? 'Его видят участники; выбрать можно того, кто уже открывал приложение'}
+    >
+      <CustomSelect
+        id="organizerId"
+        searchable
+        fetching={users === null}
+        options={organizerOptions()}
+        value={organizerId}
+        onChange={(_e, value) => value !== null && setOrganizerId(String(value))}
+      />
+    </FormItem>
+  );
 
   const onPlaceCreated = (place: Place) => {
     setPlaces((prev) => {
@@ -231,9 +283,11 @@ export function GameForm({ initial }: { initial?: GameDetails }) {
     setBusy(true);
     try {
       if (!initial) {
-        const created = await api.createGame(
-          copiedColors ? { ...parsed.value, teamColors: copiedColors } : parsed.value,
-        );
+        const created = await api.createGame({
+          ...parsed.value,
+          organizerId: Number(organizerId),
+          ...(copiedColors ? { teamColors: copiedColors } : {}),
+        });
         showToast('Сбор создан');
         navigate(routeToHash({ name: 'game', id: created.id }));
         return;
@@ -247,6 +301,7 @@ export function GameForm({ initial }: { initial?: GameDetails }) {
           key === 'startsAt' ? Date.parse(String(before)) === Date.parse(String(next)) : before === next;
         if (!same) patch[key] = next;
       }
+      if (Number(organizerId) !== initial.organizer.vkId) patch.organizerId = Number(organizerId);
       if (Object.keys(patch).length === 0) {
         showToast('Изменений нет');
       } else {
@@ -265,6 +320,15 @@ export function GameForm({ initial }: { initial?: GameDetails }) {
       setBusy(false);
     }
   };
+
+  if (!initial && config && !config.canCreateGames) {
+    return (
+      <>
+        <PanelHeader before={<PanelHeaderBack onClick={back} />}>Новый сбор</PanelHeader>
+        <Empty>Создавать сборы могут только организаторы из списка</Empty>
+      </>
+    );
+  }
 
   return (
     <>
@@ -291,7 +355,10 @@ export function GameForm({ initial }: { initial?: GameDetails }) {
         )}
         {FIELDS.map((f) =>
           f.type === 'place' ? (
-            <div key={f.key}>{renderPlace(f)}</div>
+            <div key={f.key}>
+              {renderPlace(f)}
+              {renderOrganizer()}
+            </div>
           ) : (
             <FormItem
               key={f.key}
@@ -339,7 +406,9 @@ function EditGameView({ id }: { id: number }) {
 
   if (loading) return <Empty loading />;
   if (!game) return <Empty error={error ?? 'Сбор не найден'} onRetry={reload} />;
-  if (game.organizer.vkId !== session.user.id || game.status !== 'active') {
+  // управлять сбором могут организатор и создатель
+  const manager = game.organizer.vkId === session.user.id || game.creatorId === session.user.id;
+  if (!manager || game.status !== 'active') {
     return (
       <>
         <PanelHeader before={<PanelHeaderBack onClick={back} />}>Редактирование сбора</PanelHeader>

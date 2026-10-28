@@ -16,6 +16,7 @@ import { useApp } from '../context.ts';
 import { activeFiltersCount, useListFilters } from '../filters.ts';
 import { routeToHash } from '../format.ts';
 import { useGames, useNearestGame } from '../hooks.ts';
+import { useServerConfig } from '../serverConfig.ts';
 import { useSignupFlow } from '../signup.ts';
 import {
   addDays,
@@ -72,6 +73,8 @@ function GamesTab() {
   const { navigate } = useApp();
   const filters = useListFilters();
   const active = activeFiltersCount(filters);
+  // создавать сборы могут только пользователи из списка создателей (сервер это тоже проверяет)
+  const canCreate = useServerConfig()?.canCreateGames === true;
   // пока неделю не выбрали стрелками, открывается неделя ближайшего сбора (он может появиться в реальном времени)
   const [chosen, setChosen] = useState<string | null>(readWeek);
   const now = new Date();
@@ -110,9 +113,15 @@ function GamesTab() {
             </span>
           )}
         </IconButton>
-        <IconButton className="actions__icon" label="Создать сбор" onClick={() => navigate(routeToHash({ name: 'create' }))}>
-          <Icon28AddOutline />
-        </IconButton>
+        {canCreate && (
+          <IconButton
+            className="actions__icon"
+            label="Создать сбор"
+            onClick={() => navigate(routeToHash({ name: 'create' }))}
+          >
+            <Icon28AddOutline />
+          </IconButton>
+        )}
       </div>
       <MockBar />
       <NotificationsPrompt />
@@ -142,7 +151,13 @@ function GamesTab() {
           {loading && <Empty loading />}
           {!loading && error && !data && <Empty error={error} onRetry={reload} />}
           {data && data.length === 0 && nearest === null ? (
-            <Empty>{active > 0 ? 'Нет сборов по выбранным фильтрам' : 'Пока нет предстоящих сборов. Создайте первый!'}</Empty>
+            <Empty>
+              {active > 0
+                ? 'Нет сборов по выбранным фильтрам'
+                : canCreate
+                  ? 'Пока нет предстоящих сборов. Создайте первый!'
+                  : 'Пока нет предстоящих сборов'}
+            </Empty>
           ) : (
             data && (
               <WeekDays

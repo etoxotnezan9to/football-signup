@@ -21,6 +21,8 @@ export default defineConfig({
         ...baseEnv,
         NODE_ENV: 'development',
         AUTH_DEV_BYPASS: '1',
+        // создавать сборы могут Иван, Алексей и Дмитрий; Мария — нет (проверяется в тестах)
+        GAME_CREATORS: '1001,1003,1004',
         VK_APP_ID: '54809461',
         DATABASE_FILE: ':memory:',
         HOST: '127.0.0.1',

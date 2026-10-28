@@ -695,7 +695,7 @@ test('номер телефона в реквизитах предоплаты �
 });
 
 test('цвет команды: выбор по кружку из свободных цветов, название по цвету, перенос при копировании сбора', async ({ browser }) => {
-  const org = await openAs(browser, MARIA);
+  const org = await openAs(browser, ALEXEY);
   await org.getByRole('button', { name: 'Создать сбор', exact: true }).last().click();
   await choosePlace(org, 'Арена цветов', 'ул. Радужная, 3');
   await org.getByLabel('Взнос, ₽', { exact: true }).fill('300');
@@ -782,3 +782,33 @@ for (const [platform, device] of [
     await expect(blue.getByTestId('team-seat')).toHaveCount(2);
   });
 }
+
+test('создавать сборы могут только пользователи из списка; организатором можно назначить другого', async ({ browser }) => {
+  // Мария не в списке создателей: кнопки «Создать сбор» у неё нет
+  const maria = await openAs(browser, MARIA);
+  await expect(maria.getByRole('tab', { name: 'Сборы' })).toBeVisible();
+  await expect(maria.getByRole('button', { name: 'Фильтры' })).toBeVisible();
+  await expect(maria.getByRole('button', { name: 'Создать сбор', exact: true })).toHaveCount(0);
+
+  // Алексей создаёт сбор и назначает организатором Марию; себя создатель нигде не видит
+  const alexey = await openAs(browser, ALEXEY);
+  await alexey.getByRole('button', { name: 'Создать сбор', exact: true }).last().click();
+  await choosePlace(alexey, 'Арена делегирования', 'ул. Поручений, 8');
+  await alexey.getByLabel('Взнос, ₽', { exact: true }).fill('400');
+  await alexey.getByLabel('Организатор', { exact: true }).click();
+  await alexey.getByRole('option', { name: 'Мария Сидорова', exact: true }).click();
+  await alexey.getByRole('button', { name: 'Создать сбор', exact: true }).last().click();
+  await expect(alexey).toHaveURL(/#\/game\/\d+$/);
+  const gamePath = `/${new URL(alexey.url()).hash}`;
+  const organizerRow = alexey.locator('.info-row', { hasText: 'Организатор' });
+  await expect(organizerRow).toContainText('Мария Сидорова');
+  await expect(alexey.getByText('Алексей Смирнов')).toHaveCount(0);
+
+  // управлять сбором могут организатор и создатель, участник — нет
+  await expect(alexey.getByRole('button', { name: 'Редактировать сбор', exact: true })).toBeVisible();
+  const mariaGame = await openAs(browser, MARIA, gamePath);
+  await expect(mariaGame.getByRole('button', { name: 'Редактировать сбор', exact: true })).toBeVisible();
+  const dmitry = await openAs(browser, DMITRY, gamePath);
+  await expect(dmitry.locator('.info-row', { hasText: 'Организатор' })).toContainText('Мария Сидорова');
+  await expect(dmitry.getByRole('button', { name: 'Редактировать сбор', exact: true })).toHaveCount(0);
+});
