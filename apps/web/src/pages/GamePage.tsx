@@ -121,9 +121,8 @@ function GameView({ id }: { id: number }) {
   const [tab, setTab] = useState<'roster' | 'teams' | 'results'>('roster');
   const back = () => navigate(routeToHash({ name: 'list' }));
 
-  const header = (
-    <PanelHeader before={<PanelHeaderBack onClick={back} />}>{game ? gameLabel(game) : 'Сбор'}</PanelHeader>
-  );
+  // в шапке только «Назад»: дата и место — отдельной строкой ниже, целиком, с переносом
+  const header = <PanelHeader before={<PanelHeaderBack onClick={back} />} />;
 
   if (loading) {
     return (
@@ -263,6 +262,7 @@ function GameView({ id }: { id: number }) {
   return (
     <>
       {header}
+      <h1 className="game-title">{gameLabel(game)}</h1>
       <Group>
         <Div>
           {game.status === 'cancelled' && (

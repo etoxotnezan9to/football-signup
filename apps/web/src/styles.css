@@ -497,3 +497,12 @@
 .phone-copy__icon {
   flex: none;
 }
+/* заголовок страницы сбора под шапкой: дата и место целиком */
+.game-title {
+  margin: 8px 16px 0;
+  font-size: 20px;
+  line-height: 26px;
+  font-weight: 600;
+  color: var(--vkui--color_text_primary);
+  overflow-wrap: anywhere;
+}
